@@ -51,6 +51,7 @@ An AI-assisted workflow and interactive browser studio for turning packed 2D pix
 - **Selected Element**: Shows the element role/selector, rendered size (`W × H px`), **Safe Interior** (`W × H px` strictly inside 9-slice borders), and pixel scale.
   - Displays a live warning if a child element touches or overlaps the `.px-9slice` frame border.
   - If the selected element is a screen navigation button (`data-ui-state-trigger`), an **`Open View: <name> →`** button lets you jump to that target view without leaving `Edit UI`.
+- **Widget `Transform` (`RectTransform`)**: Collapsible layout inspector card with a **`4×4` (16-preset) Anchor Preset** picker (`Click` preserves visual position while updating `PosX`/`PosY`; `Alt/Shift+Click` snaps directly to that anchor or stretch axis), `PosX`, `PosY` (bottom-left `Y`-up coordinates), `Width`, `Height`, aspect-ratio lock (`🔗`), reset (`↻`), `⋯` menu (`Snap to Active Anchor`, `Reset Transform`, `Copy Transform JSON`), `AnchorMin`, `AnchorMax`, `Pivot`, and `Rotate`. Synchronized two-way with interactive canvas gizmos (anchor crosshairs, pivot marker, drag-to-move, and 8 rotation-aware resize handles) and saved to `ui-edits.js` / `ui-edits.json`.
 - **Sprite Metadata**: Shows `Slice ID`, native size, category, and source PNG filename (plus state tabs if `data-slice-pressed` / `data-slice-on` / `data-slice-off` are present).
 - **Unity-Style 9-Slice Editor**:
   - Zoomed checkerboard preview with **4 draggable green slice guides** (`T`, `R`, `B`, `L`) and exact numeric inputs (`Top`, `Right`, `Bottom`, `Left`).

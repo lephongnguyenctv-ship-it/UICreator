@@ -26,6 +26,11 @@
     initialSlice9Defaults: new Map(),
     originalWidgetAttrs: new WeakMap(),
     originalWidgetText: new WeakMap(),
+    widgetTransforms: new WeakMap(),
+    pendingSavedTransforms: new WeakMap(),
+    transformCollapsed: false,
+    anchorPresetOpen: false,
+    transformMenuOpen: false,
     inlineEdit: null,
     spritePicker: {
       category: 'all',
@@ -200,15 +205,19 @@
     return slug || 'default';
   }
 
+  function isInternalOverlayElement(el) {
+    return Boolean(el && (el.id === '__verify_annotations__' || el.id === '__px_transform_gizmo__'));
+  }
+
   function getElementCanvasPath(el) {
     const canvas = document.getElementById('game-canvas');
-    if (!canvas || !el || !canvas.contains(el) || el === canvas) return '';
+    if (!canvas || !el || !canvas.contains(el) || el === canvas || isInternalOverlayElement(el)) return '';
     const parts = [];
     let cur = el;
     while (cur && cur !== canvas) {
       const parent = cur.parentElement;
       if (!parent) return '';
-      const kids = Array.from(parent.children).filter(c => c.id !== '__verify_annotations__');
+      const kids = Array.from(parent.children).filter(c => !isInternalOverlayElement(c));
       const idx = kids.indexOf(cur);
       if (idx < 0) return '';
       parts.unshift(String(idx));
@@ -224,7 +233,7 @@
     let cur = canvas;
     for (const idx of parts) {
       if (Number.isNaN(idx) || idx < 0) return null;
-      const kids = Array.from(cur.children).filter(c => c.id !== '__verify_annotations__');
+      const kids = Array.from(cur.children).filter(c => !isInternalOverlayElement(c));
       if (idx >= kids.length) return null;
       cur = kids[idx];
     }
@@ -244,6 +253,7 @@
     return {
       textEdits: Object.assign({}, diskEdits.textEdits || {}, localEdits.textEdits || {}),
       spriteEdits: Object.assign({}, diskEdits.spriteEdits || {}, localEdits.spriteEdits || {}),
+      transformEdits: Object.assign({}, diskEdits.transformEdits || {}, localEdits.transformEdits || {}),
     };
   }
 
@@ -252,6 +262,7 @@
     const normalized = {
       textEdits: edits && edits.textEdits ? edits.textEdits : {},
       spriteEdits: edits && edits.spriteEdits ? edits.spriteEdits : {},
+      transformEdits: edits && edits.transformEdits ? edits.transformEdits : {},
     };
     global.PIXELUI_EDITS = global.PIXELUI_EDITS || {};
     global.PIXELUI_EDITS[slug] = normalized;
@@ -259,7 +270,8 @@
       if (!global.localStorage) return;
       if (
         Object.keys(normalized.textEdits).length === 0 &&
-        Object.keys(normalized.spriteEdits).length === 0
+        Object.keys(normalized.spriteEdits).length === 0 &&
+        Object.keys(normalized.transformEdits).length === 0
       ) {
         global.localStorage.removeItem(UI_EDITS_STORAGE_PREFIX + slug);
       } else {
@@ -302,6 +314,23 @@
     attrs._classes = {
       px9: el.classList.contains('px-9slice'),
       pxBtnSq: el.classList.contains('px-btn-square'),
+    };
+    attrs._tfStyles = {
+      position: el.style.position || '',
+      left: el.style.left || '',
+      top: el.style.top || '',
+      right: el.style.right || '',
+      bottom: el.style.bottom || '',
+      width: el.style.width || '',
+      height: el.style.height || '',
+      minWidth: el.style.minWidth || '',
+      minHeight: el.style.minHeight || '',
+      maxWidth: el.style.maxWidth || '',
+      maxHeight: el.style.maxHeight || '',
+      flex: el.style.flex || '',
+      display: el.style.display || '',
+      transformOrigin: el.style.transformOrigin || '',
+      rotate: el.style.rotate || '',
     };
     state.originalWidgetAttrs.set(el, attrs);
   }
@@ -656,6 +685,822 @@
     }
   }
 
+  /* ========================================================================
+     Craftland RectTransform System (16 Presets, Live Math, Gizmos & Edits)
+     ======================================================================== */
+
+  const ANCHOR_PRESETS = [
+    { id: 'top-left',       hLabel: 'Left',    vLabel: 'Top',     aMin: [0, 1],     aMax: [0, 1] },
+    { id: 'top-center',     hLabel: 'Center',  vLabel: 'Top',     aMin: [0.5, 1],   aMax: [0.5, 1] },
+    { id: 'top-right',      hLabel: 'Right',   vLabel: 'Top',     aMin: [1, 1],     aMax: [1, 1] },
+    { id: 'top-stretch',    hLabel: 'Stretch', vLabel: 'Top',     aMin: [0, 1],     aMax: [1, 1] },
+    { id: 'middle-left',    hLabel: 'Left',    vLabel: 'Middle',  aMin: [0, 0.5],   aMax: [0, 0.5] },
+    { id: 'middle-center',  hLabel: 'Center',  vLabel: 'Middle',  aMin: [0.5, 0.5], aMax: [0.5, 0.5] },
+    { id: 'middle-right',   hLabel: 'Right',   vLabel: 'Middle',  aMin: [1, 0.5],   aMax: [1, 0.5] },
+    { id: 'middle-stretch', hLabel: 'Stretch', vLabel: 'Middle',  aMin: [0, 0.5],   aMax: [1, 0.5] },
+    { id: 'bottom-left',    hLabel: 'Left',    vLabel: 'Bottom',  aMin: [0, 0],     aMax: [0, 0] },
+    { id: 'bottom-center',  hLabel: 'Center',  vLabel: 'Bottom',  aMin: [0.5, 0],   aMax: [0.5, 0] },
+    { id: 'bottom-right',   hLabel: 'Right',   vLabel: 'Bottom',  aMin: [1, 0],     aMax: [1, 0] },
+    { id: 'bottom-stretch', hLabel: 'Stretch', vLabel: 'Bottom',  aMin: [0, 0],     aMax: [1, 0] },
+    { id: 'stretch-left',   hLabel: 'Left',    vLabel: 'Stretch', aMin: [0, 0],     aMax: [0, 1] },
+    { id: 'stretch-center', hLabel: 'Center',  vLabel: 'Stretch', aMin: [0.5, 0],   aMax: [0.5, 1] },
+    { id: 'stretch-right',  hLabel: 'Right',   vLabel: 'Stretch', aMin: [1, 0],     aMax: [1, 1] },
+    { id: 'stretch-both',   hLabel: 'Stretch', vLabel: 'Stretch', aMin: [0, 0],     aMax: [1, 1] },
+  ];
+
+  function tfNear(a, b, eps = 0.002) {
+    return Math.abs(a - b) <= eps;
+  }
+
+  function clamp01(v) {
+    return Math.max(0, Math.min(1, v));
+  }
+
+  function roundTfNum(v, decimals = 2) {
+    if (!Number.isFinite(v)) return 0;
+    const f = Math.pow(10, decimals);
+    const r = Math.round(v * f) / f;
+    return Object.is(r, -0) ? 0 : r;
+  }
+
+  function formatTfVal(v, decimals = 2) {
+    return String(roundTfNum(v, decimals));
+  }
+
+  function getCanvasZoomFactor() {
+    const canvas = document.getElementById('game-canvas');
+    if (!canvas) return 1;
+    const r = canvas.getBoundingClientRect();
+    const baseW = canvas.offsetWidth || 1280;
+    return r.width > 0 && baseW > 0 ? r.width / baseW : 1;
+  }
+
+  function getTransformParent(el) {
+    const canvas = document.getElementById('game-canvas');
+    if (!el || !canvas) return canvas;
+    if (el.parentElement && canvas.contains(el.parentElement)) {
+      return el.parentElement;
+    }
+    return canvas;
+  }
+
+  function findMatchingAnchorPreset(anchorMin, anchorMax) {
+    const [x0, y0] = anchorMin;
+    const [x1, y1] = anchorMax;
+    return (
+      ANCHOR_PRESETS.find(
+        p =>
+          tfNear(x0, p.aMin[0]) &&
+          tfNear(y0, p.aMin[1]) &&
+          tfNear(x1, p.aMax[0]) &&
+          tfNear(y1, p.aMax[1])
+      ) || null
+    );
+  }
+
+  function getAnchorAxisLabels(anchorMin, anchorMax) {
+    const preset = findMatchingAnchorPreset(anchorMin, anchorMax);
+    if (preset) {
+      return { hLabel: preset.hLabel, vLabel: preset.vLabel, preset };
+    }
+    const [x0, y0] = anchorMin;
+    const [x1, y1] = anchorMax;
+    let hLabel = 'Custom';
+    if (tfNear(x0, 0) && tfNear(x1, 0)) hLabel = 'Left';
+    else if (tfNear(x0, 0.5) && tfNear(x1, 0.5)) hLabel = 'Center';
+    else if (tfNear(x0, 1) && tfNear(x1, 1)) hLabel = 'Right';
+    else if (tfNear(x0, 0) && tfNear(x1, 1)) hLabel = 'Stretch';
+
+    let vLabel = 'Custom';
+    if (tfNear(y0, 1) && tfNear(y1, 1)) vLabel = 'Top';
+    else if (tfNear(y0, 0.5) && tfNear(y1, 0.5)) vLabel = 'Middle';
+    else if (tfNear(y0, 0) && tfNear(y1, 0)) vLabel = 'Bottom';
+    else if (tfNear(y0, 0) && tfNear(y1, 1)) vLabel = 'Stretch';
+
+    return { hLabel, vLabel, preset: null };
+  }
+
+  function renderAnchorPresetSvg(aMin, aMax, size = 36) {
+    const x0 = clamp01(aMin[0]);
+    const y0 = clamp01(aMin[1]);
+    const x1 = clamp01(aMax[0]);
+    const y1 = clamp01(aMax[1]);
+    const stretchX = Math.abs(x1 - x0) > 0.002;
+    const stretchY = Math.abs(y1 - y0) > 0.002;
+
+    let ix;
+    let iw;
+    if (stretchX) {
+      ix = 6;
+      iw = 24;
+    } else if (stretchY) {
+      iw = 10;
+      const cx = 4 + x0 * 28;
+      ix = tfNear(x0, 0) ? 7 : tfNear(x0, 1) ? 19 : Math.max(6, Math.min(20, cx - iw / 2));
+    } else {
+      iw = 12;
+      ix = tfNear(x0, 0) ? 6 : tfNear(x0, 1) ? 18 : 4 + x0 * 28 - iw / 2;
+      ix = Math.max(6, Math.min(18, ix));
+    }
+
+    let iy;
+    let ih;
+    if (stretchY) {
+      iy = 6;
+      ih = 24;
+    } else if (stretchX) {
+      ih = 10;
+      const cy = 32 - y0 * 28;
+      iy = tfNear(y0, 1) ? 7 : tfNear(y0, 0) ? 19 : Math.max(6, Math.min(20, cy - ih / 2));
+    } else {
+      ih = 12;
+      iy = tfNear(y0, 1) ? 6 : tfNear(y0, 0) ? 18 : 32 - y0 * 28 - ih / 2;
+      iy = Math.max(6, Math.min(18, iy));
+    }
+
+    const lines = [];
+    if (!stretchX && !stretchY) {
+      const ax = roundTfNum(4 + x0 * 28, 2);
+      const ay = roundTfNum(32 - y0 * 28, 2);
+      lines.push(`<line x1="${ax}" y1="4" x2="${ax}" y2="32" stroke="#f59e0b" stroke-width="1.2"/>`);
+      lines.push(`<line x1="4" y1="${ay}" x2="32" y2="${ay}" stroke="#f59e0b" stroke-width="1.2"/>`);
+    }
+
+    const arrows = [];
+    if (stretchX) {
+      const cy = roundTfNum(iy + ih / 2, 2);
+      arrows.push(
+        `<line x1="7.5" y1="${cy}" x2="28.5" y2="${cy}" stroke="#10b981" stroke-width="1.4"/>` +
+          `<polyline points="10.5,${cy - 2.6} 7.2,${cy} 10.5,${cy + 2.6}" fill="none" stroke="#10b981" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>` +
+          `<polyline points="25.5,${cy - 2.6} 28.8,${cy} 25.5,${cy + 2.6}" fill="none" stroke="#10b981" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>`
+      );
+    }
+    if (stretchY) {
+      const cx = roundTfNum(ix + iw / 2, 2);
+      arrows.push(
+        `<line x1="${cx}" y1="7.5" x2="${cx}" y2="28.5" stroke="#10b981" stroke-width="1.4"/>` +
+          `<polyline points="${cx - 2.6},10.5 ${cx},7.2 ${cx + 2.6},10.5" fill="none" stroke="#10b981" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>` +
+          `<polyline points="${cx - 2.6},25.5 ${cx},28.8 ${cx + 2.6},25.5" fill="none" stroke="#10b981" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>`
+      );
+    }
+
+    const dotMap = new Map();
+    [
+      [x0, y0],
+      [x1, y0],
+      [x0, y1],
+      [x1, y1],
+    ].forEach(([px, py]) => {
+      const sx = roundTfNum(4 + px * 28, 2);
+      const sy = roundTfNum(32 - py * 28, 2);
+      dotMap.set(`${sx},${sy}`, `<rect x="${sx - 1.7}" y="${sy - 1.7}" width="3.4" height="3.4" fill="#3b82f6" rx="0.5"/>`);
+    });
+
+    return `
+      <svg viewBox="0 0 36 36" width="${size}" height="${size}" aria-hidden="true">
+        <rect x="4" y="4" width="28" height="28" fill="none" stroke="#5b6270" stroke-width="1"/>
+        ${lines.join('')}
+        <rect x="${roundTfNum(ix, 2)}" y="${roundTfNum(iy, 2)}" width="${roundTfNum(iw, 2)}" height="${roundTfNum(ih, 2)}" fill="none" stroke="#9aa4b8" stroke-width="1.2"/>
+        ${arrows.join('')}
+        ${Array.from(dotMap.values()).join('')}
+      </svg>
+    `;
+  }
+
+  function measureElementTransformBox(el, anchorMin, anchorMax, pivot, existingRotate = 0) {
+    const parent = getTransformParent(el);
+    if (!parent || !el) return null;
+    const zoom = getCanvasZoomFactor();
+    const pRect = parent.getBoundingClientRect();
+    if (pRect.width <= 0 || pRect.height <= 0) return null;
+
+    const prevRotate = el.style.rotate;
+    const rotDeg = existingRotate || parseFloat(prevRotate || '0') || 0;
+    if (prevRotate) el.style.rotate = '0deg';
+    const eRect = el.getBoundingClientRect();
+    if (prevRotate) el.style.rotate = prevRotate;
+
+    const parentW = pRect.width / zoom;
+    const parentH = pRect.height / zoom;
+    const width = Math.max(1, Math.round(eRect.width / zoom));
+    const height = Math.max(1, Math.round(eRect.height / zoom));
+    const cssLeft = (eRect.left - pRect.left) / zoom;
+    const cssTop = (eRect.top - pRect.top) / zoom;
+
+    const anchorPxX = ((anchorMin[0] + anchorMax[0]) / 2) * parentW;
+    const anchorPxY = ((anchorMin[1] + anchorMax[1]) / 2) * parentH;
+    const pivotPxX = cssLeft + pivot[0] * width;
+    const pivotPxY = parentH - cssTop - (1 - pivot[1]) * height;
+
+    return {
+      parentW,
+      parentH,
+      cssLeft,
+      cssTop,
+      posX: Math.round(pivotPxX - anchorPxX),
+      posY: Math.round(pivotPxY - anchorPxY),
+      width,
+      height,
+      rotate: rotDeg,
+    };
+  }
+
+  function getWidgetTransformState(el) {
+    if (!el) return null;
+    const existing = state.widgetTransforms.get(el);
+    if (existing) {
+      if (!existing.dirty) {
+        const measured = measureElementTransformBox(
+          el,
+          existing.anchorMin,
+          existing.anchorMax,
+          existing.pivot,
+          existing.rotate
+        );
+        if (measured) {
+          existing.posX = measured.posX;
+          existing.posY = measured.posY;
+          existing.width = measured.width;
+          existing.height = measured.height;
+          if (!existing.lockAspect) {
+            existing.aspectRatio = measured.height > 0 ? measured.width / measured.height : 1;
+          }
+        }
+      }
+      return existing;
+    }
+
+    const anchorMin = [0.5, 0.5];
+    const anchorMax = [0.5, 0.5];
+    const pivot = [0.5, 0.5];
+    const measured = measureElementTransformBox(el, anchorMin, anchorMax, pivot, 0);
+    const tf = {
+      posX: measured ? measured.posX : 0,
+      posY: measured ? measured.posY : 0,
+      width: measured ? measured.width : 100,
+      height: measured ? measured.height : 40,
+      anchorMin,
+      anchorMax,
+      pivot,
+      rotate: measured ? measured.rotate : 0,
+      lockAspect: false,
+      aspectRatio: measured && measured.height > 0 ? measured.width / measured.height : 1,
+      dirty: false,
+    };
+    state.widgetTransforms.set(el, tf);
+    return tf;
+  }
+
+  function applyWidgetTransformToDom(el, tf, options = {}) {
+    if (!el || !tf) return false;
+    const parent = getTransformParent(el);
+    if (!parent) return false;
+
+    const pRect = parent.getBoundingClientRect();
+    if (pRect.width <= 0 || pRect.height <= 0) {
+      state.widgetTransforms.set(el, tf);
+      if (tf.dirty) {
+        state.pendingSavedTransforms.set(el, tf);
+      }
+      return false;
+    }
+
+    snapshotWidgetOriginals(el);
+    state.widgetTransforms.set(el, tf);
+    state.pendingSavedTransforms.delete(el);
+
+    if (!options.applyCss) {
+      return true;
+    }
+
+    const zoom = getCanvasZoomFactor();
+    const parentW = pRect.width / zoom;
+    const parentH = pRect.height / zoom;
+
+    const width = Math.max(1, Math.round(tf.width));
+    const height = Math.max(1, Math.round(tf.height));
+    const [aMinX, aMinY] = tf.anchorMin;
+    const [aMaxX, aMaxY] = tf.anchorMax;
+    const [pivX, pivY] = tf.pivot;
+
+    const anchorPxX = ((aMinX + aMaxX) / 2) * parentW;
+    const anchorPxY = ((aMinY + aMaxY) / 2) * parentH;
+    const pivotPxX = anchorPxX + tf.posX;
+    const pivotPxY = anchorPxY + tf.posY;
+    const targetCssLeft = pivotPxX - pivX * width;
+    const targetCssTop = parentH - pivotPxY - (1 - pivY) * height;
+
+    const cs = getComputedStyle(el);
+    if (cs.display === 'inline') {
+      el.style.display = 'inline-block';
+    }
+    if (cs.position === 'static') {
+      el.style.position = 'relative';
+    }
+    el.style.flex = '0 0 auto';
+    el.style.minWidth = '0px';
+    el.style.minHeight = '0px';
+    el.style.maxWidth = 'none';
+    el.style.maxHeight = 'none';
+    el.style.width = `${width}px`;
+    el.style.height = `${height}px`;
+
+    // Measure un-offset flow origin with rotation temporarily zeroed so bounding rects stay axis-aligned
+    el.style.rotate = '0deg';
+    el.style.right = 'auto';
+    el.style.bottom = 'auto';
+    el.style.left = '0px';
+    el.style.top = '0px';
+
+    const curRect = el.getBoundingClientRect();
+    const curParentRect = parent.getBoundingClientRect();
+    const naturalLeft = (curRect.left - curParentRect.left) / zoom;
+    const naturalTop = (curRect.top - curParentRect.top) / zoom;
+
+    el.style.left = `${Math.round(targetCssLeft - naturalLeft)}px`;
+    el.style.top = `${Math.round(targetCssTop - naturalTop)}px`;
+    el.style.transformOrigin = `${roundTfNum(pivX * 100, 2)}% ${roundTfNum((1 - pivY) * 100, 2)}%`;
+    el.style.rotate = tf.rotate ? `${roundTfNum(tf.rotate, 2)}deg` : '';
+
+    return true;
+  }
+
+  function saveWidgetTransformEdit(el, tf, persistToServer = false) {
+    if (!el || !tf) return Promise.resolve({ ok: true, method: 'browser-storage' });
+    const pathKey = getElementCanvasPath(el);
+    if (pathKey) {
+      const edits = loadUiEdits();
+      edits.transformEdits[pathKey] = {
+        posX: roundTfNum(tf.posX, 2),
+        posY: roundTfNum(tf.posY, 2),
+        width: Math.max(1, Math.round(tf.width)),
+        height: Math.max(1, Math.round(tf.height)),
+        anchorMin: [roundTfNum(tf.anchorMin[0], 4), roundTfNum(tf.anchorMin[1], 4)],
+        anchorMax: [roundTfNum(tf.anchorMax[0], 4), roundTfNum(tf.anchorMax[1], 4)],
+        pivot: [roundTfNum(tf.pivot[0], 4), roundTfNum(tf.pivot[1], 4)],
+        rotate: roundTfNum(tf.rotate || 0, 2),
+        lockAspect: Boolean(tf.lockAspect),
+        aspectRatio: roundTfNum(tf.aspectRatio || 1, 4),
+      };
+      saveUiEdits(edits);
+    }
+    if (persistToServer) {
+      return persistUiEditsToDisk();
+    }
+    return Promise.resolve({ ok: true, method: 'browser-storage' });
+  }
+
+  function flushPendingTransforms() {
+    if (!state.pendingSavedTransforms) return;
+    document.querySelectorAll('#game-canvas *').forEach(el => {
+      const pending = state.pendingSavedTransforms.get(el);
+      if (pending) {
+        applyWidgetTransformToDom(el, pending, { applyCss: Boolean(pending.dirty) });
+      }
+    });
+  }
+
+  function recalculatePosForNewAnchor(el, tf, nextAnchorMin, nextAnchorMax) {
+    const parent = getTransformParent(el);
+    if (!parent) return;
+    const pRect = parent.getBoundingClientRect();
+    const zoom = getCanvasZoomFactor();
+    const parentW = pRect.width > 0 ? pRect.width / zoom : 1280;
+    const parentH = pRect.height > 0 ? pRect.height / zoom : 720;
+
+    // Compute current visual pivot in parent Craftland coordinates from old anchor+pos
+    const oldAnchorX = ((tf.anchorMin[0] + tf.anchorMax[0]) / 2) * parentW;
+    const oldAnchorY = ((tf.anchorMin[1] + tf.anchorMax[1]) / 2) * parentH;
+    const pivotPxX = oldAnchorX + tf.posX;
+    const pivotPxY = oldAnchorY + tf.posY;
+
+    const newAnchorX = ((nextAnchorMin[0] + nextAnchorMax[0]) / 2) * parentW;
+    const newAnchorY = ((nextAnchorMin[1] + nextAnchorMax[1]) / 2) * parentH;
+
+    tf.anchorMin = [roundTfNum(nextAnchorMin[0], 4), roundTfNum(nextAnchorMin[1], 4)];
+    tf.anchorMax = [roundTfNum(nextAnchorMax[0], 4), roundTfNum(nextAnchorMax[1], 4)];
+    tf.posX = Math.round(pivotPxX - newAnchorX);
+    tf.posY = Math.round(pivotPxY - newAnchorY);
+  }
+
+  function snapWidgetTransformToAnchor(el, tf, aMin, aMax) {
+    const parent = getTransformParent(el);
+    if (!parent) return;
+    const pRect = parent.getBoundingClientRect();
+    const zoom = getCanvasZoomFactor();
+    const parentW = pRect.width > 0 ? pRect.width / zoom : 1280;
+    const parentH = pRect.height > 0 ? pRect.height / zoom : 720;
+
+    tf.anchorMin = [roundTfNum(aMin[0], 4), roundTfNum(aMin[1], 4)];
+    tf.anchorMax = [roundTfNum(aMax[0], 4), roundTfNum(aMax[1], 4)];
+
+    const [aMinX, aMinY] = tf.anchorMin;
+    const [aMaxX, aMaxY] = tf.anchorMax;
+    const [pivX, pivY] = tf.pivot;
+    const stretchX = tfNear(aMinX, 0) && tfNear(aMaxX, 1);
+    const stretchY = tfNear(aMinY, 0) && tfNear(aMaxY, 1);
+
+    if (stretchX) {
+      tf.width = Math.max(1, Math.round(parentW));
+    }
+    if (stretchY) {
+      tf.height = Math.max(1, Math.round(parentH));
+    }
+    if (tf.lockAspect && tf.aspectRatio > 0) {
+      if (stretchX && !stretchY) {
+        tf.height = Math.max(1, Math.round(tf.width / tf.aspectRatio));
+      } else if (stretchY && !stretchX) {
+        tf.width = Math.max(1, Math.round(tf.height * tf.aspectRatio));
+      } else if (stretchX && stretchY) {
+        tf.aspectRatio = tf.height > 0 ? tf.width / tf.height : 1;
+      }
+    } else {
+      tf.aspectRatio = tf.height > 0 ? tf.width / tf.height : 1;
+    }
+
+    if (stretchX) {
+      tf.posX = Math.round((pivX - 0.5) * tf.width);
+    } else if (tfNear(aMinX, 0) && tfNear(aMaxX, 0)) {
+      tf.posX = Math.round(pivX * tf.width);
+    } else if (tfNear(aMinX, 0.5) && tfNear(aMaxX, 0.5)) {
+      tf.posX = Math.round((pivX - 0.5) * tf.width);
+    } else if (tfNear(aMinX, 1) && tfNear(aMaxX, 1)) {
+      tf.posX = Math.round((pivX - 1) * tf.width);
+    } else {
+      tf.posX = 0;
+    }
+
+    if (stretchY) {
+      tf.posY = Math.round((pivY - 0.5) * tf.height);
+    } else if (tfNear(aMinY, 1) && tfNear(aMaxY, 1)) {
+      tf.posY = -Math.round((1 - pivY) * tf.height);
+    } else if (tfNear(aMinY, 0.5) && tfNear(aMaxY, 0.5)) {
+      tf.posY = Math.round((pivY - 0.5) * tf.height);
+    } else if (tfNear(aMinY, 0) && tfNear(aMaxY, 0)) {
+      tf.posY = Math.round(pivY * tf.height);
+    } else {
+      tf.posY = 0;
+    }
+
+    tf.dirty = true;
+    applyWidgetTransformToDom(el, tf, { applyCss: true });
+  }
+
+  function resetSingleElementTransform(el, edits) {
+    if (!el) return;
+    const pKey = getElementCanvasPath(el);
+    if (pKey && edits && edits.transformEdits && edits.transformEdits[pKey] !== undefined) {
+      delete edits.transformEdits[pKey];
+    }
+    const orig = state.originalWidgetAttrs.get(el);
+    if (orig && orig._tfStyles) {
+      Object.entries(orig._tfStyles).forEach(([prop, val]) => {
+        el.style[prop] = val || '';
+      });
+    }
+    state.widgetTransforms.delete(el);
+    state.pendingSavedTransforms.delete(el);
+  }
+
+  function ensureTransformGizmoLayer() {
+    const canvas = document.getElementById('game-canvas');
+    if (!canvas || isCleanMode()) return null;
+    let layer = document.getElementById('__px_transform_gizmo__');
+    if (!layer) {
+      layer = document.createElement('div');
+      layer.id = '__px_transform_gizmo__';
+      layer.setAttribute('aria-hidden', 'true');
+      canvas.appendChild(layer);
+    }
+    return layer;
+  }
+
+  function renderTransformGizmo() {
+    const canvas = document.getElementById('game-canvas');
+    const layer = document.getElementById('__px_transform_gizmo__') || (isEditMode() && !isCleanMode() ? ensureTransformGizmoLayer() : null);
+    if (!canvas || !layer) {
+      if (canvas) canvas.classList.remove('has-gizmo');
+      return;
+    }
+
+    const el = state.selectedEl;
+    if (
+      isCleanMode() ||
+      !isEditMode() ||
+      state.inspectorMode !== 'widget' ||
+      !el ||
+      !document.body.contains(el) ||
+      !canvas.contains(el)
+    ) {
+      layer.classList.remove('is-active');
+      layer.innerHTML = '';
+      canvas.classList.remove('has-gizmo');
+      return;
+    }
+
+    const parent = getTransformParent(el);
+    if (!parent) return;
+    const cRect = canvas.getBoundingClientRect();
+    const pRect = parent.getBoundingClientRect();
+    if (pRect.width <= 0 || pRect.height <= 0) {
+      layer.classList.remove('is-active');
+      layer.innerHTML = '';
+      canvas.classList.remove('has-gizmo');
+      return;
+    }
+
+    const tf = getWidgetTransformState(el);
+    if (!tf) return;
+
+    const zoom = getCanvasZoomFactor();
+    const parentLeft = (pRect.left - cRect.left) / zoom;
+    const parentTop = (pRect.top - cRect.top) / zoom;
+    const parentW = pRect.width / zoom;
+    const parentH = pRect.height / zoom;
+
+    const [aMinX, aMinY] = tf.anchorMin;
+    const [aMaxX, aMaxY] = tf.anchorMax;
+    const [pivX, pivY] = tf.pivot;
+
+    const aLeft = parentLeft + aMinX * parentW;
+    const aRight = parentLeft + aMaxX * parentW;
+    const aTop = parentTop + (1 - aMaxY) * parentH;
+    const aBottom = parentTop + (1 - aMinY) * parentH;
+
+    const anchorPxX = ((aMinX + aMaxX) / 2) * parentW;
+    const anchorPxY = ((aMinY + aMaxY) / 2) * parentH;
+    const boxLeft = parentLeft + anchorPxX + tf.posX - pivX * tf.width;
+    const boxTop = parentTop + (parentH - (anchorPxY + tf.posY)) - (1 - pivY) * tf.height;
+
+    const anchorPieces = [];
+    const sameAnchorPt = tfNear(aMinX, aMaxX) && tfNear(aMinY, aMaxY);
+    if (sameAnchorPt) {
+      anchorPieces.push(
+        `<div class="px-gizmo-anchor-guide-h" style="left:${roundTfNum(parentLeft, 1)}px;top:${roundTfNum(aTop, 1)}px;width:${roundTfNum(parentW, 1)}px;"></div>` +
+          `<div class="px-gizmo-anchor-guide-v" style="left:${roundTfNum(aLeft, 1)}px;top:${roundTfNum(parentTop, 1)}px;height:${roundTfNum(parentH, 1)}px;"></div>` +
+          `<div class="px-gizmo-anchor-dot" style="left:${roundTfNum(aLeft, 1)}px;top:${roundTfNum(aTop, 1)}px;"></div>`
+      );
+    } else {
+      anchorPieces.push(
+        `<div class="px-gizmo-anchor-box" style="left:${roundTfNum(Math.min(aLeft, aRight), 1)}px;top:${roundTfNum(Math.min(aTop, aBottom), 1)}px;width:${roundTfNum(Math.max(2, Math.abs(aRight - aLeft)), 1)}px;height:${roundTfNum(Math.max(2, Math.abs(aBottom - aTop)), 1)}px;"></div>`
+      );
+      const pts = new Map();
+      [
+        [aLeft, aTop],
+        [aRight, aTop],
+        [aLeft, aBottom],
+        [aRight, aBottom],
+      ].forEach(([px, py]) => {
+        const key = `${Math.round(px)},${Math.round(py)}`;
+        if (!pts.has(key)) {
+          pts.set(
+            key,
+            `<div class="px-gizmo-anchor-dot" style="left:${roundTfNum(px, 1)}px;top:${roundTfNum(py, 1)}px;"></div>`
+          );
+        }
+      });
+      anchorPieces.push(Array.from(pts.values()).join(''));
+    }
+
+    const originX = roundTfNum(pivX * 100, 2);
+    const originY = roundTfNum((1 - pivY) * 100, 2);
+    const rotDeg = roundTfNum(tf.rotate || 0, 2);
+    const roleLabel = describeTreeLabel(el);
+
+    layer.innerHTML = `
+      ${anchorPieces.join('')}
+      <div
+        class="px-gizmo-box"
+        style="left:${roundTfNum(boxLeft, 1)}px;top:${roundTfNum(boxTop, 1)}px;width:${Math.max(1, Math.round(tf.width))}px;height:${Math.max(1, Math.round(tf.height))}px;transform-origin:${originX}% ${originY}%;rotate:${rotDeg}deg;"
+      >
+        <div class="px-gizmo-move-bar" data-tf-drag-move title="Drag to move widget">✥ ${escapeHtml(roleLabel)}</div>
+        <div class="px-gizmo-pivot" style="left:${originX}%;top:${originY}%;" title="Pivot (${roundTfNum(pivX, 2)}, ${roundTfNum(pivY, 2)})"></div>
+        <div class="px-gizmo-handle" data-tf-handle="nw"></div>
+        <div class="px-gizmo-handle" data-tf-handle="n"></div>
+        <div class="px-gizmo-handle" data-tf-handle="ne"></div>
+        <div class="px-gizmo-handle" data-tf-handle="e"></div>
+        <div class="px-gizmo-handle" data-tf-handle="se"></div>
+        <div class="px-gizmo-handle" data-tf-handle="s"></div>
+        <div class="px-gizmo-handle" data-tf-handle="sw"></div>
+        <div class="px-gizmo-handle" data-tf-handle="w"></div>
+      </div>
+    `;
+    layer.classList.add('is-active');
+    canvas.classList.add('has-gizmo');
+  }
+
+  function syncTransformInspectorWidgets(el, tf) {
+    if (!el || !tf || state.selectedEl !== el) return;
+    const fieldMap = {
+      posX: formatTfVal(tf.posX, 1),
+      posY: formatTfVal(tf.posY, 1),
+      width: String(Math.max(1, Math.round(tf.width))),
+      height: String(Math.max(1, Math.round(tf.height))),
+      anchorMinX: formatTfVal(tf.anchorMin[0], 3),
+      anchorMinY: formatTfVal(tf.anchorMin[1], 3),
+      anchorMaxX: formatTfVal(tf.anchorMax[0], 3),
+      anchorMaxY: formatTfVal(tf.anchorMax[1], 3),
+      pivotX: formatTfVal(tf.pivot[0], 3),
+      pivotY: formatTfVal(tf.pivot[1], 3),
+      rotate: formatTfVal(tf.rotate || 0, 2),
+    };
+    const active = document.activeElement;
+    Object.entries(fieldMap).forEach(([key, val]) => {
+      const inp = document.querySelector(`[data-tf-input="${key}"]`);
+      if (inp && inp !== active) {
+        inp.value = val;
+      }
+    });
+
+    const { hLabel, vLabel, preset } = getAnchorAxisLabels(tf.anchorMin, tf.anchorMax);
+    const hNode = document.getElementById('wb-tf-label-h');
+    const vNode = document.getElementById('wb-tf-label-v');
+    const presetBtn = document.querySelector('[data-tf-preset-btn]');
+    if (hNode) hNode.textContent = hLabel;
+    if (vNode) vNode.textContent = vLabel;
+    if (presetBtn) presetBtn.innerHTML = renderAnchorPresetSvg(tf.anchorMin, tf.anchorMax, 40);
+
+    document.querySelectorAll('[data-tf-preset-pick]').forEach(tile => {
+      tile.classList.toggle('is-active', Boolean(preset && tile.getAttribute('data-tf-preset-pick') === preset.id));
+    });
+
+    const lockBtn = document.querySelector('[data-tf-lock-aspect]');
+    if (lockBtn) {
+      lockBtn.classList.toggle('is-active', Boolean(tf.lockAspect));
+      lockBtn.setAttribute('aria-pressed', tf.lockAspect ? 'true' : 'false');
+    }
+
+    updateInspectorGeometryReadout();
+    renderTransformGizmo();
+  }
+
+  function renderTransformComponentCard(el) {
+    const tf = getWidgetTransformState(el);
+    if (!tf) return '';
+    const { hLabel, vLabel, preset } = getAnchorAxisLabels(tf.anchorMin, tf.anchorMax);
+    const isCollapsed = Boolean(state.transformCollapsed);
+    const isPresetOpen = Boolean(state.anchorPresetOpen);
+    const isMenuOpen = Boolean(state.transformMenuOpen);
+
+    const presetsGridHtml = ANCHOR_PRESETS.map(p => {
+      const isActive = preset && preset.id === p.id;
+      return `
+        <button
+          type="button"
+          class="wb-tf-preset-tile${isActive ? ' is-active' : ''}"
+          data-tf-preset-pick="${p.id}"
+          title="${p.vLabel}-${p.hLabel} (Click: keep position • Alt/Shift+Click: snap)"
+          aria-label="${p.vLabel} ${p.hLabel} Anchor Preset"
+        >
+          ${renderAnchorPresetSvg(p.aMin, p.aMax, 34)}
+        </button>
+      `;
+    }).join('');
+
+    const linkIconSvg = `
+      <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+        <path d="M6.5 9.5a3 3 0 0 0 4.2.3l1.8-1.8a3 3 0 0 0-4.2-4.2L7.2 4.8"/>
+        <path d="M9.5 6.5a3 3 0 0 0-4.2-.3L3.5 8a3 3 0 0 0 4.2 4.2l1.1-1"/>
+      </svg>
+    `;
+    const resetIconSvg = `
+      <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 8a5 5 0 1 0 1.5-3.5L3 6"/>
+        <path d="M3 2.8V6h3.2"/>
+      </svg>
+    `;
+
+    return `
+      <div class="wb-insp-card wb-transform-card">
+        <div class="wb-tf-head">
+          <button type="button" class="wb-tf-toggle" data-tf-toggle aria-expanded="${isCollapsed ? 'false' : 'true'}">
+            <span class="wb-tf-caret">${isCollapsed ? '▸' : '▾'}</span>
+            <span>Transform</span>
+          </button>
+          <div class="wb-tf-menu-wrap">
+            <button type="button" class="wb-tf-dots-btn${isMenuOpen ? ' is-open' : ''}" data-tf-menu-toggle title="Transform Actions" aria-label="Transform Actions">⋯</button>
+            <div class="wb-tf-menu-dropdown${isMenuOpen ? ' is-open' : ''}" id="wb-tf-menu-dropdown">
+              <button type="button" class="wb-tf-menu-item" data-tf-menu-action="snap">Snap to Active Anchor</button>
+              <button type="button" class="wb-tf-menu-item" data-tf-menu-action="reset">Reset Transform</button>
+              <button type="button" class="wb-tf-menu-item" data-tf-menu-action="copy">Copy Transform JSON</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="wb-tf-body${isCollapsed ? ' is-collapsed' : ''}">
+          <div class="wb-tf-top">
+            <div class="wb-tf-preset-wrap">
+              <span id="wb-tf-label-h" class="wb-tf-label-h">${escapeHtml(hLabel)}</span>
+              <span id="wb-tf-label-v" class="wb-tf-label-v">${escapeHtml(vLabel)}</span>
+              <button
+                type="button"
+                class="wb-tf-preset-btn${isPresetOpen ? ' is-open' : ''}"
+                data-tf-preset-btn
+                title="Anchor Presets (${escapeHtml(vLabel)}-${escapeHtml(hLabel)})"
+                aria-expanded="${isPresetOpen ? 'true' : 'false'}"
+              >
+                ${renderAnchorPresetSvg(tf.anchorMin, tf.anchorMax, 40)}
+              </button>
+              <div id="wb-tf-preset-popover" class="wb-tf-preset-popover${isPresetOpen ? ' is-open' : ''}" role="dialog" aria-label="Anchor Presets">
+                <div class="wb-tf-preset-grid">${presetsGridHtml}</div>
+                <div class="wb-tf-preset-hint">Click: set anchor • Alt/Shift+Click: snap</div>
+              </div>
+            </div>
+
+            <div class="wb-tf-fields-grid">
+              <div class="wb-tf-num-cell" data-tf-scrub="posX" title="Drag left/right to adjust, or click to type">
+                <label for="wb-tf-posx">PosX</label>
+                <input id="wb-tf-posx" type="number" step="1" value="${escapeHtml(formatTfVal(tf.posX, 1))}" data-tf-input="posX">
+              </div>
+              <div class="wb-tf-num-cell" data-tf-scrub="posY" title="Drag left/right to adjust, or click to type">
+                <label for="wb-tf-posy">PosY</label>
+                <input id="wb-tf-posy" type="number" step="1" value="${escapeHtml(formatTfVal(tf.posY, 1))}" data-tf-input="posY">
+              </div>
+              <span></span>
+              <span></span>
+              <div class="wb-tf-num-cell" data-tf-scrub="width" title="Drag left/right to adjust, or click to type">
+                <label for="wb-tf-width">Width</label>
+                <input id="wb-tf-width" type="number" min="1" step="1" value="${Math.max(1, Math.round(tf.width))}" data-tf-input="width">
+              </div>
+              <div class="wb-tf-num-cell" data-tf-scrub="height" title="Drag left/right to adjust, or click to type">
+                <label for="wb-tf-height">Height</label>
+                <input id="wb-tf-height" type="number" min="1" step="1" value="${Math.max(1, Math.round(tf.height))}" data-tf-input="height">
+              </div>
+              <button
+                type="button"
+                class="wb-tf-icon-btn${tf.lockAspect ? ' is-active' : ''}"
+                data-tf-lock-aspect
+                aria-pressed="${tf.lockAspect ? 'true' : 'false'}"
+                title="Lock Width/Height Aspect Ratio"
+                aria-label="Lock Aspect Ratio"
+              >${linkIconSvg}</button>
+              <button
+                type="button"
+                class="wb-tf-icon-btn"
+                data-tf-reset
+                title="Reset Transform"
+                aria-label="Reset Transform"
+              >${resetIconSvg}</button>
+            </div>
+          </div>
+
+          <div class="wb-tf-vec-rows">
+            <div class="wb-tf-vec-row">
+              <span class="wb-tf-vec-label">AnchorMin</span>
+              <div class="wb-tf-vec2">
+                <label class="wb-tf-axis-field is-x" data-tf-scrub="anchorMinX" title="Drag left/right to adjust, or click to type">
+                  <span class="wb-tf-axis-tag">X</span>
+                  <input type="number" step="0.05" value="${escapeHtml(formatTfVal(tf.anchorMin[0], 3))}" data-tf-input="anchorMinX" aria-label="AnchorMin X">
+                </label>
+                <label class="wb-tf-axis-field is-y" data-tf-scrub="anchorMinY" title="Drag left/right to adjust, or click to type">
+                  <span class="wb-tf-axis-tag">Y</span>
+                  <input type="number" step="0.05" value="${escapeHtml(formatTfVal(tf.anchorMin[1], 3))}" data-tf-input="anchorMinY" aria-label="AnchorMin Y">
+                </label>
+              </div>
+            </div>
+
+            <div class="wb-tf-vec-row">
+              <span class="wb-tf-vec-label">AnchorMax</span>
+              <div class="wb-tf-vec2">
+                <label class="wb-tf-axis-field is-x" data-tf-scrub="anchorMaxX" title="Drag left/right to adjust, or click to type">
+                  <span class="wb-tf-axis-tag">X</span>
+                  <input type="number" step="0.05" value="${escapeHtml(formatTfVal(tf.anchorMax[0], 3))}" data-tf-input="anchorMaxX" aria-label="AnchorMax X">
+                </label>
+                <label class="wb-tf-axis-field is-y" data-tf-scrub="anchorMaxY" title="Drag left/right to adjust, or click to type">
+                  <span class="wb-tf-axis-tag">Y</span>
+                  <input type="number" step="0.05" value="${escapeHtml(formatTfVal(tf.anchorMax[1], 3))}" data-tf-input="anchorMaxY" aria-label="AnchorMax Y">
+                </label>
+              </div>
+            </div>
+
+            <div class="wb-tf-vec-row">
+              <span class="wb-tf-vec-label">Pivot</span>
+              <div class="wb-tf-vec2">
+                <label class="wb-tf-axis-field is-x" data-tf-scrub="pivotX" title="Drag left/right to adjust, or click to type">
+                  <span class="wb-tf-axis-tag">X</span>
+                  <input type="number" step="0.05" value="${escapeHtml(formatTfVal(tf.pivot[0], 3))}" data-tf-input="pivotX" aria-label="Pivot X">
+                </label>
+                <label class="wb-tf-axis-field is-y" data-tf-scrub="pivotY" title="Drag left/right to adjust, or click to type">
+                  <span class="wb-tf-axis-tag">Y</span>
+                  <input type="number" step="0.05" value="${escapeHtml(formatTfVal(tf.pivot[1], 3))}" data-tf-input="pivotY" aria-label="Pivot Y">
+                </label>
+              </div>
+            </div>
+
+            <div class="wb-tf-vec-row" data-tf-scrub="rotate" title="Drag left/right to adjust, or click to type">
+              <span class="wb-tf-vec-label">Rotate</span>
+              <div class="wb-tf-rotate-wrap">
+                <input type="number" step="1" class="wb-tf-rotate-input" value="${escapeHtml(formatTfVal(tf.rotate || 0, 2))}" data-tf-input="rotate" aria-label="Rotate">
+              </div>
+            </div>
+          </div>
+
+          <div id="wb-tf-feedback" class="wb-insp-feedback"></div>
+        </div>
+      </div>
+    `;
+  }
+
   function resetWidgetEdits(el) {
     if (!el) return Promise.resolve({ ok: false });
     const edits = loadUiEdits();
@@ -665,6 +1510,7 @@
     if (spriteTarget && spriteTarget !== el) {
       resetSingleElementSpriteAttrs(spriteTarget, edits);
     }
+    resetSingleElementTransform(el, edits);
 
     // Reset text edits on el or its targetEl
     const info = getEditableTextInfo(el);
@@ -682,6 +1528,7 @@
     renderResourcesDockGrid();
     renderHierarchyTree();
     renderInspector();
+    renderTransformGizmo();
     return persistUiEditsToDisk();
   }
 
@@ -689,6 +1536,7 @@
     const edits = loadUiEdits();
     const spriteEntries = Object.entries(edits.spriteEdits || {});
     const textEntries = Object.entries(edits.textEdits || {});
+    const transformEntries = Object.entries(edits.transformEdits || {});
 
     spriteEntries.forEach(([pathKey, attrMap]) => {
       const el = resolveElementByCanvasPath(pathKey);
@@ -709,7 +1557,36 @@
       setTargetElementText(el, txt);
     });
 
-    return spriteEntries.length + textEntries.length;
+    transformEntries.forEach(([pathKey, savedTf]) => {
+      const el = resolveElementByCanvasPath(pathKey);
+      if (!el || !savedTf || typeof savedTf !== 'object') return;
+      const tf = {
+        posX: Number.isFinite(Number(savedTf.posX)) ? Number(savedTf.posX) : 0,
+        posY: Number.isFinite(Number(savedTf.posY)) ? Number(savedTf.posY) : 0,
+        width: Math.max(1, Number.isFinite(Number(savedTf.width)) ? Number(savedTf.width) : 100),
+        height: Math.max(1, Number.isFinite(Number(savedTf.height)) ? Number(savedTf.height) : 40),
+        anchorMin: Array.isArray(savedTf.anchorMin) && savedTf.anchorMin.length === 2
+          ? [Number(savedTf.anchorMin[0]) || 0, Number(savedTf.anchorMin[1]) || 0]
+          : [0.5, 0.5],
+        anchorMax: Array.isArray(savedTf.anchorMax) && savedTf.anchorMax.length === 2
+          ? [Number(savedTf.anchorMax[0]) || 0, Number(savedTf.anchorMax[1]) || 0]
+          : [0.5, 0.5],
+        pivot: Array.isArray(savedTf.pivot) && savedTf.pivot.length === 2
+          ? [Number(savedTf.pivot[0]), Number(savedTf.pivot[1])]
+          : [0.5, 0.5],
+        rotate: Number.isFinite(Number(savedTf.rotate)) ? Number(savedTf.rotate) : 0,
+        lockAspect: Boolean(savedTf.lockAspect),
+        aspectRatio: Number.isFinite(Number(savedTf.aspectRatio)) && Number(savedTf.aspectRatio) > 0
+          ? Number(savedTf.aspectRatio)
+          : 1,
+        dirty: true,
+      };
+      if (!Number.isFinite(tf.pivot[0])) tf.pivot[0] = 0.5;
+      if (!Number.isFinite(tf.pivot[1])) tf.pivot[1] = 0.5;
+      applyWidgetTransformToDom(el, tf, { applyCss: true });
+    });
+
+    return spriteEntries.length + textEntries.length + transformEntries.length;
   }
 
   function parseSlice9Attr(raw) {
@@ -855,15 +1732,21 @@
     if (!isClean) {
       setStudioPanels(isEdit);
       if (isEdit) {
+        ensureTransformGizmoLayer();
         setBottomDock(true, 'resources');
         renderHierarchyTree();
         renderResourcesDockGrid();
         renderInspector();
       } else if (isWireframe) {
+        state.anchorPresetOpen = false;
+        state.transformMenuOpen = false;
         setBottomDock(true, 'behavior');
       } else {
+        state.anchorPresetOpen = false;
+        state.transformMenuOpen = false;
         setBottomDock(false);
       }
+      renderTransformGizmo();
     }
 
     const hubLink = document.querySelector('[data-wb-hub-link]');
@@ -905,7 +1788,9 @@
       btn.setAttribute('aria-pressed', active ? 'true' : 'false');
     });
 
+    flushPendingTransforms();
     renderHierarchyTree();
+    renderTransformGizmo();
     document.dispatchEvent(new CustomEvent('pixelui:statechange', { detail: { state: stateId } }));
   }
 
@@ -918,6 +1803,7 @@
     if (state.selectedEl || state.inspectorMode === 'resource') {
       renderInspector();
     }
+    renderTransformGizmo();
   }
 
   function setScene(sceneName) {
@@ -1139,6 +2025,8 @@
 
     state.selectedResourceSliceId = sliceId;
     state.inspectorMode = 'resource';
+    state.anchorPresetOpen = false;
+    state.transformMenuOpen = false;
 
     if (!isEditMode() && !isCleanMode()) {
       setRenderMode('edit');
@@ -1155,6 +2043,7 @@
 
     renderHierarchyTree();
     renderInspector();
+    renderTransformGizmo();
 
     if (options.scrollIntoView) {
       const card = document.querySelector(`#wb-resources-grid .wb-res-card[data-res-pick="${sliceId}"]`);
@@ -1185,7 +2074,7 @@
       canvas.style.zoom = '';
       return;
     }
-    const reserve = state.studioVisible ? 264 + 316 + 24 : 0;
+    const reserve = state.studioVisible ? 264 + 356 + 24 : 0;
     const avail = Math.max(480, workspace.clientWidth - reserve);
     if (avail < 1280) {
       const z = Math.max(0.54, Math.min(1, avail / 1280));
@@ -1193,6 +2082,7 @@
     } else {
       canvas.style.zoom = '';
     }
+    renderTransformGizmo();
   }
 
   function setStudioPanels(visible) {
@@ -1614,7 +2504,7 @@
 
   function isTreeElement(el) {
     if (!el || el.nodeType !== 1) return false;
-    if (el.id === '__verify_annotations__') return false;
+    if (isInternalOverlayElement(el)) return false;
     if (
       el.matches(
         '[data-ui-view], .hud-base-layer, [data-slice-id], [data-ui-role], button, .px-9slice, .px-sprite-box, .px-icon, .px-wire-box, .px-row, .px-stack, .px-grid, h1, h2, h3, h4, p'
@@ -1771,6 +2661,7 @@
 
     const hits = [];
     for (const child of Array.from(el.children)) {
+      if (isInternalOverlayElement(child)) continue;
       const cs = getComputedStyle(child);
       if (cs.display === 'none' || cs.visibility === 'hidden') continue;
       if (child.getAttribute('data-overflow-ok') === 'true' || child.getAttribute('data-border-overlap-ok') === 'true') {
@@ -2132,6 +3023,8 @@
       </div>
     `;
 
+    html += renderTransformComponentCard(el);
+
     if (canAddOrEditText) {
       html += `
         <div class="wb-insp-card">
@@ -2269,6 +3162,8 @@
 
     if (state.selectedEl && state.selectedEl !== el) {
       state.selectedEl.classList.remove('px-selected-element');
+      state.anchorPresetOpen = false;
+      state.transformMenuOpen = false;
     }
 
     state.selectedEl = el;
@@ -2290,6 +3185,7 @@
 
     renderHierarchyTree();
     renderInspector();
+    renderTransformGizmo();
 
     const selectedRow = document.querySelector('#wb-hierarchy-tree .wb-tree-node.is-selected');
     if (selectedRow && typeof selectedRow.scrollIntoView === 'function') {
@@ -2302,7 +3198,13 @@
 
     const canvas = document.getElementById('game-canvas');
     function pickStudioElement(target) {
-      if (!target || typeof target.closest !== 'function' || !canvas || !canvas.contains(target)) {
+      if (
+        !target ||
+        typeof target.closest !== 'function' ||
+        !canvas ||
+        !canvas.contains(target) ||
+        target.closest('#__verify_annotations__, #__px_transform_gizmo__')
+      ) {
         return null;
       }
       const btn = target.closest('button');
@@ -2439,10 +3341,22 @@
       }
     }
 
+    let tfDrag = null;
+    let tfScrub = null;
+    let suppressNextScrubClick = false;
+    let suppressNextCanvasClick = false;
+
     if (canvas) {
       canvas.addEventListener(
         'click',
         evt => {
+          if (suppressNextCanvasClick) {
+            suppressNextCanvasClick = false;
+            evt.preventDefault();
+            evt.stopPropagation();
+            evt.stopImmediatePropagation();
+            return;
+          }
           if (!isEditMode() && !evt.shiftKey) return;
           const target = evt.target;
           if (!target || typeof target.closest !== 'function') return;
@@ -2484,8 +3398,203 @@
       );
     }
 
+    function closeTransformPopovers() {
+      if (state.anchorPresetOpen) {
+        state.anchorPresetOpen = false;
+        const pop = document.getElementById('wb-tf-preset-popover');
+        const btn = document.querySelector('[data-tf-preset-btn]');
+        if (pop) pop.classList.remove('is-open');
+        if (btn) btn.classList.remove('is-open');
+      }
+      if (state.transformMenuOpen) {
+        state.transformMenuOpen = false;
+        const menu = document.getElementById('wb-tf-menu-dropdown');
+        const dots = document.querySelector('[data-tf-menu-toggle]');
+        if (menu) menu.classList.remove('is-open');
+        if (dots) dots.classList.remove('is-open');
+      }
+    }
+
     // Left hierarchy tree clicks & inspector actions
     document.addEventListener('click', evt => {
+      if (suppressNextScrubClick) {
+        suppressNextScrubClick = false;
+        if (evt.target && evt.target.closest && evt.target.closest('[data-tf-scrub]')) {
+          evt.preventDefault();
+          evt.stopPropagation();
+          if (document.activeElement && document.activeElement.closest && document.activeElement.closest('[data-tf-scrub]')) {
+            document.activeElement.blur();
+          }
+          return;
+        }
+      }
+
+      if (
+        (state.anchorPresetOpen || state.transformMenuOpen) &&
+        !evt.target.closest('#wb-tf-preset-popover, [data-tf-preset-btn], #wb-tf-menu-dropdown, [data-tf-menu-toggle]')
+      ) {
+        closeTransformPopovers();
+      }
+
+      const tfToggleBtn = evt.target.closest('[data-tf-toggle]');
+      if (tfToggleBtn) {
+        state.transformCollapsed = !state.transformCollapsed;
+        tfToggleBtn.setAttribute('aria-expanded', state.transformCollapsed ? 'false' : 'true');
+        const caret = tfToggleBtn.querySelector('.wb-tf-caret');
+        if (caret) caret.textContent = state.transformCollapsed ? '▸' : '▾';
+        const bodyEl = tfToggleBtn.closest('.wb-transform-card')?.querySelector('.wb-tf-body');
+        if (bodyEl) bodyEl.classList.toggle('is-collapsed', state.transformCollapsed);
+        if (state.transformCollapsed) closeTransformPopovers();
+        return;
+      }
+
+      const tfMenuBtn = evt.target.closest('[data-tf-menu-toggle]');
+      if (tfMenuBtn) {
+        evt.stopPropagation();
+        if (state.anchorPresetOpen) {
+          state.anchorPresetOpen = false;
+          document.getElementById('wb-tf-preset-popover')?.classList.remove('is-open');
+          document.querySelector('[data-tf-preset-btn]')?.classList.remove('is-open');
+        }
+        state.transformMenuOpen = !state.transformMenuOpen;
+        tfMenuBtn.classList.toggle('is-open', state.transformMenuOpen);
+        document.getElementById('wb-tf-menu-dropdown')?.classList.toggle('is-open', state.transformMenuOpen);
+        return;
+      }
+
+      const tfMenuActionBtn = evt.target.closest('[data-tf-menu-action]');
+      if (tfMenuActionBtn && state.selectedEl) {
+        const action = tfMenuActionBtn.getAttribute('data-tf-menu-action');
+        closeTransformPopovers();
+        const tf = getWidgetTransformState(state.selectedEl);
+        if (action === 'snap') {
+          snapWidgetTransformToAnchor(state.selectedEl, tf, tf.anchorMin, tf.anchorMax);
+          syncTransformInspectorWidgets(state.selectedEl, tf);
+          saveWidgetTransformEdit(state.selectedEl, tf, true).then(result => {
+            const fb = document.getElementById('wb-tf-feedback');
+            if (fb) {
+              fb.textContent =
+                result.method === 'studio-server'
+                  ? '✓ Snapped & saved to ui-edits.js!'
+                  : '✓ Snapped & saved in browser storage';
+            }
+          });
+        } else if (action === 'reset') {
+          const edits = loadUiEdits();
+          resetSingleElementTransform(state.selectedEl, edits);
+          saveUiEdits(edits);
+          renderInspector();
+          renderTransformGizmo();
+          persistUiEditsToDisk().then(result => {
+            const fb = document.getElementById('wb-tf-feedback');
+            if (fb) {
+              fb.textContent =
+                result.method === 'studio-server'
+                  ? '✓ Transform reset & saved to ui-edits.js!'
+                  : '✓ Transform reset in browser storage';
+            }
+          });
+        } else if (action === 'copy') {
+          const payload = JSON.stringify(
+            {
+              posX: roundTfNum(tf.posX, 2),
+              posY: roundTfNum(tf.posY, 2),
+              width: Math.max(1, Math.round(tf.width)),
+              height: Math.max(1, Math.round(tf.height)),
+              anchorMin: tf.anchorMin,
+              anchorMax: tf.anchorMax,
+              pivot: tf.pivot,
+              rotate: roundTfNum(tf.rotate || 0, 2),
+            },
+            null,
+            2
+          );
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(payload).catch(() => {});
+          }
+          const fb = document.getElementById('wb-tf-feedback');
+          if (fb) fb.textContent = '✓ Transform JSON copied!';
+        }
+        return;
+      }
+
+      const tfPresetBtn = evt.target.closest('[data-tf-preset-btn]');
+      if (tfPresetBtn) {
+        evt.stopPropagation();
+        if (state.transformMenuOpen) {
+          state.transformMenuOpen = false;
+          document.getElementById('wb-tf-menu-dropdown')?.classList.remove('is-open');
+          document.querySelector('[data-tf-menu-toggle]')?.classList.remove('is-open');
+        }
+        state.anchorPresetOpen = !state.anchorPresetOpen;
+        tfPresetBtn.classList.toggle('is-open', state.anchorPresetOpen);
+        document.getElementById('wb-tf-preset-popover')?.classList.toggle('is-open', state.anchorPresetOpen);
+        return;
+      }
+
+      const tfPresetTile = evt.target.closest('[data-tf-preset-pick]');
+      if (tfPresetTile && state.selectedEl) {
+        const presetId = tfPresetTile.getAttribute('data-tf-preset-pick');
+        const preset = ANCHOR_PRESETS.find(p => p.id === presetId);
+        if (preset) {
+          const tf = getWidgetTransformState(state.selectedEl);
+          const shouldSnap = Boolean(evt.altKey || evt.shiftKey);
+          if (shouldSnap) {
+            snapWidgetTransformToAnchor(state.selectedEl, tf, preset.aMin, preset.aMax);
+          } else {
+            recalculatePosForNewAnchor(state.selectedEl, tf, preset.aMin, preset.aMax);
+            tf.dirty = true;
+            applyWidgetTransformToDom(state.selectedEl, tf, { applyCss: false });
+          }
+          closeTransformPopovers();
+          syncTransformInspectorWidgets(state.selectedEl, tf);
+          saveWidgetTransformEdit(state.selectedEl, tf, true).then(result => {
+            const fb = document.getElementById('wb-tf-feedback');
+            if (fb) {
+              fb.textContent =
+                result.method === 'studio-server'
+                  ? `✓ ${shouldSnap ? 'Snapped to' : 'Anchor set:'} ${preset.vLabel}-${preset.hLabel} & saved!`
+                  : `✓ ${shouldSnap ? 'Snapped to' : 'Anchor set:'} ${preset.vLabel}-${preset.hLabel}`;
+            }
+          });
+        }
+        return;
+      }
+
+      const tfLockBtn = evt.target.closest('[data-tf-lock-aspect]');
+      if (tfLockBtn && state.selectedEl) {
+        const tf = getWidgetTransformState(state.selectedEl);
+        tf.lockAspect = !tf.lockAspect;
+        if (tf.lockAspect) {
+          tf.aspectRatio = tf.height > 0 ? tf.width / tf.height : 1;
+        }
+        syncTransformInspectorWidgets(state.selectedEl, tf);
+        if (tf.dirty) {
+          saveWidgetTransformEdit(state.selectedEl, tf, true);
+        }
+        return;
+      }
+
+      const tfResetBtn = evt.target.closest('[data-tf-reset]');
+      if (tfResetBtn && state.selectedEl) {
+        closeTransformPopovers();
+        const edits = loadUiEdits();
+        resetSingleElementTransform(state.selectedEl, edits);
+        saveUiEdits(edits);
+        renderInspector();
+        renderTransformGizmo();
+        persistUiEditsToDisk().then(result => {
+          const fb = document.getElementById('wb-tf-feedback');
+          if (fb) {
+            fb.textContent =
+              result.method === 'studio-server'
+                ? '✓ Transform reset & saved to ui-edits.js!'
+                : '✓ Transform reset in browser storage';
+          }
+        });
+        return;
+      }
+
       const toggleBtn = evt.target.closest('[data-tree-toggle]');
       if (toggleBtn) {
         evt.stopPropagation();
@@ -2816,6 +3925,144 @@
       }
     });
 
+    function getTransformFieldNumericValue(tf, field) {
+      if (!tf) return 0;
+      switch (field) {
+        case 'posX':
+          return tf.posX || 0;
+        case 'posY':
+          return tf.posY || 0;
+        case 'width':
+          return tf.width || 1;
+        case 'height':
+          return tf.height || 1;
+        case 'anchorMinX':
+          return tf.anchorMin ? tf.anchorMin[0] : 0.5;
+        case 'anchorMinY':
+          return tf.anchorMin ? tf.anchorMin[1] : 0.5;
+        case 'anchorMaxX':
+          return tf.anchorMax ? tf.anchorMax[0] : 0.5;
+        case 'anchorMaxY':
+          return tf.anchorMax ? tf.anchorMax[1] : 0.5;
+        case 'pivotX':
+          return tf.pivot ? tf.pivot[0] : 0.5;
+        case 'pivotY':
+          return tf.pivot ? tf.pivot[1] : 0.5;
+        case 'rotate':
+          return tf.rotate || 0;
+        default:
+          return 0;
+      }
+    }
+
+    function getTransformFieldScrubStep(field, evt) {
+      const isNorm =
+        field === 'anchorMinX' ||
+        field === 'anchorMinY' ||
+        field === 'anchorMaxX' ||
+        field === 'anchorMaxY' ||
+        field === 'pivotX' ||
+        field === 'pivotY';
+      if (isNorm) {
+        if (evt.altKey) return 0.001;
+        if (evt.shiftKey) return 0.02;
+        return 0.005;
+      }
+      if (evt.altKey) return 0.1;
+      if (evt.shiftKey) return 5;
+      return 1;
+    }
+
+    function applyTransformFieldEdit(el, tf, field, val) {
+      if (!el || !tf || !Number.isFinite(val)) return;
+      let applyCss = true;
+      switch (field) {
+        case 'posX':
+          tf.posX = roundTfNum(val, 2);
+          break;
+        case 'posY':
+          tf.posY = roundTfNum(val, 2);
+          break;
+        case 'width': {
+          const nextW = Math.max(1, Math.round(val));
+          tf.width = nextW;
+          if (tf.lockAspect && tf.aspectRatio > 0) {
+            tf.height = Math.max(1, Math.round(nextW / tf.aspectRatio));
+          } else {
+            tf.aspectRatio = tf.height > 0 ? tf.width / tf.height : 1;
+          }
+          break;
+        }
+        case 'height': {
+          const nextH = Math.max(1, Math.round(val));
+          tf.height = nextH;
+          if (tf.lockAspect && tf.aspectRatio > 0) {
+            tf.width = Math.max(1, Math.round(nextH * tf.aspectRatio));
+          } else {
+            tf.aspectRatio = tf.height > 0 ? tf.width / tf.height : 1;
+          }
+          break;
+        }
+        case 'anchorMinX': {
+          const nx = roundTfNum(clamp01(val), 4);
+          recalculatePosForNewAnchor(
+            el,
+            tf,
+            [nx, tf.anchorMin[1]],
+            [Math.max(tf.anchorMax[0], nx), tf.anchorMax[1]]
+          );
+          applyCss = false;
+          break;
+        }
+        case 'anchorMinY': {
+          const ny = roundTfNum(clamp01(val), 4);
+          recalculatePosForNewAnchor(
+            el,
+            tf,
+            [tf.anchorMin[0], ny],
+            [tf.anchorMax[0], Math.max(tf.anchorMax[1], ny)]
+          );
+          applyCss = false;
+          break;
+        }
+        case 'anchorMaxX': {
+          const nx = roundTfNum(clamp01(val), 4);
+          recalculatePosForNewAnchor(
+            el,
+            tf,
+            [Math.min(tf.anchorMin[0], nx), tf.anchorMin[1]],
+            [nx, tf.anchorMax[1]]
+          );
+          applyCss = false;
+          break;
+        }
+        case 'anchorMaxY': {
+          const ny = roundTfNum(clamp01(val), 4);
+          recalculatePosForNewAnchor(
+            el,
+            tf,
+            [tf.anchorMin[0], Math.min(tf.anchorMin[1], ny)],
+            [tf.anchorMax[0], ny]
+          );
+          applyCss = false;
+          break;
+        }
+        case 'pivotX':
+          tf.pivot = [roundTfNum(val, 4), tf.pivot[1]];
+          break;
+        case 'pivotY':
+          tf.pivot = [tf.pivot[0], roundTfNum(val, 4)];
+          break;
+        case 'rotate':
+          tf.rotate = roundTfNum(val, 2);
+          break;
+        default:
+          return;
+      }
+      tf.dirty = true;
+      applyWidgetTransformToDom(el, tf, { applyCss });
+    }
+
     // Apply-to-all checkboxes and inspector/sprite-picker inputs
     document.addEventListener('change', evt => {
       if (!evt.target) return;
@@ -2845,6 +4092,26 @@
             }
           });
         }
+      } else if (evt.target.closest && evt.target.closest('[data-tf-input]') && state.selectedEl) {
+        const tfInp = evt.target.closest('[data-tf-input]');
+        const field = tfInp.getAttribute('data-tf-input');
+        const val = parseFloat(tfInp.value);
+        const tf = getWidgetTransformState(state.selectedEl);
+        if (!Number.isFinite(val)) {
+          syncTransformInspectorWidgets(state.selectedEl, tf);
+          return;
+        }
+        applyTransformFieldEdit(state.selectedEl, tf, field, val);
+        syncTransformInspectorWidgets(state.selectedEl, tf);
+        saveWidgetTransformEdit(state.selectedEl, tf, true).then(result => {
+          const fb = document.getElementById('wb-tf-feedback');
+          if (fb) {
+            fb.textContent =
+              result.method === 'studio-server'
+                ? '✓ Transform saved to ui-edits.js!'
+                : '✓ Transform saved in browser storage';
+          }
+        });
       }
     });
 
@@ -2854,6 +4121,7 @@
         if (modal && modal.classList.contains('is-open')) {
           closeSpritePicker();
         }
+        closeTransformPopovers();
       } else if (evt.key === 'Enter' && evt.target && evt.target.id === 'wb-insp-slice-input') {
         evt.preventDefault();
         const applyBtn = document.querySelector('[data-insp-apply-slice]');
@@ -2863,6 +4131,30 @@
         const attrName = evt.target.getAttribute('data-btn-state-input');
         const applyBtn = attrName ? document.querySelector(`[data-btn-state-apply="${attrName}"]`) : null;
         if (applyBtn) applyBtn.click();
+      } else if (
+        evt.key === 'Enter' &&
+        evt.target &&
+        evt.target.closest &&
+        evt.target.closest('[data-tf-input]') &&
+        state.selectedEl
+      ) {
+        evt.preventDefault();
+        const tfInp = evt.target.closest('[data-tf-input]');
+        const field = tfInp.getAttribute('data-tf-input');
+        const val = parseFloat(tfInp.value);
+        if (!Number.isFinite(val)) return;
+        const tf = getWidgetTransformState(state.selectedEl);
+        applyTransformFieldEdit(state.selectedEl, tf, field, val);
+        syncTransformInspectorWidgets(state.selectedEl, tf);
+        saveWidgetTransformEdit(state.selectedEl, tf, true).then(result => {
+          const fb = document.getElementById('wb-tf-feedback');
+          if (fb) {
+            fb.textContent =
+              result.method === 'studio-server'
+                ? '✓ Transform saved to ui-edits.js!'
+                : '✓ Transform saved in browser storage';
+          }
+        });
       }
     });
 
@@ -2879,6 +4171,19 @@
       if (evt.target && evt.target.id === 'wb-res-search') {
         state.resourceDock.search = evt.target.value || '';
         renderResourcesDockGrid();
+        return;
+      }
+      const tfInp = evt.target && evt.target.closest ? evt.target.closest('[data-tf-input]') : null;
+      if (tfInp && state.selectedEl) {
+        const raw = String(tfInp.value || '').trim();
+        if (raw === '' || raw === '-' || raw === '.' || raw === '-.') return;
+        const val = parseFloat(raw);
+        if (!Number.isFinite(val)) return;
+        const field = tfInp.getAttribute('data-tf-input');
+        const tf = getWidgetTransformState(state.selectedEl);
+        applyTransformFieldEdit(state.selectedEl, tf, field, val);
+        syncTransformInspectorWidgets(state.selectedEl, tf);
+        saveWidgetTransformEdit(state.selectedEl, tf, false);
         return;
       }
       const inp = evt.target && evt.target.closest ? evt.target.closest('[data-s9-input]') : null;
@@ -2902,6 +4207,312 @@
       const applyAll = state.inspectorMode === 'resource' ? true : state.applyAllInstances;
       applyLiveSlice9(targetEl, sliceId, next, applyAll);
       syncSlice9EditorWidgets(next, resolved.rec);
+    });
+
+    // Direct canvas widget drag-move & Transform gizmo resize handles
+    document.addEventListener('mousedown', evt => {
+      if (
+        (state.anchorPresetOpen || state.transformMenuOpen) &&
+        evt.target &&
+        evt.target.closest &&
+        !evt.target.closest('#wb-tf-preset-popover, [data-tf-preset-btn], #wb-tf-menu-dropdown, [data-tf-menu-toggle]')
+      ) {
+        closeTransformPopovers();
+      }
+      if (evt.button !== 0 || !evt.target || typeof evt.target.closest !== 'function') return;
+
+      const scrubWrap = state.selectedEl ? evt.target.closest('[data-tf-scrub]') : null;
+      if (scrubWrap) {
+        const field = scrubWrap.getAttribute('data-tf-scrub');
+        const inp =
+          scrubWrap.querySelector(`[data-tf-input="${field}"]`) ||
+          document.querySelector(`[data-tf-input="${field}"]`);
+        const isInputTarget = Boolean(inp && evt.target === inp);
+        if (isInputTarget && inp.classList.contains('wb-tf-rotate-input')) {
+          const rect = inp.getBoundingClientRect();
+          if (evt.clientX >= rect.right - 18) {
+            return;
+          }
+        }
+        const tf = getWidgetTransformState(state.selectedEl);
+        const startVal = getTransformFieldNumericValue(tf, field);
+        const started = !isInputTarget;
+        if (started) {
+          evt.preventDefault();
+          suppressNextScrubClick = true;
+          document.body.classList.add('is-tf-scrubbing');
+          scrubWrap.classList.add('is-scrubbing');
+        }
+        tfScrub = {
+          field,
+          inp,
+          scrubWrap,
+          el: state.selectedEl,
+          startClientX: evt.clientX,
+          lastClientX: evt.clientX,
+          accumVal: startVal,
+          started,
+        };
+        return;
+      }
+
+      if (!isEditMode()) return;
+
+      const resizeHandle = evt.target.closest('.px-gizmo-handle[data-tf-handle]');
+      if (resizeHandle && state.selectedEl) {
+        evt.preventDefault();
+        evt.stopPropagation();
+        const tf = getWidgetTransformState(state.selectedEl);
+        tfDrag = {
+          kind: 'resize',
+          handle: resizeHandle.getAttribute('data-tf-handle') || 'se',
+          el: state.selectedEl,
+          started: true,
+          startClientX: evt.clientX,
+          startClientY: evt.clientY,
+          zoom: getCanvasZoomFactor(),
+          startPosX: tf.posX,
+          startPosY: tf.posY,
+          startWidth: tf.width,
+          startHeight: tf.height,
+          pivot: [...tf.pivot],
+          rotate: tf.rotate || 0,
+          lockAspect: Boolean(tf.lockAspect),
+          aspectRatio: tf.aspectRatio || (tf.height > 0 ? tf.width / tf.height : 1),
+        };
+        return;
+      }
+
+      const moveBar = evt.target.closest('.px-gizmo-move-bar[data-tf-drag-move]');
+      if (moveBar && state.selectedEl) {
+        evt.preventDefault();
+        evt.stopPropagation();
+        const tf = getWidgetTransformState(state.selectedEl);
+        tfDrag = {
+          kind: 'move',
+          el: state.selectedEl,
+          started: true,
+          startClientX: evt.clientX,
+          startClientY: evt.clientY,
+          zoom: getCanvasZoomFactor(),
+          startPosX: tf.posX,
+          startPosY: tf.posY,
+        };
+        return;
+      }
+
+      if (
+        state.inlineEdit &&
+        state.inlineEdit.targetEl &&
+        (evt.target === state.inlineEdit.targetEl || state.inlineEdit.targetEl.contains(evt.target))
+      ) {
+        return;
+      }
+
+      const dragTarget = pickStudioElement(evt.target);
+      if (dragTarget) {
+        const tf = getWidgetTransformState(dragTarget);
+        tfDrag = {
+          kind: 'move',
+          el: dragTarget,
+          started: false,
+          startClientX: evt.clientX,
+          startClientY: evt.clientY,
+          zoom: getCanvasZoomFactor(),
+          startPosX: tf.posX,
+          startPosY: tf.posY,
+        };
+      }
+    });
+
+    document.addEventListener('mousemove', evt => {
+      if (tfScrub) {
+        if (!tfScrub.started) {
+          if (Math.abs(evt.clientX - tfScrub.startClientX) <= 3) return;
+          tfScrub.started = true;
+          suppressNextScrubClick = true;
+          if (tfScrub.inp && document.activeElement === tfScrub.inp) {
+            tfScrub.inp.blur();
+          }
+          try {
+            const sel = global.getSelection && global.getSelection();
+            if (sel && sel.removeAllRanges) sel.removeAllRanges();
+          } catch {
+            // Ignore selection errors
+          }
+          document.body.classList.add('is-tf-scrubbing');
+          if (tfScrub.scrubWrap) tfScrub.scrubWrap.classList.add('is-scrubbing');
+        }
+
+        const dx = evt.clientX - tfScrub.lastClientX;
+        tfScrub.lastClientX = evt.clientX;
+        if (dx === 0) return;
+
+        tfScrub.accumVal += dx * getTransformFieldScrubStep(tfScrub.field, evt);
+        let nextVal = tfScrub.accumVal;
+        if (tfScrub.field === 'width' || tfScrub.field === 'height') {
+          tfScrub.accumVal = Math.max(1, tfScrub.accumVal);
+          nextVal = Math.max(1, Math.round(tfScrub.accumVal));
+        } else if (
+          tfScrub.field === 'anchorMinX' ||
+          tfScrub.field === 'anchorMinY' ||
+          tfScrub.field === 'anchorMaxX' ||
+          tfScrub.field === 'anchorMaxY'
+        ) {
+          tfScrub.accumVal = clamp01(tfScrub.accumVal);
+          nextVal = roundTfNum(tfScrub.accumVal, 3);
+        } else if (tfScrub.field === 'pivotX' || tfScrub.field === 'pivotY') {
+          nextVal = roundTfNum(tfScrub.accumVal, 3);
+        } else {
+          nextVal = evt.altKey ? roundTfNum(tfScrub.accumVal, 1) : Math.round(tfScrub.accumVal);
+        }
+
+        const tf = getWidgetTransformState(tfScrub.el);
+        applyTransformFieldEdit(tfScrub.el, tf, tfScrub.field, nextVal);
+        syncTransformInspectorWidgets(tfScrub.el, tf);
+        if (tfScrub.inp) {
+          const isNorm =
+            tfScrub.field === 'anchorMinX' ||
+            tfScrub.field === 'anchorMinY' ||
+            tfScrub.field === 'anchorMaxX' ||
+            tfScrub.field === 'anchorMaxY' ||
+            tfScrub.field === 'pivotX' ||
+            tfScrub.field === 'pivotY';
+          tfScrub.inp.value = formatTfVal(getTransformFieldNumericValue(tf, tfScrub.field), isNorm ? 3 : evt.altKey ? 1 : 2);
+        }
+        saveWidgetTransformEdit(tfScrub.el, tf, false);
+        return;
+      }
+
+      if (!tfDrag) return;
+      const rawDxScreen = evt.clientX - tfDrag.startClientX;
+      const rawDyScreen = evt.clientY - tfDrag.startClientY;
+      if (!tfDrag.started) {
+        if (Math.hypot(rawDxScreen, rawDyScreen) <= 4) return;
+        tfDrag.started = true;
+        suppressNextCanvasClick = true;
+        if (state.selectedEl !== tfDrag.el) {
+          selectElement(tfDrag.el);
+          // Re-snapshot initial PosX/PosY in case selection did anything
+          const curTf = getWidgetTransformState(tfDrag.el);
+          tfDrag.startPosX = curTf.posX;
+          tfDrag.startPosY = curTf.posY;
+        }
+      }
+
+      const zoom = tfDrag.zoom || 1;
+      const rawDx = rawDxScreen / zoom;
+      const rawDy = rawDyScreen / zoom;
+      const tf = getWidgetTransformState(tfDrag.el);
+
+      if (tfDrag.kind === 'move') {
+        tf.posX = Math.round(tfDrag.startPosX + rawDx);
+        tf.posY = Math.round(tfDrag.startPosY - rawDy);
+        tf.dirty = true;
+        applyWidgetTransformToDom(tfDrag.el, tf, { applyCss: true });
+        syncTransformInspectorWidgets(tfDrag.el, tf);
+        saveWidgetTransformEdit(tfDrag.el, tf, false);
+        return;
+      }
+
+      if (tfDrag.kind === 'resize') {
+        const rad = ((tfDrag.rotate || 0) * Math.PI) / 180;
+        const cos = Math.cos(rad);
+        const sin = Math.sin(rad);
+        const localDx = rawDx * cos + rawDy * sin;
+        const localDy = -rawDx * sin + rawDy * cos;
+
+        const handle = tfDrag.handle || '';
+        const hasW = handle.includes('w');
+        const hasE = handle.includes('e');
+        const hasN = handle.includes('n');
+        const hasS = handle.includes('s');
+
+        const dW = hasE ? localDx : hasW ? -localDx : 0;
+        const dH = hasS ? localDy : hasN ? -localDy : 0;
+
+        let nextW = Math.max(8, Math.round(tfDrag.startWidth + dW));
+        let nextH = Math.max(8, Math.round(tfDrag.startHeight + dH));
+
+        if (tfDrag.lockAspect && tfDrag.aspectRatio > 0) {
+          if ((hasW || hasE) && !(hasN || hasS)) {
+            nextH = Math.max(8, Math.round(nextW / tfDrag.aspectRatio));
+          } else if ((hasN || hasS) && !(hasW || hasE)) {
+            nextW = Math.max(8, Math.round(nextH * tfDrag.aspectRatio));
+          } else if (Math.abs(dW / Math.max(1, tfDrag.startWidth)) >= Math.abs(dH / Math.max(1, tfDrag.startHeight))) {
+            nextH = Math.max(8, Math.round(nextW / tfDrag.aspectRatio));
+          } else {
+            nextW = Math.max(8, Math.round(nextH * tfDrag.aspectRatio));
+          }
+        } else {
+          tf.aspectRatio = nextH > 0 ? nextW / nextH : 1;
+        }
+
+        const appliedDW = nextW - tfDrag.startWidth;
+        const appliedDH = nextH - tfDrag.startHeight;
+        const [pivX, pivY] = tfDrag.pivot;
+
+        const localShiftX = hasE ? pivX * appliedDW : hasW ? -(1 - pivX) * appliedDW : 0;
+        const localShiftY = hasS ? (1 - pivY) * appliedDH : hasN ? -pivY * appliedDH : 0;
+
+        const worldDx = localShiftX * cos - localShiftY * sin;
+        const worldDy = localShiftX * sin + localShiftY * cos;
+
+        tf.width = nextW;
+        tf.height = nextH;
+        tf.posX = Math.round(tfDrag.startPosX + worldDx);
+        tf.posY = Math.round(tfDrag.startPosY - worldDy);
+        tf.dirty = true;
+        applyWidgetTransformToDom(tfDrag.el, tf, { applyCss: true });
+        syncTransformInspectorWidgets(tfDrag.el, tf);
+        saveWidgetTransformEdit(tfDrag.el, tf, false);
+      }
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (tfScrub) {
+        const endedScrub = tfScrub;
+        tfScrub = null;
+        document.body.classList.remove('is-tf-scrubbing');
+        if (endedScrub.scrubWrap) endedScrub.scrubWrap.classList.remove('is-scrubbing');
+        if (endedScrub.started) {
+          suppressNextScrubClick = true;
+          const tf = getWidgetTransformState(endedScrub.el);
+          saveWidgetTransformEdit(endedScrub.el, tf, true).then(result => {
+            const fb = document.getElementById('wb-tf-feedback');
+            if (fb && state.selectedEl === endedScrub.el) {
+              fb.textContent =
+                result.method === 'studio-server'
+                  ? '✓ Transform saved to ui-edits.js!'
+                  : '✓ Transform saved in browser storage';
+            }
+          });
+          setTimeout(() => {
+            suppressNextScrubClick = false;
+          }, 80);
+        }
+        return;
+      }
+
+      if (!tfDrag) return;
+      const ended = tfDrag;
+      tfDrag = null;
+      if (ended.started) {
+        suppressNextCanvasClick = true;
+        const tf = getWidgetTransformState(ended.el);
+        saveWidgetTransformEdit(ended.el, tf, true).then(result => {
+          const fb = document.getElementById('wb-tf-feedback');
+          if (fb && state.selectedEl === ended.el) {
+            fb.textContent =
+              result.method === 'studio-server'
+                ? '✓ Transform saved to ui-edits.js!'
+                : '✓ Transform saved in browser storage';
+          }
+        });
+        setTimeout(() => {
+          suppressNextCanvasClick = false;
+        }, 80);
+      }
     });
 
     // Draggable green Unity-style 9-slice lines
@@ -3118,8 +4729,10 @@
         renderHierarchyTree();
         if (state.selectedEl || state.inspectorMode === 'resource') renderInspector();
       } else {
+        flushPendingTransforms();
         renderResourcesDockGrid();
       }
+      renderTransformGizmo();
     }, 0);
 
     const scaleParam = params.get('scale');
@@ -3171,6 +4784,8 @@
     applyWidgetTextEdit,
     resetWidgetEdits,
     openSpritePicker,
+    getWidgetTransform: getWidgetTransformState,
+    applyWidgetTransform: applyWidgetTransformToDom,
   };
 
   if (document.readyState === 'loading') {

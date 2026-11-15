@@ -8,6 +8,7 @@ from collections import deque
 from dataclasses import dataclass
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import json
+import math
 from pathlib import Path
 import re
 import sys
@@ -443,8 +444,28 @@ def apply_slice9_overrides_in_place(output_dir: Path, updates: dict[str, list[in
     return slice_9_map
 
 
+def _clean_transform_number(val: Any, default: float = 0.0) -> int | float:
+    try:
+        num = float(val)
+    except (TypeError, ValueError):
+        return default
+    if not math.isfinite(num):
+        return default
+    rounded = round(num, 4)
+    return int(rounded) if rounded.is_integer() else rounded
+
+
+def _clean_transform_pair(val: Any, default: list[float]) -> list[int | float]:
+    if isinstance(val, (list, tuple)) and len(val) == 2:
+        return [
+            _clean_transform_number(val[0], default[0]),
+            _clean_transform_number(val[1], default[1]),
+        ]
+    return list(default)
+
+
 def apply_ui_edits_in_place(previews_root: Path, slug: str, edits_payload: dict[str, Any]) -> dict[str, Any]:
-    """Persist per-preview text and sprite edits to previews/<slug>/ui-edits.json and ui-edits.js."""
+    """Persist per-preview text, sprite, and transform edits to previews/<slug>/ui-edits.json and ui-edits.js."""
     clean_slug = str(slug or "").strip()
     if not clean_slug or "/" in clean_slug or "\\" in clean_slug or clean_slug.startswith("."):
         raise ValueError(f"Invalid preview slug: {slug!r}")
@@ -456,6 +477,7 @@ def apply_ui_edits_in_place(previews_root: Path, slug: str, edits_payload: dict[
 
     raw_text = edits_payload.get("textEdits") if isinstance(edits_payload, dict) else {}
     raw_sprites = edits_payload.get("spriteEdits") if isinstance(edits_payload, dict) else {}
+    raw_transforms = edits_payload.get("transformEdits") if isinstance(edits_payload, dict) else {}
 
     clean_text: dict[str, str] = {}
     if isinstance(raw_text, dict):
@@ -475,10 +497,44 @@ def apply_ui_edits_in_place(previews_root: Path, slug: str, edits_payload: dict[
             if cleaned_attrs:
                 clean_sprites[path_key.strip()] = cleaned_attrs
 
-    normalized = {
+    clean_transforms: dict[str, dict[str, Any]] = {}
+    if isinstance(raw_transforms, dict):
+        for path_key, tf_obj in raw_transforms.items():
+            if not isinstance(path_key, str) or not path_key.strip() or not isinstance(tf_obj, dict):
+                continue
+            entry: dict[str, Any] = {}
+            if "posX" in tf_obj:
+                entry["posX"] = _clean_transform_number(tf_obj["posX"], 0)
+            if "posY" in tf_obj:
+                entry["posY"] = _clean_transform_number(tf_obj["posY"], 0)
+            if "width" in tf_obj:
+                w = float(_clean_transform_number(tf_obj["width"], 1))
+                entry["width"] = _clean_transform_number(max(1.0, w), 1)
+            if "height" in tf_obj:
+                h = float(_clean_transform_number(tf_obj["height"], 1))
+                entry["height"] = _clean_transform_number(max(1.0, h), 1)
+            if "rotate" in tf_obj:
+                entry["rotate"] = _clean_transform_number(tf_obj["rotate"], 0)
+            if "anchorMin" in tf_obj:
+                entry["anchorMin"] = _clean_transform_pair(tf_obj["anchorMin"], [0.5, 0.5])
+            if "anchorMax" in tf_obj:
+                entry["anchorMax"] = _clean_transform_pair(tf_obj["anchorMax"], [0.5, 0.5])
+            if "pivot" in tf_obj:
+                entry["pivot"] = _clean_transform_pair(tf_obj["pivot"], [0.5, 0.5])
+            if "lockAspect" in tf_obj:
+                entry["lockAspect"] = bool(tf_obj["lockAspect"])
+            if "aspectRatio" in tf_obj:
+                ratio = float(_clean_transform_number(tf_obj["aspectRatio"], 1.0))
+                entry["aspectRatio"] = _clean_transform_number(max(0.0001, ratio), 1.0)
+            if entry:
+                clean_transforms[path_key.strip()] = entry
+
+    normalized: dict[str, Any] = {
         "textEdits": clean_text,
         "spriteEdits": clean_sprites,
     }
+    if clean_transforms:
+        normalized["transformEdits"] = clean_transforms
 
     edits_json_path = target_dir / "ui-edits.json"
     edits_json_path.write_text(json.dumps(normalized, indent=2) + "\n", encoding="utf-8")
