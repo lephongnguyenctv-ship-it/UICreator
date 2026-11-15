@@ -1,10 +1,10 @@
 {
   "status": "PASSED",
   "page": "previews/upgrade-shop/index.html",
-  "timestamp": "2026-11-15T12:20:13.805Z",
+  "timestamp": "2026-11-15T17:07:27.543Z",
   "summary": {
     "statesTested": 6,
-    "totalAssetsVerified": 73,
+    "totalAssetsVerified": 74,
     "consoleErrors": 0,
     "brokenAssets": 0,
     "pixelatedViolations": 0,
@@ -37,7 +37,7 @@
         "width": 1280,
         "height": 720
       },
-      "assetsChecked": 24,
+      "assetsChecked": 25,
       "brokenAssets": [],
       "pixelatedViolations": [],
       "viewportDefects": [],

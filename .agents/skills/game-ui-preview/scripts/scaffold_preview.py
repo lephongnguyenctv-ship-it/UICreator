@@ -6,6 +6,13 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 import shutil
+import sys
+
+_SCRIPTS_DIR = str(Path(__file__).resolve().parent)
+if _SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPTS_DIR)
+
+from build_gallery import build_gallery
 
 
 STARTER_HTML = """<!DOCTYPE html>
@@ -38,18 +45,6 @@ STARTER_HTML = """<!DOCTYPE html>
         <button class="wb-btn" data-wb-scale="2">2x</button>
         <button class="wb-btn is-active" data-wb-scale="3">3x</button>
         <button class="wb-btn" data-wb-scale="4">4x</button>
-      </div>
-      <div class="wb-group">
-        <span class="wb-label">Scene</span>
-        <button class="wb-btn is-active" data-wb-scene="cozy-meadow">Meadow</button>
-        <button class="wb-btn" data-wb-scene="night">Night</button>
-        <button class="wb-btn" data-wb-scene="dungeon">Dungeon</button>
-        <button class="wb-btn" data-wb-scene="checker">Checker</button>
-      </div>
-      <div class="wb-group">
-        <button class="wb-btn{behavior_active}" data-wb-behavior>Behavior Spec</button>
-        <button class="wb-btn" data-wb-debug>Outlines</button>
-        <button class="wb-btn" data-wb-manifest>Sprites Used</button>
       </div>
     </div>
   </header>
@@ -105,6 +100,8 @@ STARTER_HTML = """<!DOCTYPE html>
   </main>
 
   <script src="{catalog_rel}catalog-data.js"></script>
+  <script src="{catalog_rel}previews-data.js"></script>
+  <script src="./ui-edits.js"></script>
   <script src="./pixel-ui-kit.js"></script>
 </body>
 </html>
@@ -146,6 +143,7 @@ def scaffold_preview(
             ),
             encoding="utf-8",
         )
+    build_gallery(previews_root=out_root, catalog_dir=catalog_dir)
     return index_path
 
 

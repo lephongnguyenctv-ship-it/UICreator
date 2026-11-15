@@ -5,6 +5,7 @@
 
   const DEFAULT_CATALOG_BASE = '../_catalog/';
   const OVERRIDES_STORAGE_KEY = 'pixelui_slice9_overrides_v1';
+  const UI_EDITS_STORAGE_PREFIX = 'pixelui_ui_edits_v1:';
 
   const STUDIO_SERVER_PORT = 17890;
   const FS_DB_NAME = 'pixelui_fs_handles_v1';
@@ -13,13 +14,32 @@
 
   const state = {
     selectedEl: null,
+    selectedResourceSliceId: null,
+    inspectorMode: 'widget', // 'widget' | 'resource'
     activeEditorSliceAttr: 'data-slice-id',
     currentMode: 'final',
     studioVisible: false,
     applyAllInstances: true,
+    swapAllSprites: false,
     collapsedViews: new WeakMap(),
     elementSlice9Overrides: new WeakMap(),
     initialSlice9Defaults: new Map(),
+    originalWidgetAttrs: new WeakMap(),
+    originalWidgetText: new WeakMap(),
+    inlineEdit: null,
+    spritePicker: {
+      category: 'all',
+      search: '',
+      attrName: 'data-slice-id',
+      targetEl: null,
+    },
+    resourceDock: {
+      open: false,
+      activeTab: 'resources', // 'resources' | 'manifest' | 'behavior'
+      category: 'all',
+      search: '',
+      onlyUsed: false,
+    },
     hierarchyItems: [],
   };
 
@@ -65,18 +85,6 @@
     } catch {
       // Ignore storage quota / privacy mode errors
     }
-  }
-
-  function buildSaveEndpoints() {
-    const endpoints = [];
-    if (global.location && /^https?:$/i.test(global.location.protocol)) {
-      endpoints.push(new URL('/api/save-slice9', global.location.origin).href);
-    }
-    const studioEndpoint = `http://127.0.0.1:${STUDIO_SERVER_PORT}/api/save-slice9`;
-    if (!endpoints.includes(studioEndpoint)) {
-      endpoints.push(studioEndpoint);
-    }
-    return endpoints;
   }
 
   function openHandleDb() {
@@ -147,8 +155,26 @@
     }
   }
 
-  async function persistSlice9ToDisk(payload) {
-    const endpoints = buildSaveEndpoints();
+  function persistSlice9ToDisk(payload) {
+    return postToStudioServer('/api/save-slice9', payload).then(async result => {
+      if (result.ok) return result;
+      const savedViaPicker = await trySaveCatalogViaFilePicker();
+      if (savedViaPicker) {
+        return { ok: true, method: 'file-system-api', resolved: {} };
+      }
+      return { ok: true, method: 'browser-storage', resolved: {} };
+    });
+  }
+
+  async function postToStudioServer(apiPath, payload) {
+    const endpoints = [];
+    if (global.location && /^https?:$/i.test(global.location.protocol)) {
+      endpoints.push(new URL(apiPath, global.location.origin).href);
+    }
+    const studioEndpoint = `http://127.0.0.1:${STUDIO_SERVER_PORT}${apiPath}`;
+    if (!endpoints.includes(studioEndpoint)) {
+      endpoints.push(studioEndpoint);
+    }
     for (const endpoint of endpoints) {
       try {
         const res = await fetch(endpoint, {
@@ -159,20 +185,531 @@
         if (res.ok) {
           const data = await res.json();
           if (data && data.ok) {
-            return { ok: true, method: 'studio-server', resolved: data.resolved || {} };
+            return { ok: true, method: 'studio-server', resolved: data.resolved || {}, data };
           }
         }
       } catch {
-        // Endpoint unreachable; try next candidate or fallback
+        // Endpoint unreachable; try next candidate
       }
     }
+    return { ok: false, method: 'browser-storage', resolved: {} };
+  }
 
-    const savedViaPicker = await trySaveCatalogViaFilePicker();
-    if (savedViaPicker) {
-      return { ok: true, method: 'file-system-api', resolved: {} };
+  function getPreviewSlugForEdits() {
+    const slug = getCurrentPreviewSlug(global.UI_PREVIEWS_CATALOG);
+    return slug || 'default';
+  }
+
+  function getElementCanvasPath(el) {
+    const canvas = document.getElementById('game-canvas');
+    if (!canvas || !el || !canvas.contains(el) || el === canvas) return '';
+    const parts = [];
+    let cur = el;
+    while (cur && cur !== canvas) {
+      const parent = cur.parentElement;
+      if (!parent) return '';
+      const kids = Array.from(parent.children).filter(c => c.id !== '__verify_annotations__');
+      const idx = kids.indexOf(cur);
+      if (idx < 0) return '';
+      parts.unshift(String(idx));
+      cur = parent;
+    }
+    return parts.join('.');
+  }
+
+  function resolveElementByCanvasPath(pathStr) {
+    const canvas = document.getElementById('game-canvas');
+    if (!canvas || !pathStr) return null;
+    const parts = String(pathStr).split('.').map(n => parseInt(n, 10));
+    let cur = canvas;
+    for (const idx of parts) {
+      if (Number.isNaN(idx) || idx < 0) return null;
+      const kids = Array.from(cur.children).filter(c => c.id !== '__verify_annotations__');
+      if (idx >= kids.length) return null;
+      cur = kids[idx];
+    }
+    return cur;
+  }
+
+  function loadUiEdits() {
+    const slug = getPreviewSlugForEdits();
+    const diskEdits = (global.PIXELUI_EDITS && global.PIXELUI_EDITS[slug]) || {};
+    let localEdits = {};
+    try {
+      const raw = global.localStorage && global.localStorage.getItem(UI_EDITS_STORAGE_PREFIX + slug);
+      if (raw) localEdits = JSON.parse(raw) || {};
+    } catch {
+      localEdits = {};
+    }
+    return {
+      textEdits: Object.assign({}, diskEdits.textEdits || {}, localEdits.textEdits || {}),
+      spriteEdits: Object.assign({}, diskEdits.spriteEdits || {}, localEdits.spriteEdits || {}),
+    };
+  }
+
+  function saveUiEdits(edits) {
+    const slug = getPreviewSlugForEdits();
+    const normalized = {
+      textEdits: edits && edits.textEdits ? edits.textEdits : {},
+      spriteEdits: edits && edits.spriteEdits ? edits.spriteEdits : {},
+    };
+    global.PIXELUI_EDITS = global.PIXELUI_EDITS || {};
+    global.PIXELUI_EDITS[slug] = normalized;
+    try {
+      if (!global.localStorage) return;
+      if (
+        Object.keys(normalized.textEdits).length === 0 &&
+        Object.keys(normalized.spriteEdits).length === 0
+      ) {
+        global.localStorage.removeItem(UI_EDITS_STORAGE_PREFIX + slug);
+      } else {
+        global.localStorage.setItem(UI_EDITS_STORAGE_PREFIX + slug, JSON.stringify(normalized));
+      }
+    } catch {
+      // Ignore storage errors
+    }
+  }
+
+  function persistUiEditsToDisk() {
+    const slug = getPreviewSlugForEdits();
+    const edits = loadUiEdits();
+    return postToStudioServer('/api/save-ui-edits', { slug, edits });
+  }
+
+  const STATE_SLICE_ATTRS = [
+    'data-slice-id',
+    'data-slice-hover',
+    'data-slice-pressed',
+    'data-slice-on',
+    'data-slice-off',
+    'data-slice-9',
+  ];
+
+  const BUTTON_STATE_DEFS = [
+    { key: 'idle', label: 'Idle', attr: 'data-slice-id', optional: false },
+    { key: 'hover', label: 'Hover', attr: 'data-slice-hover', optional: true },
+    { key: 'pressed', label: 'Pressed', attr: 'data-slice-pressed', optional: true },
+  ];
+
+  function snapshotWidgetOriginals(el) {
+    if (!el || state.originalWidgetAttrs.has(el)) return;
+    const attrs = {};
+    STATE_SLICE_ATTRS.forEach(name => {
+      attrs[name] = el.hasAttribute(name) ? el.getAttribute(name) : null;
+    });
+    attrs['--w'] = el.style.getPropertyValue('--w') || '';
+    attrs['--h'] = el.style.getPropertyValue('--h') || '';
+    attrs._classes = {
+      px9: el.classList.contains('px-9slice'),
+      pxBtnSq: el.classList.contains('px-btn-square'),
+    };
+    state.originalWidgetAttrs.set(el, attrs);
+  }
+
+  function getDirectTextNode(el) {
+    if (!el) return null;
+    for (const node of el.childNodes) {
+      if (node.nodeType === 3 && (node.textContent || '').trim().length > 0) {
+        return node;
+      }
+    }
+    return null;
+  }
+
+  function isPureSpritePrimitive(el) {
+    if (!el || el.nodeType !== 1) return false;
+    if (el.tagName === 'IMG') return true;
+    if (getDirectTextNode(el)) return false;
+    return (
+      el.classList.contains('px-icon') ||
+      el.classList.contains('px-sprite-box') ||
+      el.classList.contains('px-btn-square') ||
+      el.classList.contains('toggle-sprite-btn') ||
+      (el.hasAttribute('data-slice-id') && el.children.length === 0)
+    );
+  }
+
+  function isButtonComponent(el) {
+    if (!el || el.nodeType !== 1) return false;
+    if (el.hasAttribute('data-ui-toggle') || el.classList.contains('toggle-sprite-btn')) return false;
+    return (
+      el.tagName === 'BUTTON' ||
+      el.classList.contains('px-btn') ||
+      el.classList.contains('px-btn-square') ||
+      el.hasAttribute('data-slice-pressed') ||
+      el.hasAttribute('data-slice-hover')
+    );
+  }
+
+  function getButtonSpriteTargetEl(el) {
+    if (!el || el.nodeType !== 1) return null;
+    if (
+      el.classList.contains('px-9slice') ||
+      el.classList.contains('px-btn-square') ||
+      el.classList.contains('px-sprite-box') ||
+      el.tagName === 'IMG'
+    ) {
+      return el;
+    }
+    const childSprite = el.querySelector(
+      '.px-btn-square, [data-slice-pressed], [data-slice-hover], .px-9slice[data-slice-id], .px-sprite-box[data-slice-id]'
+    );
+    if (childSprite) return childSprite;
+    if (el.children.length === 1 && el.children[0].matches('img[data-slice-id], .px-icon[data-slice-id]')) {
+      return el.children[0];
+    }
+    return el;
+  }
+
+  function resolveInteractiveButtonPair(target) {
+    if (!target || typeof target.closest !== 'function') return null;
+    const direct = target.closest('[data-slice-pressed], [data-slice-hover]');
+    if (direct && !direct.hasAttribute('data-ui-toggle')) {
+      const hostBtn = direct.closest('button, .px-btn');
+      return {
+        hostEl: hostBtn || direct,
+        spriteEl: direct,
+      };
+    }
+    const btn = target.closest('button, .px-btn');
+    if (btn && !btn.hasAttribute('data-ui-toggle')) {
+      const spriteEl = getButtonSpriteTargetEl(btn);
+      if (spriteEl && (spriteEl.hasAttribute('data-slice-pressed') || spriteEl.hasAttribute('data-slice-hover'))) {
+        return {
+          hostEl: btn,
+          spriteEl,
+        };
+      }
+    }
+    return null;
+  }
+
+  function syncButtonVisualState(spriteEl) {
+    if (!spriteEl || !document.body.contains(spriteEl)) return;
+    const pressedId = spriteEl.getAttribute('data-slice-pressed');
+    const hoverId = spriteEl.getAttribute('data-slice-hover');
+    const idleId = spriteEl.getAttribute('data-slice-id');
+
+    let nextSlice = idleId;
+    if (!isWireframeMode() && !isEditMode()) {
+      if (spriteEl.classList.contains('is-pressed') && pressedId && resolveSliceUrl(pressedId)) {
+        nextSlice = pressedId;
+      } else if (spriteEl.classList.contains('is-hovered') && hoverId && resolveSliceUrl(hoverId)) {
+        nextSlice = hoverId;
+      }
+    }
+    if (nextSlice) {
+      applySliceToElement(spriteEl, nextSlice);
+    }
+  }
+
+  function hasNonEmptyOriginalText(el) {
+    return Boolean(el && state.originalWidgetText.has(el) && state.originalWidgetText.get(el).length > 0);
+  }
+
+  function getEditableTextInfo(el) {
+    if (!el || el.tagName === 'IMG') return null;
+    const directNode = getDirectTextNode(el);
+    if (directNode) {
+      if (!state.originalWidgetText.has(el)) {
+        state.originalWidgetText.set(el, directNode.textContent.trim().replace(/\s+/g, ' '));
+      }
+      return {
+        targetEl: el,
+        textNode: directNode,
+        currentText: directNode.textContent.trim().replace(/\s+/g, ' '),
+      };
     }
 
-    return { ok: true, method: 'browser-storage', resolved: {} };
+    if (!isPureSpritePrimitive(el) && hasNonEmptyOriginalText(el)) {
+      return {
+        targetEl: el,
+        textNode: null,
+        currentText: (el.textContent || '').trim().replace(/\s+/g, ' '),
+      };
+    }
+
+    const isCompactWidget =
+      el.matches('button, a, .wallet-chip, .hud-speech, .px-wire-box, h1, h2, h3, h4, p, span, strong, label') ||
+      (el.children.length <= 3 && !el.querySelector('[data-ui-view]'));
+    if (isCompactWidget) {
+      const candidates = Array.from(el.querySelectorAll('span, strong, em, p, h1, h2, h3, h4, div, label')).filter(
+        child =>
+          !child.hasAttribute('data-slice-id') &&
+          !isPureSpritePrimitive(child) &&
+          (Boolean(getDirectTextNode(child)) || hasNonEmptyOriginalText(child))
+      );
+      if (candidates.length === 1) {
+        const targetEl = candidates[0];
+        const node = getDirectTextNode(targetEl);
+        if (!state.originalWidgetText.has(targetEl) && node) {
+          state.originalWidgetText.set(targetEl, node.textContent.trim().replace(/\s+/g, ' '));
+        }
+        return {
+          targetEl,
+          textNode: node,
+          currentText: node
+            ? node.textContent.trim().replace(/\s+/g, ' ')
+            : (targetEl.textContent || '').trim().replace(/\s+/g, ' '),
+        };
+      }
+    }
+    return null;
+  }
+
+  function setTargetElementText(targetEl, nextText) {
+    if (!targetEl) return;
+    if (!state.originalWidgetText.has(targetEl)) {
+      const origNode = getDirectTextNode(targetEl);
+      state.originalWidgetText.set(targetEl, origNode ? origNode.textContent.trim().replace(/\s+/g, ' ') : (targetEl.textContent || '').trim());
+    }
+    const existingNode = getDirectTextNode(targetEl);
+    if (existingNode) {
+      existingNode.textContent = nextText;
+    } else if (targetEl.children.length === 0) {
+      targetEl.textContent = nextText;
+    } else {
+      targetEl.insertBefore(document.createTextNode(nextText), targetEl.firstChild);
+    }
+  }
+
+  function applyWidgetTextEdit(el, nextText, persistToServer = false) {
+    const info = getEditableTextInfo(el);
+    const targetEl = info && info.targetEl ? info.targetEl : null;
+    if (!targetEl) return false;
+
+    setTargetElementText(targetEl, nextText);
+
+    const pathKey = getElementCanvasPath(targetEl);
+    if (pathKey) {
+      const edits = loadUiEdits();
+      edits.textEdits[pathKey] = nextText;
+      saveUiEdits(edits);
+    }
+
+    renderHierarchyTree();
+    if (state.selectedEl === el) {
+      updateInspectorGeometryReadout();
+    }
+
+    if (persistToServer) {
+      return persistUiEditsToDisk();
+    }
+    return Promise.resolve({ ok: true, method: 'browser-storage' });
+  }
+
+  function applySpriteAttrToElement(el, attrName, newSliceId) {
+    if (!el || !newSliceId) return;
+    snapshotWidgetOriginals(el);
+    el.setAttribute(attrName, newSliceId);
+
+    if (attrName === 'data-slice-id') {
+      if (
+        getButtonSpriteTargetEl(el) === el &&
+        el.tagName !== 'IMG' &&
+        !el.classList.contains('px-9slice') &&
+        !el.classList.contains('px-btn-square') &&
+        !el.classList.contains('px-sprite-box') &&
+        !el.classList.contains('toggle-sprite-btn') &&
+        !el.classList.contains('px-icon')
+      ) {
+        const resClassCheck = resolveSliceUrl(newSliceId);
+        if (resClassCheck && resClassCheck.rec && Array.isArray(resClassCheck.rec.slice_9)) {
+          el.classList.add('px-9slice');
+        } else {
+          el.classList.add('px-btn-square');
+        }
+      }
+      el.removeAttribute('data-slice-9');
+      if (el.dataset) delete el.dataset.htmlSlice9;
+      state.elementSlice9Overrides.delete(el);
+      const resolved = resolveSliceUrl(newSliceId);
+      if (resolved && resolved.rec) {
+        el.style.setProperty('--w', String(resolved.rec.width));
+        el.style.setProperty('--h', String(resolved.rec.height));
+      }
+      applySliceToElement(el, newSliceId);
+    } else {
+      syncButtonVisualState(el);
+    }
+  }
+
+  function findMatchingSpriteTargets(el, attrName) {
+    const targets = [el];
+    const oldSliceId = el.getAttribute(attrName);
+    const isBtn = isButtonComponent(el);
+    let selector = null;
+    if (oldSliceId) {
+      selector = `#game-canvas [${attrName}="${oldSliceId}"]`;
+    } else if (attrName !== 'data-slice-id') {
+      const idleId = el.getAttribute('data-slice-id');
+      if (idleId) {
+        selector = `#game-canvas [data-slice-id="${idleId}"]`;
+      }
+    }
+    if (selector) {
+      document.querySelectorAll(selector).forEach(node => {
+        if (node === el) return;
+        if (isBtn && !isButtonComponent(node)) return;
+        targets.push(node);
+      });
+    }
+    return targets;
+  }
+
+  function refreshStudioViewsAfterSpriteChange() {
+    renderManifestTable();
+    renderResourcesDockGrid();
+    renderHierarchyTree();
+    if (state.selectedEl || state.inspectorMode === 'resource') {
+      renderInspector();
+    }
+  }
+
+  function changeWidgetSprite(el, attrName, newSliceId, applyToAllMatching = false) {
+    if (!el || !newSliceId) return Promise.resolve({ ok: false });
+    const resolved = resolveSliceUrl(newSliceId);
+    if (!resolved) {
+      return Promise.resolve({ ok: false, error: `Unknown slice ID: ${newSliceId}` });
+    }
+
+    const baseTarget = isButtonComponent(el) ? getButtonSpriteTargetEl(el) || el : el;
+    const edits = loadUiEdits();
+    const targets = applyToAllMatching ? findMatchingSpriteTargets(baseTarget, attrName) : [baseTarget];
+
+    targets.forEach(node => {
+      applySpriteAttrToElement(node, attrName, newSliceId);
+      const pKey = getElementCanvasPath(node);
+      if (pKey) {
+        edits.spriteEdits[pKey] = edits.spriteEdits[pKey] || {};
+        edits.spriteEdits[pKey][attrName] = newSliceId;
+      }
+    });
+
+    saveUiEdits(edits);
+    refreshStudioViewsAfterSpriteChange();
+    return persistUiEditsToDisk();
+  }
+
+  function clearWidgetSpriteAttr(el, attrName, applyToAllMatching = false) {
+    if (!el || !attrName || attrName === 'data-slice-id') return Promise.resolve({ ok: false });
+    const baseTarget = isButtonComponent(el) ? getButtonSpriteTargetEl(el) || el : el;
+    const edits = loadUiEdits();
+    const targets = applyToAllMatching ? findMatchingSpriteTargets(baseTarget, attrName) : [baseTarget];
+
+    targets.forEach(node => {
+      snapshotWidgetOriginals(node);
+      node.removeAttribute(attrName);
+      if (attrName === 'data-slice-hover') node.classList.remove('is-hovered');
+      if (attrName === 'data-slice-pressed') node.classList.remove('is-pressed');
+      syncButtonVisualState(node);
+      const pKey = getElementCanvasPath(node);
+      if (pKey) {
+        edits.spriteEdits[pKey] = edits.spriteEdits[pKey] || {};
+        edits.spriteEdits[pKey][attrName] = '';
+      }
+    });
+
+    saveUiEdits(edits);
+    refreshStudioViewsAfterSpriteChange();
+    return persistUiEditsToDisk();
+  }
+
+  function resetSingleElementSpriteAttrs(node, edits) {
+    if (!node) return;
+    const nodePath = getElementCanvasPath(node);
+    if (nodePath && edits.spriteEdits[nodePath]) {
+      delete edits.spriteEdits[nodePath];
+    }
+    const origAttrs = state.originalWidgetAttrs.get(node);
+    if (!origAttrs) return;
+
+    STATE_SLICE_ATTRS.forEach(name => {
+      if (origAttrs[name] === null) {
+        node.removeAttribute(name);
+      } else {
+        node.setAttribute(name, origAttrs[name]);
+      }
+    });
+    if (origAttrs._classes) {
+      node.classList.toggle('px-9slice', Boolean(origAttrs._classes.px9));
+      node.classList.toggle('px-btn-square', Boolean(origAttrs._classes.pxBtnSq));
+    }
+    if (origAttrs['--w']) node.style.setProperty('--w', origAttrs['--w']);
+    else node.style.removeProperty('--w');
+    if (origAttrs['--h']) node.style.setProperty('--h', origAttrs['--h']);
+    else node.style.removeProperty('--h');
+    if (node.dataset) {
+      node.dataset.htmlSlice9 = origAttrs['data-slice-9'] || '';
+    }
+    node.classList.remove('is-hovered', 'is-pressed');
+    state.elementSlice9Overrides.delete(node);
+    const restoredId = node.getAttribute('data-slice-id');
+    if (restoredId) {
+      applySliceToElement(node, restoredId);
+    } else if (node.tagName !== 'IMG') {
+      node.style.removeProperty('--skin-url');
+      node.style.removeProperty('--slice-t');
+      node.style.removeProperty('--slice-r');
+      node.style.removeProperty('--slice-b');
+      node.style.removeProperty('--slice-l');
+    }
+  }
+
+  function resetWidgetEdits(el) {
+    if (!el) return Promise.resolve({ ok: false });
+    const edits = loadUiEdits();
+
+    resetSingleElementSpriteAttrs(el, edits);
+    const spriteTarget = getButtonSpriteTargetEl(el);
+    if (spriteTarget && spriteTarget !== el) {
+      resetSingleElementSpriteAttrs(spriteTarget, edits);
+    }
+
+    // Reset text edits on el or its targetEl
+    const info = getEditableTextInfo(el);
+    const textTarget = (info && info.targetEl) || el;
+    const textPath = getElementCanvasPath(textTarget);
+    if (textPath && edits.textEdits[textPath] !== undefined) {
+      delete edits.textEdits[textPath];
+    }
+    if (state.originalWidgetText.has(textTarget)) {
+      setTargetElementText(textTarget, state.originalWidgetText.get(textTarget));
+    }
+
+    saveUiEdits(edits);
+    renderManifestTable();
+    renderResourcesDockGrid();
+    renderHierarchyTree();
+    renderInspector();
+    return persistUiEditsToDisk();
+  }
+
+  function applySavedUiEdits() {
+    const edits = loadUiEdits();
+    const spriteEntries = Object.entries(edits.spriteEdits || {});
+    const textEntries = Object.entries(edits.textEdits || {});
+
+    spriteEntries.forEach(([pathKey, attrMap]) => {
+      const el = resolveElementByCanvasPath(pathKey);
+      if (!el || !attrMap || typeof attrMap !== 'object') return;
+      Object.entries(attrMap).forEach(([attrName, sliceId]) => {
+        if (sliceId === '' && (attrName === 'data-slice-hover' || attrName === 'data-slice-pressed')) {
+          snapshotWidgetOriginals(el);
+          el.removeAttribute(attrName);
+        } else if (sliceId && resolveSliceUrl(sliceId)) {
+          applySpriteAttrToElement(el, attrName, sliceId);
+        }
+      });
+    });
+
+    textEntries.forEach(([pathKey, txt]) => {
+      const el = resolveElementByCanvasPath(pathKey);
+      if (!el || typeof txt !== 'string' || isPureSpritePrimitive(el)) return;
+      setTargetElementText(el, txt);
+    });
+
+    return spriteEntries.length + textEntries.length;
   }
 
   function parseSlice9Attr(raw) {
@@ -297,6 +834,14 @@
     const canvas = document.getElementById('game-canvas');
     if (canvas) {
       canvas.classList.toggle('is-wireframe', isWireframe);
+      if (isWireframe || isEdit) {
+        canvas.querySelectorAll('.is-hovered, .is-pressed').forEach(node => {
+          node.classList.remove('is-hovered', 'is-pressed');
+          if (node.hasAttribute('data-slice-id')) {
+            syncButtonVisualState(node);
+          }
+        });
+      }
     }
 
     document.querySelectorAll('[data-wb-mode]').forEach(btn => {
@@ -310,19 +855,20 @@
     if (!isClean) {
       setStudioPanels(isEdit);
       if (isEdit) {
+        setBottomDock(true, 'resources');
         renderHierarchyTree();
+        renderResourcesDockGrid();
         renderInspector();
+      } else if (isWireframe) {
+        setBottomDock(true, 'behavior');
+      } else {
+        setBottomDock(false);
       }
     }
 
-    const behaviorDrawer = document.getElementById('wb-behavior-drawer');
-    const behaviorBtn = document.querySelector('[data-wb-behavior]');
-    if (behaviorDrawer && !isClean) {
-      behaviorDrawer.classList.toggle('is-open', isWireframe);
-      if (behaviorBtn) {
-        behaviorBtn.classList.toggle('is-active', isWireframe);
-        behaviorBtn.setAttribute('aria-pressed', isWireframe ? 'true' : 'false');
-      }
+    const hubLink = document.querySelector('[data-wb-hub-link]');
+    if (hubLink) {
+      hubLink.setAttribute('href', isWireframe ? '../index.html?thumb=wireframe' : '../index.html');
     }
 
     document.dispatchEvent(new CustomEvent('pixelui:modechange', { detail: { mode: normalized } }));
@@ -369,7 +915,7 @@
     document.querySelectorAll('[data-wb-scale]').forEach(btn => {
       btn.classList.toggle('is-active', parseInt(btn.getAttribute('data-wb-scale'), 10) === numeric);
     });
-    if (state.selectedEl) {
+    if (state.selectedEl || state.inspectorMode === 'resource') {
       renderInspector();
     }
   }
@@ -384,43 +930,239 @@
     });
   }
 
+  function getCanvasSliceUsageCounts() {
+    const counts = new Map();
+    const attrs = ['data-slice-id', 'data-slice-hover', 'data-slice-pressed', 'data-slice-on', 'data-slice-off'];
+    document.querySelectorAll('#game-canvas *').forEach(el => {
+      attrs.forEach(attr => {
+        const val = el.getAttribute && el.getAttribute(attr);
+        if (val) {
+          counts.set(val, (counts.get(val) || 0) + 1);
+        }
+      });
+    });
+    return counts;
+  }
+
+  function getActive9SliceId() {
+    if (state.inspectorMode === 'resource' && state.selectedResourceSliceId) {
+      return state.selectedResourceSliceId;
+    }
+    if (state.selectedEl) {
+      const spriteEl = isButtonComponent(state.selectedEl) ? getButtonSpriteTargetEl(state.selectedEl) : state.selectedEl;
+      return spriteEl ? spriteEl.getAttribute(state.activeEditorSliceAttr || 'data-slice-id') : null;
+    }
+    return null;
+  }
+
   function renderManifestTable() {
     const tbody = document.getElementById('wb-manifest-body');
     if (!tbody) return;
     const catalog = getCatalog();
     const seen = new Map();
 
-    document.querySelectorAll('#game-canvas [data-slice-id]').forEach(el => {
-      const id = el.getAttribute('data-slice-id');
+    document.querySelectorAll('#game-canvas [data-slice-id], #game-canvas [data-slice-hover], #game-canvas [data-slice-pressed]').forEach(el => {
       const role = el.getAttribute('data-ui-role') || el.getAttribute('alt') || el.tagName.toLowerCase();
-      if (!seen.has(id)) {
-        seen.set(id, { id, roles: new Set([role]) });
-      } else {
-        seen.get(id).roles.add(role);
-      }
+      ['data-slice-id', 'data-slice-hover', 'data-slice-pressed'].forEach(attr => {
+        const id = el.getAttribute(attr);
+        if (!id) return;
+        const label = attr === 'data-slice-id' ? role : `${role} (${attr.replace('data-slice-', '')})`;
+        if (!seen.has(id)) {
+          seen.set(id, { id, roles: new Set([label]) });
+        } else {
+          seen.get(id).roles.add(label);
+        }
+      });
     });
 
+    const overrides = loadSlice9Overrides();
     const rows = [];
     for (const [id, info] of seen.entries()) {
       const rec = catalog.slices && catalog.slices[id];
       const thumbUrl = rec ? getCatalogBase() + rec.file : '';
       const dims = rec ? `${rec.width}x${rec.height}` : '?';
       const src = rec ? rec.source_file : 'missing';
-      const overrides = loadSlice9Overrides();
       const eff9 = overrides[id] || (rec && rec.slice_9);
       const slice9 = eff9 ? `[${eff9.join(', ')}]${overrides[id] ? ' *' : ''}` : '-';
+      const isSelected = state.inspectorMode === 'resource' && state.selectedResourceSliceId === id;
       rows.push(
-        `<tr>
+        `<tr class="manifest-row-clickable${isSelected ? ' is-selected' : ''}" data-res-pick="${escapeHtml(id)}" title="Click to edit 9-slice in Right tab">
           <td><img class="manifest-thumb" src="${thumbUrl}" alt=""></td>
-          <td><code>${id}</code></td>
-          <td>${Array.from(info.roles).join(', ')}</td>
-          <td>${src}</td>
+          <td><code>${escapeHtml(id)}</code></td>
+          <td>${escapeHtml(Array.from(info.roles).join(', '))}</td>
+          <td>${escapeHtml(src)}</td>
           <td>${dims}</td>
           <td>${slice9}</td>
         </tr>`
       );
     }
     tbody.innerHTML = rows.join('');
+  }
+
+  function setBottomDock(open, tabName) {
+    if (isCleanMode()) return;
+    const dock = document.getElementById('wb-bottom-dock');
+    if (!dock) return;
+
+    const nextOpen = Boolean(open);
+    state.resourceDock.open = nextOpen;
+    if (tabName) {
+      state.resourceDock.activeTab = tabName;
+    }
+
+    dock.classList.toggle('is-open', nextOpen);
+
+    const activeTab = state.resourceDock.activeTab || 'resources';
+    dock.querySelectorAll('[data-dock-tab]').forEach(btn => {
+      const isMatch = btn.getAttribute('data-dock-tab') === activeTab;
+      btn.classList.toggle('is-active', isMatch);
+      btn.setAttribute('aria-pressed', isMatch ? 'true' : 'false');
+    });
+
+    dock.querySelectorAll('.wb-dock-pane').forEach(pane => {
+      pane.classList.toggle('is-active', pane.getAttribute('data-dock-pane') === activeTab);
+    });
+
+    const resToolbar = document.getElementById('wb-res-toolbar');
+    if (resToolbar) {
+      resToolbar.style.display = activeTab === 'resources' ? 'flex' : 'none';
+    }
+
+    const behaviorBtn = document.querySelector('[data-wb-behavior]');
+    const manifestBtn = document.querySelector('[data-wb-manifest]');
+    const resourcesBtn = document.querySelector('[data-wb-resources]');
+    if (behaviorBtn) {
+      const active = nextOpen && activeTab === 'behavior';
+      behaviorBtn.classList.toggle('is-active', active);
+      behaviorBtn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    }
+    if (manifestBtn) {
+      const active = nextOpen && activeTab === 'manifest';
+      manifestBtn.classList.toggle('is-active', active);
+      manifestBtn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    }
+    if (resourcesBtn) {
+      const active = nextOpen && activeTab === 'resources';
+      resourcesBtn.classList.toggle('is-active', active);
+      resourcesBtn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    }
+
+    if (nextOpen && activeTab === 'resources') {
+      renderResourcesDockGrid();
+    } else if (nextOpen && activeTab === 'manifest') {
+      renderManifestTable();
+    }
+  }
+
+  function syncResourceCardBadge(sliceId, slice9Arr, isOverride = true) {
+    if (!sliceId) return;
+    const grid = document.getElementById('wb-resources-grid');
+    if (!grid) return;
+    const card = grid.querySelector(`.wb-res-card[data-res-pick="${sliceId}"]`);
+    if (!card) return;
+    const badge = card.querySelector('[data-res-9s-badge]');
+    if (badge) {
+      badge.className = Array.isArray(slice9Arr) ? 'wb-res-9s-badge' : '';
+      badge.textContent = Array.isArray(slice9Arr)
+        ? `9s:[${slice9Arr.join(',')}]${isOverride ? '*' : ''}`
+        : card.getAttribute('data-card-cat') || '';
+    }
+  }
+
+  function renderResourcesDockGrid() {
+    const grid = document.getElementById('wb-resources-grid');
+    const countBadge = document.getElementById('wb-res-count-badge');
+    if (!grid) return;
+
+    const catalog = getCatalog();
+    const allSlices = catalog && catalog.slices ? Object.values(catalog.slices) : [];
+    const usageCounts = getCanvasSliceUsageCounts();
+    const overrides = loadSlice9Overrides();
+    const query = (state.resourceDock.search || '').trim().toLowerCase();
+    const cat = state.resourceDock.category || 'all';
+    const onlyUsed = Boolean(state.resourceDock.onlyUsed);
+
+    const filtered = allSlices.filter(rec => {
+      if (cat !== 'all' && rec.category !== cat) return false;
+      if (onlyUsed && !usageCounts.has(rec.id)) return false;
+      if (!query) return true;
+      return (
+        String(rec.id || '').toLowerCase().includes(query) ||
+        String(rec.source_file || '').toLowerCase().includes(query) ||
+        String(rec.category || '').toLowerCase().includes(query)
+      );
+    });
+
+    if (countBadge) {
+      countBadge.textContent =
+        filtered.length === allSlices.length
+          ? `${allSlices.length}`
+          : `${filtered.length}/${allSlices.length}`;
+    }
+
+    if (!filtered.length) {
+      grid.innerHTML = '<div class="wb-insp-empty" style="grid-column:1/-1;">No matching sprites in catalog.</div>';
+      return;
+    }
+
+    grid.innerHTML = filtered
+      .map(rec => {
+        const url = getCatalogBase() + rec.file;
+        const isSelected = state.inspectorMode === 'resource' && state.selectedResourceSliceId === rec.id;
+
+        return `
+          <button
+            type="button"
+            class="wb-res-card${isSelected ? ' is-selected' : ''}"
+            data-res-pick="${escapeHtml(rec.id)}"
+            data-card-cat="${escapeHtml(rec.category)}"
+            title="${escapeHtml(rec.id)} (${escapeHtml(rec.source_file)})"
+          >
+            <div class="wb-res-thumb">
+              <img src="${escapeHtml(url)}" alt="${escapeHtml(rec.id)}" loading="lazy">
+            </div>
+            <div class="wb-res-id">${escapeHtml(rec.id)}</div>
+          </button>
+        `;
+      })
+      .join('');
+  }
+
+  function selectResourceSprite(sliceId, options = {}) {
+    if (!sliceId) return false;
+    const resolved = resolveSliceUrl(sliceId);
+    if (!resolved) return false;
+
+    if (state.selectedEl) {
+      state.selectedEl.classList.remove('px-selected-element');
+    }
+
+    state.selectedResourceSliceId = sliceId;
+    state.inspectorMode = 'resource';
+
+    if (!isEditMode() && !isCleanMode()) {
+      setRenderMode('edit');
+    } else if (!state.studioVisible && !isCleanMode()) {
+      setStudioPanels(true);
+    }
+
+    document.querySelectorAll('#wb-resources-grid .wb-res-card').forEach(card => {
+      card.classList.toggle('is-selected', card.getAttribute('data-res-pick') === sliceId);
+    });
+    document.querySelectorAll('#wb-manifest-body tr[data-res-pick]').forEach(row => {
+      row.classList.toggle('is-selected', row.getAttribute('data-res-pick') === sliceId);
+    });
+
+    renderHierarchyTree();
+    renderInspector();
+
+    if (options.scrollIntoView) {
+      const card = document.querySelector(`#wb-resources-grid .wb-res-card[data-res-pick="${sliceId}"]`);
+      if (card && typeof card.scrollIntoView === 'function') {
+        card.scrollIntoView({ block: 'nearest' });
+      }
+    }
+    return true;
   }
 
   /* ========================================================================
@@ -461,8 +1203,278 @@
     updateCanvasFitZoom();
   }
 
+  function getCurrentPreviewSlug(catalog) {
+    const parts = String((global.location && global.location.pathname) || '')
+      .split('/')
+      .filter(Boolean);
+    const previews = catalog && Array.isArray(catalog.previews) ? catalog.previews : [];
+    const slugSet = new Set(previews.map(p => p.slug));
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const seg = decodeURIComponent(parts[i]);
+      if (slugSet.has(seg)) return seg;
+    }
+    if (parts.length >= 2 && /\.html?$/i.test(parts[parts.length - 1])) {
+      return decodeURIComponent(parts[parts.length - 2]);
+    }
+    return parts.length >= 1 ? decodeURIComponent(parts[parts.length - 1]) : '';
+  }
+
+  function populatePreviewSwitcher(catalog) {
+    const select = document.getElementById('wb-ui-select');
+    if (!select) return;
+    const previews = catalog && Array.isArray(catalog.previews) ? catalog.previews : [];
+    const currentSlug = getCurrentPreviewSlug(catalog);
+
+    select.innerHTML = '';
+    if (previews.length === 0) {
+      const fallback = document.createElement('option');
+      fallback.value = currentSlug;
+      fallback.textContent = currentSlug || 'Current UI';
+      fallback.selected = true;
+      select.appendChild(fallback);
+      return;
+    }
+
+    let matched = false;
+    previews.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.slug;
+      const status = p.verification && p.verification.status;
+      const mark = status === 'PASSED' ? '✓ ' : status === 'FAILED' ? '✕ ' : '';
+      opt.textContent = `${mark}${p.title} (${p.slug})`;
+      if (p.slug === currentSlug) {
+        opt.selected = true;
+        matched = true;
+      }
+      select.appendChild(opt);
+    });
+
+    if (!matched && currentSlug) {
+      const cur = document.createElement('option');
+      cur.value = currentSlug;
+      cur.textContent = currentSlug;
+      cur.selected = true;
+      select.insertBefore(cur, select.firstChild);
+    }
+  }
+
+  function ensurePreviewsCatalogLoaded(callback) {
+    if (global.UI_PREVIEWS_CATALOG && Array.isArray(global.UI_PREVIEWS_CATALOG.previews)) {
+      callback(global.UI_PREVIEWS_CATALOG);
+    } else if (!document.querySelector('script[data-previews-catalog="true"]')) {
+      const script = document.createElement('script');
+      script.src = getCatalogBase() + 'previews-data.js';
+      script.async = true;
+      script.setAttribute('data-previews-catalog', 'true');
+      script.onload = () => {
+        if (global.UI_PREVIEWS_CATALOG) callback(global.UI_PREVIEWS_CATALOG);
+      };
+      document.head.appendChild(script);
+    }
+
+    if (global.location && /^https?:$/i.test(global.location.protocol)) {
+      fetch(new URL('/api/previews', global.location.origin).href, { cache: 'no-store' })
+        .then(res => (res.ok ? res.json() : null))
+        .then(data => {
+          if (data && Array.isArray(data.previews)) {
+            global.UI_PREVIEWS_CATALOG = data;
+            callback(data);
+          }
+        })
+        .catch(() => {
+          // Static server without /api/previews; previews-data.js handles it
+        });
+    }
+  }
+
+  function ensurePreviewSwitcher() {
+    if (isCleanMode()) return;
+    const titleBar = document.querySelector('.workbench-bar .workbench-title');
+    if (!titleBar) return;
+
+    if (!titleBar.querySelector('[data-wb-hub-link]')) {
+      const hubLink = document.createElement('a');
+      hubLink.className = 'wb-btn wb-hub-link';
+      hubLink.href = '../index.html';
+      hubLink.setAttribute('data-wb-hub-link', 'true');
+      hubLink.title = 'Back to Game UI Preview Hub';
+      hubLink.textContent = '⊞ All UIs';
+      titleBar.insertBefore(hubLink, titleBar.firstChild);
+    }
+
+    if (!document.getElementById('wb-ui-select')) {
+      const wrap = document.createElement('div');
+      wrap.className = 'wb-ui-switcher';
+      wrap.innerHTML =
+        '<label class="wb-label" for="wb-ui-select">UI</label>' +
+        '<select id="wb-ui-select" class="wb-ui-select" aria-label="Switch UI Preview"></select>';
+      titleBar.appendChild(wrap);
+
+      const select = wrap.querySelector('#wb-ui-select');
+      select.addEventListener('change', () => {
+        const targetSlug = select.value;
+        const currentSlug = getCurrentPreviewSlug(global.UI_PREVIEWS_CATALOG);
+        if (!targetSlug || targetSlug === currentSlug) return;
+        const targetMode = encodeURIComponent(state.currentMode || 'final');
+        global.location.href = `../${encodeURIComponent(targetSlug)}/index.html?mode=${targetMode}`;
+      });
+    }
+
+    ensurePreviewsCatalogLoaded(populatePreviewSwitcher);
+  }
+
+  function ensureSpritePickerModal() {
+    if (isCleanMode() || document.getElementById('wb-sprite-picker-modal')) return;
+
+    if (!document.getElementById('wb-catalog-slices-list')) {
+      const datalist = document.createElement('datalist');
+      datalist.id = 'wb-catalog-slices-list';
+      const catalog = getCatalog();
+      const ids = catalog && catalog.slices ? Object.keys(catalog.slices).sort() : [];
+      datalist.innerHTML = ids.map(id => `<option value="${escapeHtml(id)}"></option>`).join('');
+      document.body.appendChild(datalist);
+    }
+
+    const modal = document.createElement('div');
+    modal.id = 'wb-sprite-picker-modal';
+    modal.className = 'wb-modal-backdrop';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', 'Choose Widget Sprite');
+    modal.innerHTML = `
+      <div class="wb-sprite-picker-box">
+        <div class="wb-sp-head">
+          <div>
+            <div id="wb-sp-title" class="wb-sp-title">Choose Sprite</div>
+            <div id="wb-sp-subtitle" class="wb-insp-hint">Click any sprite below to assign it to the selected widget.</div>
+          </div>
+          <div class="slice9-actions-row">
+            <label class="wb-check-row">
+              <input type="checkbox" id="wb-sp-swap-all">
+              <span>Swap on all matching widgets</span>
+            </label>
+            <button type="button" class="wb-btn wb-btn-sm" data-close-sprite-picker>Close</button>
+          </div>
+        </div>
+        <div class="wb-sp-toolbar">
+          <div class="wb-sp-cats" id="wb-sp-cats">
+            <button type="button" class="wb-btn wb-btn-sm is-active" data-sp-cat="all">All</button>
+            <button type="button" class="wb-btn wb-btn-sm" data-sp-cat="panel">Panel</button>
+            <button type="button" class="wb-btn wb-btn-sm" data-sp-cat="button">Button</button>
+            <button type="button" class="wb-btn wb-btn-sm" data-sp-cat="dialog">Dialog</button>
+            <button type="button" class="wb-btn wb-btn-sm" data-sp-cat="icon">Icon</button>
+            <button type="button" class="wb-btn wb-btn-sm" data-sp-cat="emote">Emote</button>
+            <button type="button" class="wb-btn wb-btn-sm" data-sp-cat="cursor">Cursor</button>
+          </div>
+          <input id="wb-sp-search" class="wb-sp-search" type="search" placeholder="Filter slice ID or source PNG..." aria-label="Filter sprites">
+        </div>
+        <div id="wb-sp-grid" class="wb-sp-grid"></div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+
+  function renderSpritePickerGrid() {
+    const grid = document.getElementById('wb-sp-grid');
+    if (!grid) return;
+    const catalog = getCatalog();
+    const allSlices = catalog && catalog.slices ? Object.values(catalog.slices) : [];
+    const query = (state.spritePicker.search || '').trim().toLowerCase();
+    const cat = state.spritePicker.category || 'all';
+    const pickerTarget =
+      (state.spritePicker.targetEl && document.body.contains(state.spritePicker.targetEl) && state.spritePicker.targetEl) ||
+      state.selectedEl;
+    const currentId =
+      pickerTarget && state.spritePicker.attrName
+        ? pickerTarget.getAttribute(state.spritePicker.attrName)
+        : '';
+
+    const filtered = allSlices.filter(rec => {
+      if (cat !== 'all' && rec.category !== cat) return false;
+      if (!query) return true;
+      return (
+        String(rec.id || '').toLowerCase().includes(query) ||
+        String(rec.source_file || '').toLowerCase().includes(query) ||
+        String(rec.category || '').toLowerCase().includes(query)
+      );
+    });
+
+    if (!filtered.length) {
+      grid.innerHTML = '<div class="wb-insp-empty" style="grid-column:1/-1;">No matching sprites in catalog.</div>';
+      return;
+    }
+
+    grid.innerHTML = filtered
+      .map(rec => {
+        const url = getCatalogBase() + rec.file;
+        const meta = Array.isArray(rec.slice_9) ? `9s:[${rec.slice_9.join(',')}]` : rec.category;
+        const isCurrent = rec.id === currentId ? ' is-current' : '';
+        return `
+          <button type="button" class="wb-sp-card${isCurrent}" data-sp-pick="${escapeHtml(rec.id)}" title="${escapeHtml(rec.source_file)}">
+            <div class="wb-sp-thumb">
+              <img src="${escapeHtml(url)}" alt="${escapeHtml(rec.id)}" loading="lazy">
+            </div>
+            <div class="wb-sp-id">${escapeHtml(rec.id)}</div>
+            <div class="wb-sp-meta">
+              <span>${rec.width}×${rec.height}</span>
+              <span>${escapeHtml(meta)}</span>
+            </div>
+          </button>
+        `;
+      })
+      .join('');
+  }
+
+  function formatSliceAttrStateLabel(attrName) {
+    if (attrName === 'data-slice-id') return 'Idle';
+    if (attrName === 'data-slice-hover') return 'Hover';
+    if (attrName === 'data-slice-pressed') return 'Pressed';
+    if (attrName === 'data-slice-on') return 'On';
+    if (attrName === 'data-slice-off') return 'Off';
+    return attrName;
+  }
+
+  function openSpritePicker(attrName, targetEl) {
+    ensureSpritePickerModal();
+    const modal = document.getElementById('wb-sprite-picker-modal');
+    if (!modal || !state.selectedEl) return;
+
+    const effectiveTarget =
+      targetEl ||
+      (isButtonComponent(state.selectedEl) ? getButtonSpriteTargetEl(state.selectedEl) : null) ||
+      state.selectedEl;
+    state.spritePicker.attrName = attrName || state.activeEditorSliceAttr || 'data-slice-id';
+    state.spritePicker.targetEl = effectiveTarget;
+
+    const titleEl = document.getElementById('wb-sp-title');
+    const subEl = document.getElementById('wb-sp-subtitle');
+    const swapCb = document.getElementById('wb-sp-swap-all');
+    if (titleEl) {
+      titleEl.textContent = `Choose ${formatSliceAttrStateLabel(state.spritePicker.attrName)} Sprite for "${describeTreeLabel(state.selectedEl)}"`;
+    }
+    if (subEl) {
+      const curVal = effectiveTarget ? effectiveTarget.getAttribute(state.spritePicker.attrName) || 'none' : 'none';
+      subEl.textContent = `State: ${formatSliceAttrStateLabel(state.spritePicker.attrName)} (${state.spritePicker.attrName}) • current: ${curVal}`;
+    }
+    if (swapCb) {
+      swapCb.checked = Boolean(state.swapAllSprites);
+    }
+
+    renderSpritePickerGrid();
+    modal.classList.add('is-open');
+    const searchEl = document.getElementById('wb-sp-search');
+    if (searchEl) searchEl.focus();
+  }
+
+  function closeSpritePicker() {
+    const modal = document.getElementById('wb-sprite-picker-modal');
+    if (modal) modal.classList.remove('is-open');
+  }
+
   function ensureStudioShell() {
     if (isCleanMode()) return;
+    ensurePreviewSwitcher();
+    ensureSpritePickerModal();
     const stage = document.querySelector('.workbench-stage');
     const canvas = document.getElementById('game-canvas');
     if (!stage || !canvas) return;
@@ -511,11 +1523,11 @@
       rightSidebar.setAttribute('aria-label', 'Sprite & 9-Slice Inspector');
       rightSidebar.innerHTML = `
         <div class="wb-sidebar-head">
-          <span class="wb-sidebar-title">Inspector &amp; 9-Slice</span>
+          <span class="wb-sidebar-title">Inspector</span>
           <span id="wb-insp-badge" class="wb-tree-tag">None</span>
         </div>
         <div id="wb-inspector-body" class="wb-sidebar-body">
-          <div class="wb-insp-empty">Click any UI element on the canvas or in the Hierarchy tree to inspect it and tweak its 9-slice borders.</div>
+          <div class="wb-insp-empty">Select any sprite from the bottom Resources tab to edit its 9-slice, or click a UI widget on the canvas to edit its text &amp; sprite.</div>
         </div>
       `;
 
@@ -526,6 +1538,76 @@
       workspace.appendChild(rightSidebar);
     }
 
+    document
+      .querySelectorAll(
+        '.workbench-controls [data-wb-scene], .workbench-controls [data-wb-behavior], .workbench-controls [data-wb-debug], .workbench-controls [data-wb-manifest], .workbench-controls [data-wb-resources]'
+      )
+      .forEach(btn => {
+        const grp = btn.closest('.wb-group');
+        btn.remove();
+        if (grp && !grp.querySelector('button, select, input')) {
+          grp.remove();
+        }
+      });
+
+    if (!document.getElementById('wb-bottom-dock')) {
+      const dock = document.createElement('section');
+      dock.id = 'wb-bottom-dock';
+      dock.className = 'wb-bottom-dock';
+      dock.setAttribute('aria-label', 'Bottom Workbench Dock');
+      dock.innerHTML = `
+        <div class="wb-dock-head">
+          <div class="wb-dock-tabs">
+            <button type="button" class="wb-btn wb-btn-sm is-active" data-dock-tab="resources">
+              Resources <span id="wb-res-count-badge" class="wb-tree-tag">0</span>
+            </button>
+            <button type="button" class="wb-btn wb-btn-sm" data-dock-tab="manifest">Sprites Used</button>
+            <button type="button" class="wb-btn wb-btn-sm" data-dock-tab="behavior">Behavior Spec</button>
+          </div>
+          <div id="wb-res-toolbar" class="wb-dock-toolbar">
+            <div class="wb-dock-cats" id="wb-res-cats">
+              <button type="button" class="wb-btn wb-btn-sm is-active" data-res-cat="all">All</button>
+              <button type="button" class="wb-btn wb-btn-sm" data-res-cat="panel">Panel</button>
+              <button type="button" class="wb-btn wb-btn-sm" data-res-cat="button">Button</button>
+              <button type="button" class="wb-btn wb-btn-sm" data-res-cat="dialog">Dialog</button>
+              <button type="button" class="wb-btn wb-btn-sm" data-res-cat="icon">Icon</button>
+              <button type="button" class="wb-btn wb-btn-sm" data-res-cat="emote">Emote</button>
+              <button type="button" class="wb-btn wb-btn-sm" data-res-cat="cursor">Cursor</button>
+            </div>
+            <label class="wb-check-row">
+              <input type="checkbox" id="wb-res-only-used">
+              <span>Used in UI</span>
+            </label>
+            <input id="wb-res-search" class="wb-dock-search" type="search" placeholder="Search sprite ID or source PNG..." aria-label="Search resource sprites">
+          </div>
+        </div>
+        <div id="wb-dock-pane-resources" class="wb-dock-pane is-active" data-dock-pane="resources">
+          <div id="wb-resources-grid" class="wb-res-grid"></div>
+        </div>
+        <div id="wb-dock-pane-manifest" class="wb-dock-pane" data-dock-pane="manifest"></div>
+        <div id="wb-dock-pane-behavior" class="wb-dock-pane" data-dock-pane="behavior"></div>
+      `;
+
+      const ws = document.querySelector('.workbench-workspace');
+      if (ws && ws.parentNode === stage) {
+        ws.insertAdjacentElement('afterend', dock);
+      } else {
+        stage.appendChild(dock);
+      }
+
+      const manifestDrawer = document.getElementById('wb-manifest-drawer');
+      const manifestPane = document.getElementById('wb-dock-pane-manifest');
+      if (manifestDrawer && manifestPane) {
+        manifestPane.appendChild(manifestDrawer);
+      }
+
+      const behaviorDrawer = document.getElementById('wb-behavior-drawer');
+      const behaviorPane = document.getElementById('wb-dock-pane-behavior');
+      if (behaviorDrawer && behaviorPane) {
+        behaviorPane.appendChild(behaviorDrawer);
+      }
+    }
+
     global.addEventListener('resize', updateCanvasFitZoom);
     updateCanvasFitZoom();
   }
@@ -533,9 +1615,14 @@
   function isTreeElement(el) {
     if (!el || el.nodeType !== 1) return false;
     if (el.id === '__verify_annotations__') return false;
-    return el.matches(
-      '[data-ui-view], .hud-base-layer, [data-slice-id], [data-ui-role], button, .px-9slice, .px-sprite-box, .px-icon, .px-wire-box, .px-row, .px-stack, .px-grid, h1, h2, h3, p'
-    );
+    if (
+      el.matches(
+        '[data-ui-view], .hud-base-layer, [data-slice-id], [data-ui-role], button, .px-9slice, .px-sprite-box, .px-icon, .px-wire-box, .px-row, .px-stack, .px-grid, h1, h2, h3, h4, p'
+      )
+    ) {
+      return true;
+    }
+    return el.matches('span, strong, em, label, div') && getDirectText(el).length > 0;
   }
 
   function getDirectText(el) {
@@ -629,7 +1716,7 @@
     const html = items
       .map((item, idx) => {
         const { el, depth, isView, isCollapsed, hasChildren } = item;
-        const selected = el === state.selectedEl;
+        const selected = state.inspectorMode === 'widget' && el === state.selectedEl;
         const sliceId = el.getAttribute('data-slice-id');
         const label = describeTreeLabel(el);
         const tag = el.classList.contains('px-9slice')
@@ -705,7 +1792,7 @@
 
   function applyLiveSlice9(el, sliceId, arr, applyToAll) {
     const clamped = arr.map(v => Math.max(0, parseInt(v, 10) || 0));
-    if (applyToAll && sliceId) {
+    if ((applyToAll || state.inspectorMode === 'resource') && sliceId) {
       const overrides = loadSlice9Overrides();
       overrides[sliceId] = clamped;
       saveSlice9Overrides(overrides);
@@ -714,6 +1801,7 @@
         state.elementSlice9Overrides.delete(node);
         applySliceToElement(node, sliceId);
       });
+      syncResourceCardBadge(sliceId, clamped, true);
     } else if (el) {
       state.elementSlice9Overrides.set(el, clamped);
       if (sliceId) applySliceToElement(el, sliceId);
@@ -727,7 +1815,7 @@
 
   function updateInspectorGeometryReadout() {
     const el = state.selectedEl;
-    if (!el) return;
+    if (!el || state.inspectorMode !== 'widget') return;
     const rect = el.getBoundingClientRect();
     const cs = getComputedStyle(el);
     const sizeNode = document.getElementById('wb-insp-size');
@@ -756,30 +1844,235 @@
     }
   }
 
-  function renderInspector() {
-    const body = document.getElementById('wb-inspector-body');
-    const badge = document.getElementById('wb-insp-badge');
-    if (!body || !badge) return;
+  function renderResourceInspector(body, badge) {
+    const sliceId = state.selectedResourceSliceId;
+    const resolved = sliceId ? resolveSliceUrl(sliceId) : null;
+    if (!sliceId || !resolved || !resolved.rec) {
+      badge.textContent = 'None';
+      body.innerHTML =
+        '<div class="wb-insp-empty">Select any sprite from the bottom Resources tab to edit its 9-slice borders.</div>';
+      return;
+    }
 
+    const rec = resolved.rec;
+    badge.textContent = '9-Slice Resource';
+
+    const usageCounts = getCanvasSliceUsageCounts();
+    const usedCount = usageCounts.get(sliceId) || 0;
+    const eff9 = resolveEffectiveSlice9(null, sliceId, rec) || [0, 0, 0, 0];
+    const [sT, sR, sB, sL] = eff9;
+
+    const maxStageW = 248;
+    const maxStageH = 164;
+    let stageScale = Math.floor(Math.min(maxStageW / rec.width, maxStageH / rec.height));
+    let dispW;
+    let dispH;
+    if (stageScale >= 1) {
+      dispW = rec.width * stageScale;
+      dispH = rec.height * stageScale;
+    } else {
+      const fit = Math.min(maxStageW / rec.width, maxStageH / rec.height);
+      stageScale = fit;
+      dispW = Math.max(1, Math.round(rec.width * fit));
+      dispH = Math.max(1, Math.round(rec.height * fit));
+    }
+
+    const hasTargetWidget = Boolean(state.selectedEl && document.body.contains(state.selectedEl));
+    const targetIsBtn = hasTargetWidget && isButtonComponent(state.selectedEl);
+    const assignBtnHtml = !hasTargetWidget
+      ? ''
+      : targetIsBtn
+        ? `<div class="slice9-actions-row">
+             <button type="button" class="wb-btn wb-btn-sm" data-assign-resource-to-widget="${escapeHtml(sliceId)}" data-assign-attr="data-slice-id">Assign Idle</button>
+             <button type="button" class="wb-btn wb-btn-sm" data-assign-resource-to-widget="${escapeHtml(sliceId)}" data-assign-attr="data-slice-hover">Assign Hover</button>
+             <button type="button" class="wb-btn wb-btn-sm" data-assign-resource-to-widget="${escapeHtml(sliceId)}" data-assign-attr="data-slice-pressed">Assign Pressed</button>
+           </div>`
+        : `<div class="slice9-actions-row">
+             <button type="button" class="wb-btn wb-btn-sm" data-assign-resource-to-widget="${escapeHtml(sliceId)}">
+               Assign to "${escapeHtml(describeTreeLabel(state.selectedEl))}"
+             </button>
+           </div>`;
+
+    body.innerHTML = `
+      <div class="wb-insp-card">
+        <div class="wb-insp-section-title">Selected Sprite Resource</div>
+        <div class="wb-insp-kv">
+          <span class="wb-insp-k">Slice ID</span><span class="wb-insp-v">${escapeHtml(rec.id)}</span>
+          <span class="wb-insp-k">Native Size</span><span class="wb-insp-v">${rec.width} × ${rec.height} px</span>
+          <span class="wb-insp-k">Category</span><span class="wb-insp-v">${escapeHtml(rec.category)}</span>
+          <span class="wb-insp-k">Source PNG</span><span class="wb-insp-v">${escapeHtml(rec.source_file)}</span>
+          <span class="wb-insp-k">Canvas Usage</span><span class="wb-insp-v">${usedCount} widget${usedCount === 1 ? '' : 's'}</span>
+        </div>
+        ${assignBtnHtml}
+        <div id="wb-res-feedback" class="wb-insp-feedback"></div>
+      </div>
+
+      <div class="wb-insp-card">
+        <div class="wb-insp-section-title">Unity-Style 9-Slice Editor (${rec.width}×${rec.height})</div>
+        <div class="slice9-editor-stage">
+          <div
+            id="slice9-canvas-wrap"
+            class="slice9-canvas-wrap"
+            data-slice-id="${escapeHtml(sliceId)}"
+            data-native-w="${rec.width}"
+            data-native-h="${rec.height}"
+            data-zoom="${stageScale}"
+            style="width:${dispW}px;height:${dispH}px;"
+          >
+            <img class="slice9-preview-img" src="${resolved.url}" alt="${escapeHtml(sliceId)}" draggable="false">
+            <div class="slice9-line is-h" data-slice-edge="t" data-edge="T:${sT}" style="top:${Math.round(sT * stageScale)}px;"></div>
+            <div class="slice9-line is-h" data-slice-edge="b" data-edge="B:${sB}" style="top:${Math.round((rec.height - sB) * stageScale)}px;"></div>
+            <div class="slice9-line is-v" data-slice-edge="l" data-edge="L:${sL}" style="left:${Math.round(sL * stageScale)}px;"></div>
+            <div class="slice9-line is-v" data-slice-edge="r" data-edge="R:${sR}" style="left:${Math.round((rec.width - sR) * stageScale)}px;"></div>
+          </div>
+        </div>
+
+        <div class="slice9-inputs-grid">
+          <div class="slice9-input-cell">
+            <label for="s9-in-t">Top</label>
+            <input id="s9-in-t" type="number" min="0" max="${Math.floor(rec.height / 2)}" value="${sT}" data-s9-input="t">
+          </div>
+          <div class="slice9-input-cell">
+            <label for="s9-in-r">Right</label>
+            <input id="s9-in-r" type="number" min="0" max="${Math.floor(rec.width / 2)}" value="${sR}" data-s9-input="r">
+          </div>
+          <div class="slice9-input-cell">
+            <label for="s9-in-b">Bottom</label>
+            <input id="s9-in-b" type="number" min="0" max="${Math.floor(rec.height / 2)}" value="${sB}" data-s9-input="b">
+          </div>
+          <div class="slice9-input-cell">
+            <label for="s9-in-l">Left</label>
+            <input id="s9-in-l" type="number" min="0" max="${Math.floor(rec.width / 2)}" value="${sL}" data-s9-input="l">
+          </div>
+        </div>
+
+        <div class="wb-insp-section-title" style="margin-top:4px;">Live 9-Slice Stretch Preview</div>
+        <div class="slice9-live-preview-stage">
+          <div
+            id="slice9-live-preview-box"
+            class="px-9slice slice9-live-preview-box"
+            style="--skin-url:url(&quot;${resolved.url}&quot;);--slice-t:${sT};--slice-r:${sR};--slice-b:${sB};--slice-l:${sL};"
+          >
+            <span id="slice9-live-preview-label">9-Slice Preview (${sT}, ${sR}, ${sB}, ${sL})</span>
+          </div>
+        </div>
+
+        <div class="slice9-actions-row">
+          <button type="button" class="wb-btn wb-btn-sm wb-btn--primary" data-s9-save>Save 9-Slice</button>
+          <button type="button" class="wb-btn wb-btn-sm" data-s9-reset>Reset Default</button>
+        </div>
+        <div id="wb-s9-feedback" class="wb-insp-feedback"></div>
+      </div>
+    `;
+  }
+
+  function describeElementSelector(el) {
+    if (!el) return '';
+    const tagSel = el.tagName.toLowerCase() + (el.id ? `#${el.id}` : '');
+    const clsList = Array.from(el.classList).filter(c => c !== 'px-selected-element' && c !== 'is-hovered' && c !== 'is-pressed').join('.');
+    return clsList ? `${tagSel}.${clsList}` : tagSel;
+  }
+
+  function renderButtonComponentCard(el, spriteTargetEl, canAddOrEditText) {
+    const target = spriteTargetEl || el;
+    const idleId = target.getAttribute('data-slice-id') || '';
+    const matchingCount = idleId ? findMatchingSpriteTargets(target, 'data-slice-id').length : 0;
+    const targetInfoHtml =
+      target !== el
+        ? `<div class="wb-insp-hint">Sprite states target child <code>${escapeHtml(describeElementSelector(target))}</code></div>`
+        : '';
+
+    const rowsHtml = BUTTON_STATE_DEFS.map(stateDef => {
+      const stId = target.getAttribute(stateDef.attr) || '';
+      const stResolved = stId ? resolveSliceUrl(stId) : null;
+      const stRec = stResolved ? stResolved.rec : null;
+      return `
+        <div class="wb-btn-state-row" data-btn-state="${stateDef.key}">
+          <div class="wb-btn-state-head">
+            <div class="wb-btn-state-thumb">
+              ${stResolved ? `<img src="${escapeHtml(stResolved.url)}" alt="${escapeHtml(stId)}">` : '<span>—</span>'}
+            </div>
+            <div class="wb-btn-state-meta">
+              <div class="wb-btn-state-title-line">
+                <span class="wb-btn-state-badge is-${stateDef.key}">${stateDef.label}</span>
+                <span class="wb-btn-state-dim">${stRec ? `${stRec.width}×${stRec.height}` : 'Unassigned'}</span>
+              </div>
+              <div class="wb-btn-state-file" title="${stRec ? escapeHtml(stRec.source_file) : ''}">
+                ${stRec ? escapeHtml(stRec.source_file) : stateDef.optional ? 'Optional (falls back to Idle)' : 'Base resting button sprite'}
+              </div>
+            </div>
+          </div>
+          <div class="wb-slice-edit-row">
+            <input
+              class="wb-slice-input"
+              type="text"
+              list="wb-catalog-slices-list"
+              value="${escapeHtml(stId)}"
+              placeholder="${stateDef.optional ? 'Optional Slice ID...' : 'Slice ID...'}"
+              data-btn-state-input="${stateDef.attr}"
+              aria-label="${stateDef.label} Slice ID"
+            >
+            <button type="button" class="wb-btn wb-btn-sm" data-btn-state-apply="${stateDef.attr}">Apply</button>
+          </div>
+          <div class="slice9-actions-row">
+            <button type="button" class="wb-btn wb-btn-sm wb-btn--primary" data-btn-state-browse="${stateDef.attr}">Browse…</button>
+            ${
+              stId && stRec
+                ? `<button type="button" class="wb-btn wb-btn-sm" data-insp-edit-resource-s9="${escapeHtml(stId)}">Edit 9-Slice →</button>`
+                : ''
+            }
+            ${
+              stateDef.optional && stId
+                ? `<button type="button" class="wb-btn wb-btn-sm wb-btn--warn" data-btn-state-clear="${stateDef.attr}">Clear</button>`
+                : ''
+            }
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="wb-insp-card">
+        <div class="wb-insp-section-title">Button</div>
+        ${targetInfoHtml}
+        <div class="wb-btn-state-list">${rowsHtml}</div>
+        <label class="wb-check-row">
+          <input type="checkbox" id="wb-swap-all-sprites-cb" ${state.swapAllSprites ? 'checked' : ''}>
+          <span>Swap on all ${matchingCount} matching button${matchingCount === 1 ? '' : 's'}</span>
+        </label>
+        ${!canAddOrEditText ? '<div class="slice9-actions-row"><button type="button" class="wb-btn wb-btn-sm wb-btn--warn" data-reset-widget-edits>Reset Widget</button></div>' : ''}
+        <div id="wb-sprite-feedback" class="wb-insp-feedback"></div>
+      </div>
+    `;
+  }
+
+  function renderWidgetInspector(body, badge) {
     const el = state.selectedEl;
     if (!el || !document.body.contains(el)) {
       badge.textContent = 'None';
       body.innerHTML =
-        '<div class="wb-insp-empty">Click any UI element on the canvas or in the Hierarchy tree on the left to inspect its properties and tweak its 9-slice borders.</div>';
+        '<div class="wb-insp-empty">Select any sprite from the bottom Resources tab to edit its 9-slice, or click a UI widget on the canvas to edit its text &amp; sprite.</div>';
       return;
     }
 
     const role = describeTreeLabel(el);
-    const tagSel = el.tagName.toLowerCase() + (el.id ? `#${el.id}` : '');
-    const clsList = Array.from(el.classList).filter(c => c !== 'px-selected-element').join('.');
-    const selectorText = clsList ? `${tagSel}.${clsList}` : tagSel;
+    const selectorText = describeElementSelector(el);
     const rect = el.getBoundingClientRect();
     const cs = getComputedStyle(el);
     const pixelScale = getComputedStyle(document.documentElement).getPropertyValue('--pixel-scale').trim() || '3';
 
+    const isBtnComp = isButtonComponent(el);
+    const buttonSpriteTargetEl = isBtnComp ? getButtonSpriteTargetEl(el) : null;
+
     const sliceAttrs = ['data-slice-id', 'data-slice-pressed', 'data-slice-on', 'data-slice-off'].filter(a =>
       Boolean(el.getAttribute(a))
     );
+    if (
+      sliceAttrs.length === 0 &&
+      (el.classList.contains('px-9slice') || el.classList.contains('px-sprite-box') || el.classList.contains('px-icon') || el.tagName === 'IMG')
+    ) {
+      sliceAttrs.push('data-slice-id');
+    }
     if (!sliceAttrs.includes(state.activeEditorSliceAttr)) {
       state.activeEditorSliceAttr = sliceAttrs[0] || 'data-slice-id';
     }
@@ -787,7 +2080,19 @@
     const resolved = activeSliceId ? resolveSliceUrl(activeSliceId) : null;
     const rec = resolved ? resolved.rec : null;
 
-    badge.textContent = activeSliceId ? (el.classList.contains('px-9slice') ? '9-Slice' : 'Sprite') : el.tagName.toLowerCase();
+    const textInfo = getEditableTextInfo(el);
+    const canAddOrEditText = Boolean(textInfo);
+    const currentTextValue = textInfo ? textInfo.currentText : '';
+
+    badge.textContent = isBtnComp
+      ? 'Button Widget'
+      : activeSliceId
+        ? el.classList.contains('px-9slice')
+          ? '9-Slice Widget'
+          : 'Sprite Widget'
+        : canAddOrEditText
+          ? 'Text Widget'
+          : 'Layout Widget';
 
     const is9SliceEl = el.classList.contains('px-9slice');
     const bT = parseFloat(cs.borderTopWidth || '0');
@@ -802,6 +2107,13 @@
       ? `<div style="margin-top:6px;"><button type="button" class="wb-btn wb-btn-sm" data-insp-goto-view="${escapeHtml(targetView)}">Open View: ${escapeHtml(targetView)} →</button></div>`
       : '';
 
+    const childIconEl = el.tagName !== 'IMG' ? el.querySelector('[data-slice-id]') : null;
+    const childIconId = childIconEl ? childIconEl.getAttribute('data-slice-id') : null;
+    const childIconBtnHtml =
+      childIconEl && childIconId && (!isBtnComp || childIconEl !== buttonSpriteTargetEl)
+        ? `<button type="button" class="wb-btn wb-btn-sm" data-insp-select-child-icon>Select Child Icon (${escapeHtml(childIconId)})</button>`
+        : '';
+
     let html = `
       <div class="wb-insp-card">
         <div class="wb-insp-section-title">Selected Element</div>
@@ -813,32 +2125,32 @@
           <span class="wb-insp-k">Pixel Scale</span><span class="wb-insp-v">${escapeHtml(pixelScale)}x</span>
         </div>
         ${gotoBtnHtml}
+        ${childIconBtnHtml ? `<div style="margin-top:4px;">${childIconBtnHtml}</div>` : ''}
         <div id="wb-insp-border-warn" class="wb-insp-warn" style="display:${overlaps.length > 0 ? 'block' : 'none'};">
           ${overlaps.length > 0 ? `Border overlap detected: ${escapeHtml(overlaps.join(', '))} touches the 9-slice frame border.` : ''}
         </div>
       </div>
     `;
 
-    if (activeSliceId && resolved && rec) {
-      const sameSliceCount = document.querySelectorAll(`#game-canvas [data-slice-id="${activeSliceId}"]`).length;
-      const eff9 = resolveEffectiveSlice9(el, activeSliceId, rec) || [0, 0, 0, 0];
-      const [sT, sR, sB, sL] = eff9;
+    if (canAddOrEditText) {
+      html += `
+        <div class="wb-insp-card">
+          <div class="wb-insp-section-title">Text</div>
+          <textarea id="wb-insp-text-input" class="wb-text-input" rows="2" placeholder="Enter widget text...">${escapeHtml(currentTextValue)}</textarea>
+          <div class="wb-insp-hint">Tip: You can also double-click text on the canvas in Edit UI mode.</div>
+          <div class="slice9-actions-row">
+            <button type="button" class="wb-btn wb-btn-sm wb-btn--primary" data-ui-edits-save>Save Text &amp; Sprites</button>
+            <button type="button" class="wb-btn wb-btn-sm wb-btn--warn" data-reset-widget-edits>Reset Widget</button>
+          </div>
+          <div id="wb-text-feedback" class="wb-insp-feedback"></div>
+        </div>
+      `;
+    }
 
-      const maxStageW = 248;
-      const maxStageH = 164;
-      let stageScale = Math.floor(Math.min(maxStageW / rec.width, maxStageH / rec.height));
-      let dispW;
-      let dispH;
-      if (stageScale >= 1) {
-        dispW = rec.width * stageScale;
-        dispH = rec.height * stageScale;
-      } else {
-        const fit = Math.min(maxStageW / rec.width, maxStageH / rec.height);
-        stageScale = fit;
-        dispW = Math.max(1, Math.round(rec.width * fit));
-        dispH = Math.max(1, Math.round(rec.height * fit));
-      }
-
+    if (isBtnComp) {
+      html += renderButtonComponentCard(el, buttonSpriteTargetEl, canAddOrEditText);
+    } else if (sliceAttrs.length > 0) {
+      const sameSliceCount = activeSliceId ? findMatchingSpriteTargets(el, state.activeEditorSliceAttr).length : 0;
       const attrTabsHtml =
         sliceAttrs.length > 1
           ? `<div class="slice9-actions-row">${sliceAttrs
@@ -851,70 +2163,53 @@
 
       html += `
         <div class="wb-insp-card">
-          <div class="wb-insp-section-title">Sprite Metadata</div>
+          <div class="wb-insp-section-title">Sprite</div>
           ${attrTabsHtml}
-          <div class="wb-insp-kv">
-            <span class="wb-insp-k">Slice ID</span><span class="wb-insp-v">${escapeHtml(activeSliceId)}</span>
-            <span class="wb-insp-k">Native Size</span><span class="wb-insp-v">${rec.width} × ${rec.height} px</span>
-            <span class="wb-insp-k">Category</span><span class="wb-insp-v">${escapeHtml(rec.category)}</span>
-            <span class="wb-insp-k">Source PNG</span><span class="wb-insp-v">${escapeHtml(rec.source_file)}</span>
+          <div class="wb-slice-edit-row">
+            <input id="wb-insp-slice-input" class="wb-slice-input" type="text" list="wb-catalog-slices-list" value="${escapeHtml(activeSliceId || '')}" placeholder="Slice ID...">
+            <button type="button" class="wb-btn wb-btn-sm" data-insp-apply-slice>Apply</button>
           </div>
-        </div>
-
-        <div class="wb-insp-card">
-          <div class="wb-insp-section-title">Unity-Style 9-Slice Editor (${rec.width}×${rec.height})</div>
-          <div class="slice9-editor-stage">
-            <div
-              id="slice9-canvas-wrap"
-              class="slice9-canvas-wrap"
-              data-slice-id="${escapeHtml(activeSliceId)}"
-              data-native-w="${rec.width}"
-              data-native-h="${rec.height}"
-              data-zoom="${stageScale}"
-              style="width:${dispW}px;height:${dispH}px;"
-            >
-              <img class="slice9-preview-img" src="${resolved.url}" alt="${escapeHtml(activeSliceId)}" draggable="false">
-              <div class="slice9-line is-h" data-slice-edge="t" data-edge="T:${sT}" style="top:${Math.round(sT * stageScale)}px;"></div>
-              <div class="slice9-line is-h" data-slice-edge="b" data-edge="B:${sB}" style="top:${Math.round((rec.height - sB) * stageScale)}px;"></div>
-              <div class="slice9-line is-v" data-slice-edge="l" data-edge="L:${sL}" style="left:${Math.round(sL * stageScale)}px;"></div>
-              <div class="slice9-line is-v" data-slice-edge="r" data-edge="R:${sR}" style="left:${Math.round((rec.width - sR) * stageScale)}px;"></div>
-            </div>
-          </div>
-
-          <div class="slice9-inputs-grid">
-            <div class="slice9-input-cell">
-              <label for="s9-in-t">Top</label>
-              <input id="s9-in-t" type="number" min="0" max="${Math.floor(rec.height / 2)}" value="${sT}" data-s9-input="t">
-            </div>
-            <div class="slice9-input-cell">
-              <label for="s9-in-r">Right</label>
-              <input id="s9-in-r" type="number" min="0" max="${Math.floor(rec.width / 2)}" value="${sR}" data-s9-input="r">
-            </div>
-            <div class="slice9-input-cell">
-              <label for="s9-in-b">Bottom</label>
-              <input id="s9-in-b" type="number" min="0" max="${Math.floor(rec.height / 2)}" value="${sB}" data-s9-input="b">
-            </div>
-            <div class="slice9-input-cell">
-              <label for="s9-in-l">Left</label>
-              <input id="s9-in-l" type="number" min="0" max="${Math.floor(rec.width / 2)}" value="${sL}" data-s9-input="l">
-            </div>
-          </div>
-
-          <label class="wb-check-row">
-            <input type="checkbox" id="wb-apply-all-cb" ${state.applyAllInstances ? 'checked' : ''}>
-            <span>Apply to all ${sameSliceCount} instance${sameSliceCount === 1 ? '' : 's'} of sprite</span>
-          </label>
-
           <div class="slice9-actions-row">
-            <button type="button" class="wb-btn wb-btn-sm wb-btn--primary" data-s9-save>Save 9-Slice</button>
-            <button type="button" class="wb-btn wb-btn-sm" data-s9-reset>Reset Default</button>
+            <button type="button" class="wb-btn wb-btn-sm wb-btn--primary" data-open-sprite-picker>Browse Sprites…</button>
+            ${
+              activeSliceId && rec
+                ? `<button type="button" class="wb-btn wb-btn-sm" data-insp-edit-resource-s9="${escapeHtml(activeSliceId)}">Edit 9-Slice →</button>`
+                : ''
+            }
+            ${!canAddOrEditText ? '<button type="button" class="wb-btn wb-btn-sm wb-btn--warn" data-reset-widget-edits>Reset Widget</button>' : ''}
           </div>
-          <div id="wb-s9-feedback" style="font-size:11px;color:#86efac;min-height:14px;"></div>
+          <label class="wb-check-row">
+            <input type="checkbox" id="wb-swap-all-sprites-cb" ${state.swapAllSprites ? 'checked' : ''}>
+            <span>Swap on all ${sameSliceCount} matching widget${sameSliceCount === 1 ? '' : 's'}</span>
+          </label>
+          ${
+            rec
+              ? `<div class="wb-insp-kv">
+                  <span class="wb-insp-k">Native Size</span><span class="wb-insp-v">${rec.width} × ${rec.height} px</span>
+                  <span class="wb-insp-k">Category</span><span class="wb-insp-v">${escapeHtml(rec.category)}</span>
+                  <span class="wb-insp-k">Source PNG</span><span class="wb-insp-v">${escapeHtml(rec.source_file)}</span>
+                </div>`
+              : '<div class="wb-insp-hint">No sprite currently assigned. Click Browse Sprites… to pick one.</div>'
+          }
+          <div id="wb-sprite-feedback" class="wb-insp-feedback"></div>
         </div>
       `;
     }
 
     body.innerHTML = html;
+  }
+
+  function renderInspector() {
+    const body = document.getElementById('wb-inspector-body');
+    const badge = document.getElementById('wb-insp-badge');
+    if (!body || !badge) return;
+
+    if (state.inspectorMode === 'resource' && state.selectedResourceSliceId) {
+      renderResourceInspector(body, badge);
+      return;
+    }
+
+    renderWidgetInspector(body, badge);
   }
 
   function syncSlice9EditorWidgets(slice9Arr, rec) {
@@ -954,6 +2249,18 @@
     if (inB) inB.value = String(b);
     if (inL) inL.value = String(l);
 
+    const previewBox = document.getElementById('slice9-live-preview-box');
+    if (previewBox) {
+      previewBox.style.setProperty('--slice-t', String(t));
+      previewBox.style.setProperty('--slice-r', String(r));
+      previewBox.style.setProperty('--slice-b', String(b));
+      previewBox.style.setProperty('--slice-l', String(l));
+      const previewLabel = document.getElementById('slice9-live-preview-label');
+      if (previewLabel) {
+        previewLabel.textContent = `9-Slice Preview (${t}, ${r}, ${b}, ${l})`;
+      }
+    }
+
     updateInspectorGeometryReadout();
   }
 
@@ -965,7 +2272,15 @@
     }
 
     state.selectedEl = el;
+    state.inspectorMode = 'widget';
     el.classList.add('px-selected-element');
+
+    document.querySelectorAll('#wb-resources-grid .wb-res-card.is-selected').forEach(card => {
+      card.classList.remove('is-selected');
+    });
+    document.querySelectorAll('#wb-manifest-body tr.is-selected').forEach(row => {
+      row.classList.remove('is-selected');
+    });
 
     // If inside an inactive view, activate that view so user can see the element
     const viewAncestor = el.closest('[data-ui-view]');
@@ -986,6 +2301,144 @@
     if (isCleanMode()) return;
 
     const canvas = document.getElementById('game-canvas');
+    function pickStudioElement(target) {
+      if (!target || typeof target.closest !== 'function' || !canvas || !canvas.contains(target)) {
+        return null;
+      }
+      const btn = target.closest('button');
+      if (btn && canvas.contains(btn)) {
+        const btnSpriteEl = !btn.hasAttribute('data-ui-toggle') ? getButtonSpriteTargetEl(btn) : null;
+        if (btnSpriteEl && btnSpriteEl !== btn && (target === btnSpriteEl || btnSpriteEl.contains(target))) {
+          return btn;
+        }
+        if (target.tagName === 'IMG' || target.hasAttribute('data-slice-id')) {
+          return target;
+        }
+        return btn;
+      }
+      if (getDirectText(target).length > 0) {
+        return target;
+      }
+      const pickable = target.closest(
+        '[data-slice-id], [data-ui-role], button, a, .px-9slice, .px-sprite-box, .px-icon, .px-wire-box, h1, h2, h3, h4, p'
+      );
+      return pickable && canvas.contains(pickable) ? pickable : null;
+    }
+
+    function readInlineEditableText(targetEl) {
+      if (targetEl.children.length === 0) {
+        return targetEl.textContent.replace(/\s+/g, ' ').trim();
+      }
+      const txtNode = getDirectTextNode(targetEl);
+      if (txtNode) return txtNode.textContent.replace(/\s+/g, ' ').trim();
+      return Array.from(targetEl.childNodes)
+        .filter(n => n.nodeType === 3)
+        .map(n => n.textContent)
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    function startInlineTextEdit(ownerEl) {
+      const info = getEditableTextInfo(ownerEl);
+      const targetEl = info && info.targetEl ? info.targetEl : null;
+      if (!targetEl || !canvas || !canvas.contains(targetEl)) return;
+
+      if (state.inlineEdit) {
+        if (state.inlineEdit.targetEl === targetEl) return;
+        state.inlineEdit.finish(true);
+      }
+
+      const prevText = info ? info.currentText : readInlineEditableText(targetEl);
+      const nonEditableChildren = [];
+      Array.from(targetEl.children).forEach(child => {
+        nonEditableChildren.push({ el: child, prev: child.getAttribute('contenteditable') });
+        child.setAttribute('contenteditable', 'false');
+      });
+
+      targetEl.setAttribute('contenteditable', 'plaintext-only');
+      if (targetEl.contentEditable !== 'plaintext-only' && !targetEl.isContentEditable) {
+        targetEl.setAttribute('contenteditable', 'true');
+      }
+      targetEl.classList.add('px-inline-editing');
+
+      const finish = commit => {
+        if (!state.inlineEdit || state.inlineEdit.targetEl !== targetEl) return;
+        state.inlineEdit = null;
+        targetEl.removeEventListener('input', onInlineInput);
+        targetEl.removeEventListener('keydown', onInlineKeyDown);
+        targetEl.removeEventListener('blur', onInlineBlur);
+        targetEl.removeAttribute('contenteditable');
+        targetEl.classList.remove('px-inline-editing');
+        nonEditableChildren.forEach(item => {
+          if (item.prev === null) item.el.removeAttribute('contenteditable');
+          else item.el.setAttribute('contenteditable', item.prev);
+        });
+
+        const nextText = commit ? readInlineEditableText(targetEl) : prevText;
+        if (!commit) {
+          setTargetElementText(targetEl, prevText);
+        }
+        const inspInput = document.getElementById('wb-insp-text-input');
+        if (inspInput) inspInput.value = nextText;
+
+        const saveResultPromise = applyWidgetTextEdit(ownerEl, nextText, Boolean(commit));
+        if (commit && saveResultPromise && typeof saveResultPromise.then === 'function') {
+          saveResultPromise.then(result => {
+            const fb = document.getElementById('wb-text-feedback');
+            if (fb) {
+              fb.textContent =
+                result.method === 'studio-server'
+                  ? '✓ Inline edit saved permanently to ui-edits.js!'
+                  : '✓ Inline edit saved in browser storage';
+            }
+          });
+        }
+      };
+
+      const onInlineInput = () => {
+        const liveText = readInlineEditableText(targetEl);
+        const inspInput = document.getElementById('wb-insp-text-input');
+        if (inspInput) inspInput.value = liveText;
+      };
+
+      const onInlineKeyDown = evt => {
+        if (evt.key === 'Enter' && !evt.shiftKey) {
+          evt.preventDefault();
+          evt.stopPropagation();
+          finish(true);
+        } else if (evt.key === 'Escape') {
+          evt.preventDefault();
+          evt.stopPropagation();
+          finish(false);
+        }
+      };
+
+      const onInlineBlur = () => {
+        finish(true);
+      };
+
+      state.inlineEdit = { ownerEl, targetEl, prevText, finish };
+      targetEl.addEventListener('input', onInlineInput);
+      targetEl.addEventListener('keydown', onInlineKeyDown);
+      targetEl.addEventListener('blur', onInlineBlur);
+      targetEl.focus();
+
+      try {
+        const sel = global.getSelection && global.getSelection();
+        if (sel) {
+          const range = document.createRange();
+          const txtNode = getDirectTextNode(targetEl);
+          if (txtNode) range.selectNodeContents(txtNode);
+          else range.selectNodeContents(targetEl);
+          sel.removeAllRanges();
+          sel.addRange(range);
+        }
+      } catch {
+        // Ignore selection errors
+      }
+    }
+
     if (canvas) {
       canvas.addEventListener(
         'click',
@@ -993,10 +2446,11 @@
           if (!isEditMode() && !evt.shiftKey) return;
           const target = evt.target;
           if (!target || typeof target.closest !== 'function') return;
-          const pickable = target.closest(
-            '[data-slice-id], [data-ui-role], button, .px-9slice, .px-sprite-box, .px-icon, .px-wire-box, h1, h2, h3, p'
-          );
-          if (!pickable || !canvas.contains(pickable)) return;
+          if (state.inlineEdit && (target === state.inlineEdit.targetEl || state.inlineEdit.targetEl.contains(target))) {
+            return;
+          }
+          const pickable = pickStudioElement(target);
+          if (!pickable) return;
 
           if (!isEditMode() && evt.shiftKey) {
             setRenderMode('edit');
@@ -1005,6 +2459,26 @@
           evt.stopPropagation();
           evt.stopImmediatePropagation();
           selectElement(pickable);
+        },
+        true
+      );
+
+      canvas.addEventListener(
+        'dblclick',
+        evt => {
+          if (!isEditMode()) return;
+          const target = evt.target;
+          if (!target || typeof target.closest !== 'function') return;
+          if (state.inlineEdit && (target === state.inlineEdit.targetEl || state.inlineEdit.targetEl.contains(target))) {
+            return;
+          }
+          const pickable = pickStudioElement(target);
+          if (!pickable) return;
+          evt.preventDefault();
+          evt.stopPropagation();
+          evt.stopImmediatePropagation();
+          selectElement(pickable);
+          startInlineTextEdit(pickable);
         },
         true
       );
@@ -1041,6 +2515,13 @@
         return;
       }
 
+      const childIconBtn = evt.target.closest('[data-insp-select-child-icon]');
+      if (childIconBtn && state.selectedEl) {
+        const childIcon = state.selectedEl.tagName !== 'IMG' ? state.selectedEl.querySelector('[data-slice-id]') : null;
+        if (childIcon) selectElement(childIcon);
+        return;
+      }
+
       const sliceTab = evt.target.closest('[data-insp-slice-attr]');
       if (sliceTab) {
         state.activeEditorSliceAttr = sliceTab.getAttribute('data-insp-slice-attr');
@@ -1048,13 +2529,159 @@
         return;
       }
 
+      const openPickerBtn = evt.target.closest('[data-open-sprite-picker]');
+      if (openPickerBtn && state.selectedEl) {
+        openSpritePicker(state.activeEditorSliceAttr, state.selectedEl);
+        return;
+      }
+
+      const btnBrowse = evt.target.closest('[data-btn-state-browse]');
+      if (btnBrowse && state.selectedEl) {
+        const attrName = btnBrowse.getAttribute('data-btn-state-browse') || 'data-slice-id';
+        const spriteTarget = getButtonSpriteTargetEl(state.selectedEl) || state.selectedEl;
+        openSpritePicker(attrName, spriteTarget);
+        return;
+      }
+
+      const btnClear = evt.target.closest('[data-btn-state-clear]');
+      if (btnClear && state.selectedEl) {
+        const attrName = btnClear.getAttribute('data-btn-state-clear');
+        const spriteTarget = getButtonSpriteTargetEl(state.selectedEl) || state.selectedEl;
+        clearWidgetSpriteAttr(spriteTarget, attrName, state.swapAllSprites).then(result => {
+          const fb = document.getElementById('wb-sprite-feedback');
+          if (fb) {
+            fb.textContent =
+              result.method === 'studio-server'
+                ? `✓ Cleared ${formatSliceAttrStateLabel(attrName)} state & saved!`
+                : `✓ Cleared ${formatSliceAttrStateLabel(attrName)} state (browser storage)`;
+          }
+        });
+        return;
+      }
+
+      if (evt.target.closest('[data-close-sprite-picker]') || evt.target.id === 'wb-sprite-picker-modal') {
+        closeSpritePicker();
+        return;
+      }
+
+      const catBtn = evt.target.closest('[data-sp-cat]');
+      if (catBtn) {
+        const cat = catBtn.getAttribute('data-sp-cat') || 'all';
+        state.spritePicker.category = cat;
+        document.querySelectorAll('#wb-sp-cats [data-sp-cat]').forEach(btn => {
+          btn.classList.toggle('is-active', btn.getAttribute('data-sp-cat') === cat);
+        });
+        renderSpritePickerGrid();
+        return;
+      }
+
+      const showSpriteFeedback = (feedbackId, result, sliceId, attrName, verb = 'Swapped') => {
+        const fb = document.getElementById(feedbackId);
+        if (!fb) return;
+        const stateLabel = formatSliceAttrStateLabel(attrName);
+        fb.textContent = !result.ok
+          ? result.error || `Unknown slice ID: "${sliceId}"`
+          : result.method === 'studio-server'
+            ? `✓ ${verb} ${stateLabel} → "${sliceId}" & saved to disk!`
+            : `✓ ${verb} ${stateLabel} → "${sliceId}" (browser storage)`;
+      };
+
+      const applyInputSliceValue = (targetEl, attrName, rawVal, feedbackId) => {
+        const newSliceId = String(rawVal || '').trim();
+        if (!newSliceId && (attrName === 'data-slice-hover' || attrName === 'data-slice-pressed')) {
+          return clearWidgetSpriteAttr(targetEl, attrName, state.swapAllSprites).then(result => {
+            const fb = document.getElementById(feedbackId);
+            if (fb) {
+              fb.textContent =
+                result.method === 'studio-server'
+                  ? `✓ Cleared ${formatSliceAttrStateLabel(attrName)} state & saved!`
+                  : `✓ Cleared ${formatSliceAttrStateLabel(attrName)} state (browser storage)`;
+            }
+          });
+        }
+        return changeWidgetSprite(targetEl, attrName, newSliceId, state.swapAllSprites).then(result => {
+          showSpriteFeedback(feedbackId, result, newSliceId, attrName, 'Swapped');
+        });
+      };
+
+      const pickCard = evt.target.closest('[data-sp-pick]');
+      if (pickCard && state.selectedEl) {
+        const newSliceId = pickCard.getAttribute('data-sp-pick');
+        const attrName = state.spritePicker.attrName || state.activeEditorSliceAttr || 'data-slice-id';
+        const targetEl =
+          (state.spritePicker.targetEl && document.body.contains(state.spritePicker.targetEl) && state.spritePicker.targetEl) ||
+          (isButtonComponent(state.selectedEl) ? getButtonSpriteTargetEl(state.selectedEl) : null) ||
+          state.selectedEl;
+        closeSpritePicker();
+        changeWidgetSprite(targetEl, attrName, newSliceId, state.swapAllSprites).then(result => {
+          showSpriteFeedback('wb-sprite-feedback', result, newSliceId, attrName, 'Set');
+        });
+        return;
+      }
+
+      const btnApply = evt.target.closest('[data-btn-state-apply]');
+      if (btnApply && state.selectedEl) {
+        const attrName = btnApply.getAttribute('data-btn-state-apply') || 'data-slice-id';
+        const row = btnApply.closest('[data-btn-state]');
+        const inp = row ? row.querySelector(`[data-btn-state-input="${attrName}"]`) : null;
+        const targetEl = getButtonSpriteTargetEl(state.selectedEl) || state.selectedEl;
+        applyInputSliceValue(targetEl, attrName, inp ? inp.value : '', 'wb-sprite-feedback');
+        return;
+      }
+
+      const applySliceBtn = evt.target.closest('[data-insp-apply-slice]');
+      if (applySliceBtn && state.selectedEl) {
+        const inp = document.getElementById('wb-insp-slice-input');
+        const attrName = state.activeEditorSliceAttr || 'data-slice-id';
+        applyInputSliceValue(state.selectedEl, attrName, inp ? inp.value : '', 'wb-sprite-feedback');
+        return;
+      }
+
+      const saveEditsBtn = evt.target.closest('[data-ui-edits-save]');
+      if (saveEditsBtn && state.selectedEl) {
+        const textInput = document.getElementById('wb-insp-text-input');
+        if (textInput) {
+          applyWidgetTextEdit(state.selectedEl, textInput.value, false);
+        }
+        const fb = document.getElementById('wb-text-feedback');
+        if (fb) fb.textContent = 'Saving...';
+        saveEditsBtn.disabled = true;
+        persistUiEditsToDisk().then(result => {
+          saveEditsBtn.disabled = false;
+          const fbAfter = document.getElementById('wb-text-feedback');
+          if (fbAfter) {
+            fbAfter.textContent =
+              result.method === 'studio-server'
+                ? '✓ Saved permanently to ui-edits.js!'
+                : '✓ Saved in browser storage (start server to write disk)';
+          }
+        });
+        return;
+      }
+
+      const resetWidgetBtn = evt.target.closest('[data-reset-widget-edits]');
+      if (resetWidgetBtn && state.selectedEl) {
+        resetWidgetBtn.disabled = true;
+        resetWidgetEdits(state.selectedEl).then(result => {
+          const fbText = document.getElementById('wb-text-feedback');
+          const fbSprite = document.getElementById('wb-sprite-feedback');
+          const msg =
+            result.method === 'studio-server'
+              ? '✓ Reset widget & updated ui-edits.js.'
+              : '✓ Reset widget to default.';
+          if (fbText) fbText.textContent = msg;
+          else if (fbSprite) fbSprite.textContent = msg;
+        });
+        return;
+      }
+
       const saveBtn = evt.target.closest('[data-s9-save]');
-      if (saveBtn && state.selectedEl) {
-        const el = state.selectedEl;
-        const sliceId = el.getAttribute(state.activeEditorSliceAttr);
+      if (saveBtn) {
+        const sliceId = getActive9SliceId();
         const resolved = sliceId ? resolveSliceUrl(sliceId) : null;
         if (sliceId && resolved) {
-          const arr = resolveEffectiveSlice9(el, sliceId, resolved.rec) || [0, 0, 0, 0];
+          const targetEl = state.inspectorMode === 'widget' ? state.selectedEl : null;
+          const arr = resolveEffectiveSlice9(targetEl, sliceId, resolved.rec) || [0, 0, 0, 0];
           const clamped = arr.map(v => Math.max(0, parseInt(v, 10) || 0));
           const overrides = loadSlice9Overrides();
           overrides[sliceId] = clamped;
@@ -1069,6 +2696,7 @@
             applySliceToElement(node, sliceId);
           });
           renderManifestTable();
+          syncResourceCardBadge(sliceId, clamped, true);
 
           const fb = document.getElementById('wb-s9-feedback');
           if (fb) fb.textContent = 'Saving...';
@@ -1088,10 +2716,11 @@
       }
 
       const resetBtn = evt.target.closest('[data-s9-reset]');
-      if (resetBtn && state.selectedEl) {
-        const el = state.selectedEl;
-        const sliceId = el.getAttribute(state.activeEditorSliceAttr);
-        state.elementSlice9Overrides.delete(el);
+      if (resetBtn) {
+        const sliceId = getActive9SliceId();
+        if (state.selectedEl) {
+          state.elementSlice9Overrides.delete(state.selectedEl);
+        }
         if (sliceId) {
           const overrides = loadSlice9Overrides();
           delete overrides[sliceId];
@@ -1106,12 +2735,15 @@
               state.initialSlice9Defaults.get(sliceId);
             if (restored && catalog.slices && catalog.slices[sliceId]) {
               catalog.slices[sliceId].slice_9 = [...restored];
+            } else if (catalog.slices && catalog.slices[sliceId] && result.resolved && sliceId in result.resolved) {
+              catalog.slices[sliceId].slice_9 = result.resolved[sliceId];
             }
             document.querySelectorAll(`#game-canvas [data-slice-id="${sliceId}"]`).forEach(node => {
               state.elementSlice9Overrides.delete(node);
               applySliceToElement(node, sliceId);
             });
             renderManifestTable();
+            renderResourcesDockGrid();
             renderInspector();
             const fbAfter = document.getElementById('wb-s9-feedback');
             if (fbAfter) fbAfter.textContent = '✓ Reset to default slice.';
@@ -1121,20 +2753,137 @@
         }
         return;
       }
+
+      const dockTabBtn = evt.target.closest('[data-dock-tab]');
+      if (dockTabBtn) {
+        const tabName = dockTabBtn.getAttribute('data-dock-tab');
+        if (tabName) setBottomDock(true, tabName);
+        return;
+      }
+
+      const resCatBtn = evt.target.closest('#wb-res-cats [data-res-cat]');
+      if (resCatBtn) {
+        const cat = resCatBtn.getAttribute('data-res-cat') || 'all';
+        state.resourceDock.category = cat;
+        document.querySelectorAll('#wb-res-cats [data-res-cat]').forEach(btn => {
+          btn.classList.toggle('is-active', btn.getAttribute('data-res-cat') === cat);
+        });
+        renderResourcesDockGrid();
+        return;
+      }
+
+      const resPickEl = evt.target.closest('[data-res-pick]');
+      if (resPickEl) {
+        const sliceId = resPickEl.getAttribute('data-res-pick');
+        if (sliceId) {
+          selectResourceSprite(sliceId, {
+            scrollIntoView: Boolean(resPickEl.closest('#wb-manifest-body')),
+          });
+        }
+        return;
+      }
+
+      const editResS9Btn = evt.target.closest('[data-insp-edit-resource-s9]');
+      if (editResS9Btn) {
+        const sliceId = editResS9Btn.getAttribute('data-insp-edit-resource-s9');
+        if (sliceId) {
+          selectResourceSprite(sliceId, { scrollIntoView: true });
+        }
+        return;
+      }
+
+      const assignResBtn = evt.target.closest('[data-assign-resource-to-widget]');
+      if (assignResBtn && state.selectedEl && document.body.contains(state.selectedEl)) {
+        const sliceId = assignResBtn.getAttribute('data-assign-resource-to-widget');
+        const attrName = assignResBtn.getAttribute('data-assign-attr') || state.activeEditorSliceAttr || 'data-slice-id';
+        const targetEl = isButtonComponent(state.selectedEl)
+          ? getButtonSpriteTargetEl(state.selectedEl) || state.selectedEl
+          : state.selectedEl;
+        if (sliceId && targetEl) {
+          changeWidgetSprite(targetEl, attrName, sliceId, state.swapAllSprites).then(result => {
+            const fb = document.getElementById('wb-res-feedback');
+            if (fb) {
+              const stateLabel = formatSliceAttrStateLabel(attrName);
+              fb.textContent = !result.ok
+                ? result.error || 'Failed to assign sprite.'
+                : result.method === 'studio-server'
+                  ? `✓ Assigned ${stateLabel} "${sliceId}" & saved to ui-edits.js!`
+                  : `✓ Assigned ${stateLabel} "${sliceId}" (browser storage)`;
+            }
+          });
+        }
+        return;
+      }
     });
 
-    // Apply-to-all checkbox and numeric inputs in 9-slice editor
+    // Apply-to-all checkboxes and inspector/sprite-picker inputs
     document.addEventListener('change', evt => {
-      if (evt.target && evt.target.id === 'wb-apply-all-cb') {
+      if (!evt.target) return;
+      if (evt.target.id === 'wb-apply-all-cb') {
         state.applyAllInstances = Boolean(evt.target.checked);
+      } else if (evt.target.id === 'wb-res-only-used') {
+        state.resourceDock.onlyUsed = Boolean(evt.target.checked);
+        renderResourcesDockGrid();
+      } else if (evt.target.id === 'wb-swap-all-sprites-cb') {
+        state.swapAllSprites = Boolean(evt.target.checked);
+        const spCb = document.getElementById('wb-sp-swap-all');
+        if (spCb) spCb.checked = state.swapAllSprites;
+      } else if (evt.target.id === 'wb-sp-swap-all') {
+        state.swapAllSprites = Boolean(evt.target.checked);
+        const inspCb = document.getElementById('wb-swap-all-sprites-cb');
+        if (inspCb) inspCb.checked = state.swapAllSprites;
+      } else if (evt.target.id === 'wb-insp-text-input' && state.selectedEl) {
+        const res = applyWidgetTextEdit(state.selectedEl, evt.target.value, true);
+        if (res && typeof res.then === 'function') {
+          res.then(result => {
+            const fb = document.getElementById('wb-text-feedback');
+            if (fb && !fb.textContent) {
+              fb.textContent =
+                result.method === 'studio-server'
+                  ? '✓ Saved permanently to ui-edits.js!'
+                  : '✓ Saved in browser storage';
+            }
+          });
+        }
+      }
+    });
+
+    document.addEventListener('keydown', evt => {
+      if (evt.key === 'Escape') {
+        const modal = document.getElementById('wb-sprite-picker-modal');
+        if (modal && modal.classList.contains('is-open')) {
+          closeSpritePicker();
+        }
+      } else if (evt.key === 'Enter' && evt.target && evt.target.id === 'wb-insp-slice-input') {
+        evt.preventDefault();
+        const applyBtn = document.querySelector('[data-insp-apply-slice]');
+        if (applyBtn) applyBtn.click();
+      } else if (evt.key === 'Enter' && evt.target && evt.target.hasAttribute('data-btn-state-input')) {
+        evt.preventDefault();
+        const attrName = evt.target.getAttribute('data-btn-state-input');
+        const applyBtn = attrName ? document.querySelector(`[data-btn-state-apply="${attrName}"]`) : null;
+        if (applyBtn) applyBtn.click();
       }
     });
 
     document.addEventListener('input', evt => {
+      if (evt.target && evt.target.id === 'wb-insp-text-input' && state.selectedEl) {
+        applyWidgetTextEdit(state.selectedEl, evt.target.value, false);
+        return;
+      }
+      if (evt.target && evt.target.id === 'wb-sp-search') {
+        state.spritePicker.search = evt.target.value || '';
+        renderSpritePickerGrid();
+        return;
+      }
+      if (evt.target && evt.target.id === 'wb-res-search') {
+        state.resourceDock.search = evt.target.value || '';
+        renderResourcesDockGrid();
+        return;
+      }
       const inp = evt.target && evt.target.closest ? evt.target.closest('[data-s9-input]') : null;
-      if (!inp || !state.selectedEl) return;
-      const el = state.selectedEl;
-      const sliceId = el.getAttribute(state.activeEditorSliceAttr);
+      if (!inp) return;
+      const sliceId = getActive9SliceId();
       const resolved = sliceId ? resolveSliceUrl(sliceId) : null;
       if (!resolved) return;
 
@@ -1149,7 +2898,9 @@
         Math.max(0, Math.min(Math.floor(resolved.rec.width / 2), l)),
       ];
 
-      applyLiveSlice9(el, sliceId, next, state.applyAllInstances);
+      const targetEl = state.inspectorMode === 'widget' ? state.selectedEl : null;
+      const applyAll = state.inspectorMode === 'resource' ? true : state.applyAllInstances;
+      applyLiveSlice9(targetEl, sliceId, next, applyAll);
       syncSlice9EditorWidgets(next, resolved.rec);
     });
 
@@ -1157,7 +2908,7 @@
     let activeDrag = null;
     document.addEventListener('mousedown', evt => {
       const line = evt.target.closest && evt.target.closest('.slice9-line[data-slice-edge]');
-      if (!line || !state.selectedEl) return;
+      if (!line) return;
       const wrap = document.getElementById('slice9-canvas-wrap');
       if (!wrap) return;
       evt.preventDefault();
@@ -1175,10 +2926,11 @@
     });
 
     document.addEventListener('mousemove', evt => {
-      if (!activeDrag || !state.selectedEl) return;
+      if (!activeDrag) return;
       const { edge, wrap, sliceId, rec, zoom } = activeDrag;
       const wRect = wrap.getBoundingClientRect();
-      const cur = resolveEffectiveSlice9(state.selectedEl, sliceId, rec) || [0, 0, 0, 0];
+      const targetEl = state.inspectorMode === 'widget' ? state.selectedEl : null;
+      const cur = resolveEffectiveSlice9(targetEl, sliceId, rec) || [0, 0, 0, 0];
       const next = [...cur];
 
       if (edge === 't') {
@@ -1195,7 +2947,8 @@
         next[3] = Math.max(0, Math.min(Math.floor(rec.width / 2), px));
       }
 
-      applyLiveSlice9(state.selectedEl, sliceId, next, state.applyAllInstances);
+      const applyAll = state.inspectorMode === 'resource' ? true : state.applyAllInstances;
+      applyLiveSlice9(targetEl, sliceId, next, applyAll);
       syncSlice9EditorWidgets(next, rec);
     });
 
@@ -1255,11 +3008,10 @@
 
       const wbBehavior = evt.target.closest('[data-wb-behavior]');
       if (wbBehavior) {
-        const drawer = document.getElementById('wb-behavior-drawer');
-        if (drawer) {
-          const open = drawer.classList.toggle('is-open');
-          wbBehavior.classList.toggle('is-active', open);
-          wbBehavior.setAttribute('aria-pressed', open ? 'true' : 'false');
+        if (state.resourceDock.open && state.resourceDock.activeTab === 'behavior') {
+          setBottomDock(false);
+        } else {
+          setBottomDock(true, 'behavior');
         }
         return;
       }
@@ -1283,31 +3035,62 @@
         return;
       }
 
+      const wbResources = evt.target.closest('[data-wb-resources]');
+      if (wbResources) {
+        if (state.resourceDock.open && state.resourceDock.activeTab === 'resources') {
+          setBottomDock(false);
+        } else {
+          setBottomDock(true, 'resources');
+        }
+        return;
+      }
+
       const wbManifest = evt.target.closest('[data-wb-manifest]');
       if (wbManifest) {
-        const drawer = document.getElementById('wb-manifest-drawer');
-        if (drawer) {
-          const open = drawer.classList.toggle('is-open');
-          wbManifest.classList.toggle('is-active', open);
-          if (open) renderManifestTable();
+        if (state.resourceDock.open && state.resourceDock.activeTab === 'manifest') {
+          setBottomDock(false);
+        } else {
+          setBottomDock(true, 'manifest');
         }
       }
     });
 
-    // Pressed sprite state swapping
+    // Hover & Pressed sprite state swapping (Idle / Hover / Pressed)
+    document.addEventListener('mouseover', evt => {
+      if (isWireframeMode() || isEditMode()) return;
+      const pair = resolveInteractiveButtonPair(evt.target);
+      if (!pair) return;
+      if (evt.relatedTarget && pair.hostEl.contains(evt.relatedTarget)) return;
+      pair.spriteEl.classList.add('is-hovered');
+      if (pair.hostEl !== pair.spriteEl) pair.hostEl.classList.add('is-hovered');
+      syncButtonVisualState(pair.spriteEl);
+    });
+
+    document.addEventListener('mouseout', evt => {
+      if (isWireframeMode() || isEditMode()) return;
+      const pair = resolveInteractiveButtonPair(evt.target);
+      if (!pair) return;
+      if (evt.relatedTarget && pair.hostEl.contains(evt.relatedTarget)) return;
+      pair.spriteEl.classList.remove('is-hovered');
+      if (pair.hostEl !== pair.spriteEl) pair.hostEl.classList.remove('is-hovered');
+      syncButtonVisualState(pair.spriteEl);
+    });
+
     document.addEventListener('mousedown', evt => {
       if (isWireframeMode() || isEditMode()) return;
-      const btn = evt.target.closest('[data-slice-pressed]');
-      if (!btn) return;
-      btn.classList.add('is-pressed');
-      applySliceToElement(btn, btn.getAttribute('data-slice-pressed'));
+      const pair = resolveInteractiveButtonPair(evt.target);
+      if (!pair) return;
+      pair.spriteEl.classList.add('is-pressed');
+      if (pair.hostEl !== pair.spriteEl) pair.hostEl.classList.add('is-pressed');
+      syncButtonVisualState(pair.spriteEl);
     });
 
     const releasePressed = () => {
-      document.querySelectorAll('[data-slice-pressed].is-pressed').forEach(btn => {
-        btn.classList.remove('is-pressed');
-        const normalId = btn.getAttribute('data-slice-id');
-        if (normalId) applySliceToElement(btn, normalId);
+      document.querySelectorAll('.is-pressed').forEach(node => {
+        node.classList.remove('is-pressed');
+        if (node.hasAttribute('data-slice-id') || node.hasAttribute('data-slice-pressed') || node.hasAttribute('data-slice-hover')) {
+          syncButtonVisualState(node);
+        }
       });
     };
     document.addEventListener('mouseup', releasePressed);
@@ -1322,9 +3105,22 @@
     }
 
     ensureStudioShell();
+    applySavedUiEdits();
     hydrateSprites(document);
     wireInteractions();
     wireStudioInteractions();
+
+    // Re-apply saved edits after any same-tick DOMContentLoaded page scripts finish hydrating dynamic widgets
+    setTimeout(() => {
+      if (applySavedUiEdits() > 0) {
+        renderManifestTable();
+        renderResourcesDockGrid();
+        renderHierarchyTree();
+        if (state.selectedEl || state.inspectorMode === 'resource') renderInspector();
+      } else {
+        renderResourcesDockGrid();
+      }
+    }, 0);
 
     const scaleParam = params.get('scale');
     if (scaleParam) setPixelScale(scaleParam);
@@ -1363,9 +3159,18 @@
     setScene,
     renderManifestTable,
     selectElement,
+    selectResourceSprite,
+    setBottomDock,
     setStudioPanels,
     saveSlice9: persistSlice9ToDisk,
     getOverrides: loadSlice9Overrides,
+    changeWidgetSprite,
+    clearWidgetSpriteAttr,
+    isButtonComponent,
+    getButtonSpriteTargetEl,
+    applyWidgetTextEdit,
+    resetWidgetEdits,
+    openSpritePicker,
   };
 
   if (document.readyState === 'loading') {

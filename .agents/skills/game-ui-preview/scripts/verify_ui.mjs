@@ -4,10 +4,11 @@
  * interactive state audit, and clean/annotated screenshot capture.
  */
 
+import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 function loadPlaywright() {
   const require = createRequire(import.meta.url);
@@ -625,6 +626,21 @@ async function main() {
 
   const reportPath = path.join(outDir, 'report.json');
   fs.writeFileSync(reportPath, JSON.stringify(report, null, 2), 'utf-8');
+
+  try {
+    const scriptDir = path.dirname(fileURLToPath(import.meta.url));
+    const buildGalleryScript = path.join(scriptDir, 'build_gallery.py');
+    if (fs.existsSync(buildGalleryScript)) {
+      const previewsRoot = path.dirname(path.dirname(pageAbs));
+      const catalogDir = path.join(previewsRoot, '_catalog');
+      const pyArgs = fs.existsSync(catalogDir)
+        ? [buildGalleryScript, '--previews-root', previewsRoot, '--catalog', catalogDir, '--no-sync-kit']
+        : [buildGalleryScript, '--no-sync-kit'];
+      spawnSync('python', pyArgs, { stdio: 'ignore' });
+    }
+  } catch {
+    // Non-fatal if Python is unavailable during standalone verify_ui.mjs run
+  }
 
   console.log(`VERIFICATION ${report.status}`);
   console.log(`States tested: ${summary.statesTested} | Assets verified: ${summary.totalAssetsVerified}`);

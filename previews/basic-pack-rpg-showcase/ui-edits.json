@@ -1,0 +1,10 @@
+{
+  "textEdits": {
+    "2.0.1.1.1": "Morning, Mayor! The clover beds by the river look thirsty\u2014grab your Copper Can and check your Backpack!"
+  },
+  "spriteEdits": {
+    "2.0.0.0.0.0": {
+      "data-slice-hover": "basic_pack_047"
+    }
+  }
+}
