@@ -1,0 +1,8 @@
+{
+  "name": "effect_abc",
+  "systems": [
+    { "name": "Ring", "texture": "ring", "color": [0.3, 0.9, 1, 0.9], "maxParticles": 20, "rate": 8, "lifetime": 2.5, "size": 0.5, "sizeEnd": 0.2, "shape": "none", "orbitSpeed": 0.6, "additive": true },
+    { "name": "Sparks", "texture": "sparkle", "color": [1, 0.95, 0.5, 1], "colorEnd": [1, 1, 1, 0], "maxParticles": 25, "rate": 10, "lifetime": 1.2, "speed": 0.3, "size": 0.25, "sizeEnd": 0.05, "shape": "sphere", "radius": 1.3, "additive": true },
+    { "name": "Comet", "texture": "glow", "color": [1, 0.6, 0.2, 1], "maxParticles": 3, "rate": 3, "lifetime": 3, "size": 0.2, "sizeEnd": 0.1, "shape": "none", "position": [0, 0.9, 0], "orbitSpeed": 1.2, "trail": true, "additive": true }
+  ]
+}

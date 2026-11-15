@@ -1,0 +1,4 @@
+dist/
+
+# Reference-only packaged skill files (source material, not KB content)
+*.skill

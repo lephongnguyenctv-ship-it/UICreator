@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>UI kit gallery</title>
+<link rel="stylesheet" href="ui-kit.css">
+<style>
+  body { margin: 0; padding: 24px; background: #2b2420; color: #eee; font-family: system-ui, sans-serif; }
+  .g-head { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; }
+  .g-item { margin: 0 0 32px; }
+  .g-item h2 { font-size: 15px; font-weight: 600; margin: 0 0 8px; color: #ddd; }
+</style>
+</head>
+<body>
+<!-- Component gallery ("storybook"): every screen in SCREENS rendered with the real kit.
+     The designer reviews THIS page once to approve the kit; after that new screens only compose approved parts.
+     Toggle "Outline boxes" to see every layout box and spot misalignment by eye. -->
+<div class="g-head">
+  <label><input type="checkbox" id="dbg"> Outline boxes</label>
+</div>
+<div id="gallery"></div>
+<script src="ui-kit.js"></script>
+<script src="example-screens.js"></script>
+<script>
+  const g = document.getElementById('gallery');
+  g.innerHTML = SCREENS.map(s => `<div class="g-item" id="${s.id}"><h2>${UIKit.esc(s.label)} <small>#${s.id}</small></h2>${s.render()}</div>`).join('');
+  document.getElementById('dbg').addEventListener('change', e => g.classList.toggle('k-debug', e.target.checked));
+</script>
+</body>
+</html>

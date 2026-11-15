@@ -1,0 +1,11 @@
+{
+  "name": "craftland-game-ui-creator",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sprite-sheet-driven Game UI HTML preview & Playwright self-verification workflow",
+  "scripts": {
+    "slice": "python .agents/skills/game-ui-preview/scripts/slice_sprites.py",
+    "scaffold": "python .agents/skills/game-ui-preview/scripts/scaffold_preview.py",
+    "verify": "node .agents/skills/game-ui-preview/scripts/verify_ui.mjs"
+  }
+}

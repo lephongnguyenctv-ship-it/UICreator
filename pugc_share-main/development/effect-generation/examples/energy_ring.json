@@ -1,0 +1,46 @@
+{
+  "name": "energy_ring",
+  "prefab": "Effect_EnergyRing",
+  "systems": [
+    {
+      "name": "Ground_Ring", "texture": "ring", "blend": "additive",
+      "position": [0, 0.03, 0], "render": { "mode": "horizontal" },
+      "maxParticles": 3, "rate": 0.5, "lifetime": 5, "prewarm": true, "duration": 5,
+      "size": [2.0, 2.4], "rotation": [0, 360], "rotationOverLife": [20, 40],
+      "color": { "gradient": [[0, 0.2, 0.9, 1, 0.9], [1, 0.5, 0.6, 1, 0.9]], "random": true },
+      "fade": [0.3, 0.3]
+    },
+    {
+      "name": "Core_Glow", "texture": "glow", "blend": "additive",
+      "position": [0, 1, 0], "maxParticles": 6, "rate": 2, "lifetime": [2, 3], "prewarm": true, "duration": 3,
+      "size": [0.7, 1.0], "sizeOverLife": [[0, 0.7], [1, 1.1]],
+      "color": [0.3, 0.8, 1, 0.5], "fade": [0.3, 0.3],
+      "shape": { "type": "sphere", "radius": 0.35 }
+    },
+    {
+      "name": "Sparks", "texture": "sparkle", "blend": "additive",
+      "position": [0, 1, 0], "maxParticles": 18, "rate": 10, "lifetime": [0.8, 1.5], "prewarm": true, "duration": 2,
+      "size": [0.08, 0.2], "rotation": [0, 30],
+      "color": { "gradient": [[0, 1, 1, 1, 1], [0.5, 0.6, 0.9, 1, 1], [1, 1, 0.9, 0.6, 1]], "random": true },
+      "fade": [0.3, 0.4],
+      "shape": { "type": "sphere", "radius": 1.1, "thickness": 0.4 }
+    },
+    {
+      "name": "Comet", "texture": "glow", "blend": "additive",
+      "position": [0, 1.2, 0], "tilt": [30, 0, 15], "maxParticles": 1, "rate": 10, "lifetime": [3, 5], "duration": 2,
+      "size": [0.14, 0.18], "color": [0.7, 0.9, 1, 1], "fade": [0.08, 0.15],
+      "shape": { "type": "circle", "radius": 1.2, "thickness": 0, "rotation": [90, 0, 0] },
+      "orbit": [0, 3, 0],
+      "trail": { "lifetime": 0.1, "minVertexDistance": 0.03, "width": [[0, 1], [1, 0.2]], "widthScale": 0.5,
+                 "colorOverTrail": [[0, 1, 1, 1, 1], [0.5, 0.45, 0.8, 1, 0.7], [1, 0.45, 0.8, 1, 0]] }
+    },
+    {
+      "name": "Planet", "texture": "earth_8x8", "blend": "alpha",
+      "position": [0, 1, 0], "tilt": [-5, 0, -7], "maxParticles": 1, "rate": 10, "lifetime": 600, "duration": 5,
+      "size": 0.22, "color": [1, 1, 1, 1], "fade": null,
+      "shape": { "type": "circle", "radius": 1.0, "thickness": 0, "rotation": [90, 0, 0] },
+      "orbit": [0, -1, 0],
+      "flipbook": { "tiles": [8, 8], "cycles": 75, "blend": true }
+    }
+  ]
+}

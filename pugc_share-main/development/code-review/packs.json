@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "packs": [
+    {
+      "id": "database",
+      "trigger": [
+        "database review",
+        "data storage",
+        "datastore quota",
+        "save/load player data",
+        "/database"
+      ],
+      "applicability_signals": [
+        "Database.fcc",
+        "ReadFromDataStore",
+        "WriteToDataStore",
+        "OnPlayerJoin",
+        "globalEntity",
+        "sessionGeneration"
+      ],
+      "rule_prefix": "DB",
+      "path": "database"
+    },
+    {
+      "id": "network-reconnect-action-spam",
+      "trigger": [
+        "network review",
+        "reconnect spam",
+        "duplicate reward",
+        "one pay multiple earn",
+        "transaction race",
+        "disconnect/reconnect exploit"
+      ],
+      "applicability_signals": [
+        "DispatchEventToEntity",
+        "BroadcastCustomEvent",
+        "PlatformType.Server",
+        "OnUserQuitOrUserMatchEnd",
+        "UserUID",
+        "UUID"
+      ],
+      "rule_prefix": "NET",
+      "path": "network-reconnect-action-spam"
+    },
+    {
+      "id": "performance",
+      "trigger": [
+        "performance review",
+        "tối ưu performance",
+        "lag",
+        "FPS",
+        "network traffic",
+        "broadcast",
+        "dirty flag",
+        "pooling",
+        "stress test"
+      ],
+      "applicability_signals": [
+        "GetAllPlayers",
+        "DispatchEventToEntity",
+        "BroadcastCustomEvent",
+        "while true",
+        "WaitForMillisecond",
+        "List.Contain",
+        "LogInfo",
+        "OnUpdate",
+        "SetActive",
+        "ReturnToPool",
+        "IsVisible",
+        "VisiblePlayers"
+      ],
+      "rule_prefix": "PERF",
+      "path": "performance"
+    }
+  ]
+}

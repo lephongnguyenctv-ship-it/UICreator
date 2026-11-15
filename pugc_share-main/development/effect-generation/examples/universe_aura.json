@@ -1,0 +1,613 @@
+{
+  "name": "universe_effect",
+  "prefab": "Effect_UniverseAura",
+  "systems": [
+    {
+      "name": "Nebula_Disc",
+      "duration": 6.0,
+      "loop": true,
+      "prewarm": true,
+      "maxParticles": 4,
+      "rate": 0.6,
+      "lifetime": 6.0,
+      "speed": 0.0,
+      "size": [
+        2.4,
+        3.0
+      ],
+      "rotation": [
+        0.0,
+        360.0
+      ],
+      "color": {
+        "gradient": [
+          [
+            0.0,
+            0.95,
+            0.35,
+            0.85,
+            0.8
+          ],
+          [
+            0.5,
+            0.45,
+            0.3,
+            1.0,
+            0.8
+          ],
+          [
+            1.0,
+            0.25,
+            0.6,
+            1.0,
+            0.8
+          ]
+        ],
+        "random": true
+      },
+      "shape": "none",
+      "fade": [
+        0.3,
+        0.3
+      ],
+      "rotationOverLife": [
+        20.054,
+        40.107
+      ],
+      "texture": "nebuladisc",
+      "blend": "additive",
+      "position": [
+        0.0,
+        0.03,
+        0.0
+      ],
+      "render": {
+        "mode": "horizontal"
+      }
+    },
+    {
+      "name": "Nebula_Glow",
+      "duration": 3.5,
+      "loop": true,
+      "prewarm": true,
+      "maxParticles": 10,
+      "rate": 3.0,
+      "lifetime": [
+        2.5,
+        3.5
+      ],
+      "speed": [
+        0.02,
+        0.08
+      ],
+      "size": [
+        0.6,
+        1.0
+      ],
+      "rotation": [
+        0.0,
+        360.0
+      ],
+      "color": {
+        "gradient": [
+          [
+            0.0,
+            0.9,
+            0.3,
+            0.8,
+            0.45
+          ],
+          [
+            0.5,
+            0.5,
+            0.25,
+            0.95,
+            0.45
+          ],
+          [
+            1.0,
+            0.2,
+            0.5,
+            1.0,
+            0.45
+          ]
+        ],
+        "random": true
+      },
+      "shape": {
+        "type": "sphere",
+        "radius": 0.55,
+        "scale": [
+          1.0,
+          1.5,
+          1.0
+        ]
+      },
+      "fade": [
+        0.3,
+        0.3
+      ],
+      "sizeOverLife": [
+        [
+          0.0,
+          0.7
+        ],
+        [
+          1.0,
+          1.1
+        ]
+      ],
+      "rotationOverLife": [
+        -22.918,
+        22.918
+      ],
+      "texture": "cloud",
+      "blend": "additive",
+      "position": [
+        0.0,
+        1.0,
+        0.0
+      ]
+    },
+    {
+      "name": "Stars",
+      "duration": 2.0,
+      "loop": true,
+      "prewarm": true,
+      "maxParticles": 20,
+      "rate": 12.0,
+      "lifetime": [
+        0.8,
+        1.6
+      ],
+      "speed": 0.0,
+      "size": [
+        0.08,
+        0.2
+      ],
+      "rotation": [
+        0.0,
+        34.377
+      ],
+      "color": {
+        "gradient": [
+          [
+            0.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          [
+            0.5,
+            0.6,
+            0.8,
+            1.0,
+            1.0
+          ],
+          [
+            1.0,
+            1.0,
+            0.85,
+            0.55,
+            1.0
+          ]
+        ],
+        "random": true
+      },
+      "shape": {
+        "type": "sphere",
+        "radius": 1.1,
+        "thickness": 0.4
+      },
+      "fade": [
+        0.3,
+        0.4
+      ],
+      "texture": "sparkle",
+      "blend": "additive",
+      "position": [
+        0.0,
+        1.0,
+        0.0
+      ]
+    },
+    {
+      "name": "Star_Dust",
+      "duration": 2.5,
+      "loop": true,
+      "prewarm": true,
+      "maxParticles": 25,
+      "rate": 10.0,
+      "lifetime": [
+        1.5,
+        2.5
+      ],
+      "speed": [
+        0.2,
+        0.5
+      ],
+      "size": [
+        0.03,
+        0.07
+      ],
+      "color": {
+        "gradient": [
+          [
+            0.0,
+            0.7,
+            0.85,
+            1.0,
+            1.0
+          ],
+          [
+            1.0,
+            1.0,
+            0.6,
+            0.9,
+            1.0
+          ]
+        ],
+        "random": true
+      },
+      "shape": {
+        "type": "cone",
+        "radius": 0.9,
+        "angle": 8.0,
+        "thickness": 0.4,
+        "rotation": [
+          -90.0,
+          0.0,
+          0.0
+        ]
+      },
+      "fade": [
+        0.2,
+        0.4
+      ],
+      "texture": "glow",
+      "blend": "additive"
+    },
+    {
+      "name": "Sun",
+      "duration": 5.0,
+      "loop": true,
+      "maxParticles": 1,
+      "rate": 10.0,
+      "lifetime": 600.0,
+      "speed": 0.0,
+      "size": 0.45,
+      "color": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "shape": {
+        "type": "circle",
+        "radius": 0.85,
+        "thickness": 0.0,
+        "rotation": [
+          90.0,
+          0.0,
+          0.0
+        ]
+      },
+      "fade": [
+        0,
+        0
+      ],
+      "orbit": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "flipbook": {
+        "tiles": [
+          4,
+          4
+        ],
+        "cycles": 50.0,
+        "blend": true
+      },
+      "texture": "sun_4x4",
+      "blend": "additive",
+      "position": [
+        0.0,
+        1.55,
+        0.0
+      ],
+      "rotationEuler": [
+        12.0,
+        -0.0,
+        8.0
+      ]
+    },
+    {
+      "name": "Earth",
+      "duration": 5.0,
+      "loop": true,
+      "maxParticles": 1,
+      "rate": 10.0,
+      "lifetime": 600.0,
+      "speed": 0.0,
+      "size": 0.22,
+      "color": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "shape": {
+        "type": "circle",
+        "radius": 1.0,
+        "thickness": 0.0,
+        "rotation": [
+          90.0,
+          0.0,
+          0.0
+        ]
+      },
+      "fade": [
+        0,
+        0
+      ],
+      "orbit": [
+        0.0,
+        -1.0,
+        0.0
+      ],
+      "flipbook": {
+        "tiles": [
+          8,
+          8
+        ],
+        "cycles": 75.0,
+        "blend": true
+      },
+      "texture": "earth_8x8",
+      "blend": "alpha",
+      "position": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "rotationEuler": [
+        -10.0,
+        -0.0,
+        -14.0
+      ]
+    },
+    {
+      "name": "Saturn",
+      "duration": 5.0,
+      "loop": true,
+      "maxParticles": 1,
+      "rate": 10.0,
+      "lifetime": 600.0,
+      "speed": 0.0,
+      "size": 0.42,
+      "color": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "shape": {
+        "type": "circle",
+        "radius": 1.15,
+        "thickness": 0.0,
+        "rotation": [
+          90.0,
+          0.0,
+          0.0
+        ]
+      },
+      "fade": [
+        0,
+        0
+      ],
+      "orbit": [
+        0.0,
+        0.55,
+        0.0
+      ],
+      "texture": "saturn",
+      "blend": "alpha",
+      "position": [
+        0.0,
+        0.55,
+        0.0
+      ],
+      "rotationEuler": [
+        8.0,
+        -0.0,
+        10.0
+      ]
+    },
+    {
+      "name": "Comet_A",
+      "duration": 2.0,
+      "loop": true,
+      "maxParticles": 1,
+      "rate": 10.0,
+      "lifetime": [
+        3.0,
+        5.0
+      ],
+      "speed": 0.0,
+      "size": [
+        0.14,
+        0.18
+      ],
+      "color": [
+        0.725,
+        0.9,
+        1.0,
+        1.0
+      ],
+      "shape": {
+        "type": "circle",
+        "radius": 1.25,
+        "thickness": 0.0,
+        "rotation": [
+          90.0,
+          0.0,
+          0.0
+        ]
+      },
+      "fade": [
+        0.08,
+        0.15
+      ],
+      "orbit": [
+        0.0,
+        3.5,
+        0.0
+      ],
+      "trail": {
+        "lifetime": 0.1,
+        "minVertexDistance": 0.03,
+        "width": [
+          [
+            0.0,
+            1.0
+          ],
+          [
+            1.0,
+            0.2
+          ]
+        ],
+        "widthScale": 0.5,
+        "colorOverTrail": [
+          [
+            0.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          [
+            0.5,
+            0.45,
+            0.8,
+            1.0,
+            0.7
+          ],
+          [
+            1.0,
+            0.45,
+            0.8,
+            1.0,
+            0.0
+          ]
+        ],
+        "texture": "trail"
+      },
+      "texture": "glow",
+      "blend": "additive",
+      "position": [
+        0.0,
+        1.2,
+        0.0
+      ],
+      "rotationEuler": [
+        35.0,
+        0.0,
+        15.0
+      ]
+    },
+    {
+      "name": "Comet_B",
+      "duration": 2.0,
+      "loop": true,
+      "maxParticles": 1,
+      "rate": 10.0,
+      "lifetime": [
+        3.0,
+        5.0
+      ],
+      "speed": 0.0,
+      "size": [
+        0.14,
+        0.18
+      ],
+      "color": [
+        1.0,
+        0.775,
+        0.925,
+        1.0
+      ],
+      "shape": {
+        "type": "circle",
+        "radius": 0.95,
+        "thickness": 0.0,
+        "rotation": [
+          90.0,
+          0.0,
+          0.0
+        ]
+      },
+      "fade": [
+        0.08,
+        0.15
+      ],
+      "orbit": [
+        0.0,
+        -3.0,
+        0.0
+      ],
+      "trail": {
+        "lifetime": 0.1,
+        "minVertexDistance": 0.03,
+        "width": [
+          [
+            0.0,
+            1.0
+          ],
+          [
+            1.0,
+            0.2
+          ]
+        ],
+        "widthScale": 0.5,
+        "colorOverTrail": [
+          [
+            0.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          [
+            0.5,
+            1.0,
+            0.55,
+            0.85,
+            0.7
+          ],
+          [
+            1.0,
+            1.0,
+            0.55,
+            0.85,
+            0.0
+          ]
+        ],
+        "texture": "trail"
+      },
+      "texture": "glow",
+      "blend": "additive",
+      "position": [
+        0.0,
+        0.9,
+        0.0
+      ],
+      "rotationEuler": [
+        -40.0,
+        0.0,
+        -25.0
+      ]
+    }
+  ]
+}
