@@ -1,7 +1,7 @@
 {
   "input_dir": "Sprite sheets",
-  "total_sources": 27,
-  "total_slices": 548,
+  "total_sources": 58,
+  "total_slices": 579,
   "contact_sheets": [
     "contact_sheets/contact_sheet_dialouge_ui_01.png",
     "contact_sheets/contact_sheet_dialouge_ui_02.png",
@@ -21,7 +21,8 @@
     "contact_sheets/contact_sheet_root_07.png",
     "contact_sheets/contact_sheet_root_08.png",
     "contact_sheets/contact_sheet_root_09.png",
-    "contact_sheets/contact_sheet_root_10.png"
+    "contact_sheets/contact_sheet_root_10.png",
+    "contact_sheets/contact_sheet_speedyrace_01.png"
   ],
   "sources": [
     {
@@ -813,6 +814,316 @@
         "ui_settings_buttons_018",
         "ui_settings_buttons_019",
         "ui_settings_buttons_020"
+      ]
+    },
+    {
+      "source_file": "speedyrace/Backgrounds/bg_team_dark.png",
+      "width": 64,
+      "height": 64,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "sr_bg_team_dark"
+      ]
+    },
+    {
+      "source_file": "speedyrace/Backgrounds/bg_menu_dark.png",
+      "width": 66,
+      "height": 66,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "sr_bg_menu_dark"
+      ]
+    },
+    {
+      "source_file": "speedyrace/Backgrounds/linear_gradient_bg.png",
+      "width": 64,
+      "height": 64,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "sr_linear_gradient_bg"
+      ]
+    },
+    {
+      "source_file": "speedyrace/Backgrounds/Frame_BannerFrame04_Navy01.png",
+      "width": 278,
+      "height": 323,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "sr_frame_banner_navy"
+      ]
+    },
+    {
+      "source_file": "speedyrace/Backgrounds/Frame_CardFrame01_Gray.png",
+      "width": 164,
+      "height": 164,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "sr_frame_card_gray"
+      ]
+    },
+    {
+      "source_file": "speedyrace/Backgrounds/SquareRounded128.png",
+      "width": 128,
+      "height": 128,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "sr_square_rounded_128"
+      ]
+    },
+    {
+      "source_file": "speedyrace/Backgrounds/SelectingBox.png",
+      "width": 44,
+      "height": 44,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "sr_selecting_box"
+      ]
+    },
+    {
+      "source_file": "speedyrace/Backgrounds/TitleBG.png",
+      "width": 618,
+      "height": 74,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "sr_title_bg"
+      ]
+    },
+    {
+      "source_file": "speedyrace/Backgrounds/SubTitleBG.png",
+      "width": 38,
+      "height": 36,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "sr_subtitle_bg"
+      ]
+    },
+    {
+      "source_file": "speedyrace/Buttons/BlueButton.png",
+      "width": 280,
+      "height": 71,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "sr_blue_button"
+      ]
+    },
+    {
+      "source_file": "speedyrace/Buttons/YellowButton.png",
+      "width": 280,
+      "height": 71,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "sr_yellow_button"
+      ]
+    },
+    {
+      "source_file": "speedyrace/Buttons/GrayButton.png",
+      "width": 280,
+      "height": 71,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "sr_gray_button"
+      ]
+    },
+    {
+      "source_file": "speedyrace/Buttons/ButtonBG.png",
+      "width": 102,
+      "height": 102,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "sr_button_bg"
+      ]
+    },
+    {
+      "source_file": "speedyrace/Backgrounds/ui_btn_01_small_normal.png",
+      "width": 24,
+      "height": 40,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "sr_btn_small_01"
+      ]
+    },
+    {
+      "source_file": "speedyrace/Backgrounds/ui_btn_02_small_normal.png",
+      "width": 24,
+      "height": 40,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "sr_btn_small_02"
+      ]
+    },
+    {
+      "source_file": "speedyrace/Backgrounds/btn_disable.png",
+      "width": 24,
+      "height": 40,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "sr_btn_disable"
+      ]
+    },
+    {
+      "source_file": "speedyrace/Icons/CrossIcon.png",
+      "width": 128,
+      "height": 128,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "sr_cross_icon"
+      ]
+    },
+    {
+      "source_file": "speedyrace/Icons/CloseIcon.png",
+      "width": 44,
+      "height": 44,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "sr_close_icon"
+      ]
+    },
+    {
+      "source_file": "speedyrace/Icons/Icon_Lock.png",
+      "width": 256,
+      "height": 256,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "sr_icon_lock"
+      ]
+    },
+    {
+      "source_file": "speedyrace/Icons/TickIcon.png",
+      "width": 256,
+      "height": 256,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "sr_tick_icon"
+      ]
+    },
+    {
+      "source_file": "speedyrace/Icons/Gem.png",
+      "width": 256,
+      "height": 256,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "sr_gem"
+      ]
+    },
+    {
+      "source_file": "speedyrace/Icons/SpeedBoost.png",
+      "width": 256,
+      "height": 256,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "sr_speed_boost"
+      ]
+    },
+    {
+      "source_file": "speedyrace/Icons/GoldenTicket.png",
+      "width": 256,
+      "height": 256,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "sr_golden_ticket"
+      ]
+    },
+    {
+      "source_file": "speedyrace/Icons/tower_img.png",
+      "width": 184,
+      "height": 250,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "sr_tower_img"
+      ]
+    },
+    {
+      "source_file": "speedyrace/Icons/PASS_Stamp.png",
+      "width": 64,
+      "height": 64,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "sr_pass_stamp"
+      ]
+    },
+    {
+      "source_file": "speedyrace/Icons/IN_PROGRESS_Stamp.png",
+      "width": 64,
+      "height": 64,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "sr_in_progress_stamp"
+      ]
+    },
+    {
+      "source_file": "speedyrace/../ItemIcon/Aura_Trail/IconKelly1.png",
+      "width": 75,
+      "height": 128,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "sr_kelly_stand"
+      ]
+    },
+    {
+      "source_file": "speedyrace/../ItemIcon/Aura_Trail/IconKelly2.png",
+      "width": 86,
+      "height": 128,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "sr_kelly_run"
+      ]
+    },
+    {
+      "source_file": "speedyrace/c:\\Users\\lephong.nguyen_ctv\\Desktop\\CraftlandProject\\UICreator\\assets\\generated\\world_banner_1_grassland.png",
+      "width": 586,
+      "height": 875,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "sr_world_banner_1"
+      ]
+    },
+    {
+      "source_file": "speedyrace/c:\\Users\\lephong.nguyen_ctv\\Desktop\\CraftlandProject\\UICreator\\assets\\generated\\world_banner_2_savanna.png",
+      "width": 586,
+      "height": 875,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "sr_world_banner_2"
+      ]
+    },
+    {
+      "source_file": "speedyrace/c:\\Users\\lephong.nguyen_ctv\\Desktop\\CraftlandProject\\UICreator\\assets\\generated\\world_banner_3_snow.png",
+      "width": 586,
+      "height": 875,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "sr_world_banner_3"
       ]
     }
   ],
@@ -10741,6 +11052,613 @@
         8,
         5
       ],
+      "is_white_mask_candidate": false
+    },
+    "sr_bg_team_dark": {
+      "id": "sr_bg_team_dark",
+      "file": "slices/sr_bg_team_dark.png",
+      "source_file": "speedyrace/Backgrounds/bg_team_dark.png",
+      "group": "speedyrace",
+      "bbox": [
+        0,
+        0,
+        64,
+        64
+      ],
+      "width": 64,
+      "height": 64,
+      "category": "panel",
+      "slice_9": [
+        16,
+        16,
+        16,
+        16
+      ],
+      "is_white_mask_candidate": false
+    },
+    "sr_bg_menu_dark": {
+      "id": "sr_bg_menu_dark",
+      "file": "slices/sr_bg_menu_dark.png",
+      "source_file": "speedyrace/Backgrounds/bg_menu_dark.png",
+      "group": "speedyrace",
+      "bbox": [
+        0,
+        0,
+        66,
+        66
+      ],
+      "width": 66,
+      "height": 66,
+      "category": "panel",
+      "slice_9": [
+        16,
+        16,
+        16,
+        16
+      ],
+      "is_white_mask_candidate": false
+    },
+    "sr_linear_gradient_bg": {
+      "id": "sr_linear_gradient_bg",
+      "file": "slices/sr_linear_gradient_bg.png",
+      "source_file": "speedyrace/Backgrounds/linear_gradient_bg.png",
+      "group": "speedyrace",
+      "bbox": [
+        0,
+        0,
+        64,
+        64
+      ],
+      "width": 64,
+      "height": 64,
+      "category": "panel",
+      "slice_9": [
+        8,
+        8,
+        8,
+        8
+      ],
+      "is_white_mask_candidate": false
+    },
+    "sr_frame_banner_navy": {
+      "id": "sr_frame_banner_navy",
+      "file": "slices/sr_frame_banner_navy.png",
+      "source_file": "speedyrace/Backgrounds/Frame_BannerFrame04_Navy01.png",
+      "group": "speedyrace",
+      "bbox": [
+        0,
+        0,
+        278,
+        323
+      ],
+      "width": 278,
+      "height": 323,
+      "category": "panel",
+      "slice_9": [
+        28,
+        28,
+        28,
+        28
+      ],
+      "is_white_mask_candidate": false
+    },
+    "sr_frame_card_gray": {
+      "id": "sr_frame_card_gray",
+      "file": "slices/sr_frame_card_gray.png",
+      "source_file": "speedyrace/Backgrounds/Frame_CardFrame01_Gray.png",
+      "group": "speedyrace",
+      "bbox": [
+        0,
+        0,
+        164,
+        164
+      ],
+      "width": 164,
+      "height": 164,
+      "category": "panel",
+      "slice_9": [
+        36,
+        36,
+        36,
+        36
+      ],
+      "is_white_mask_candidate": false
+    },
+    "sr_square_rounded_128": {
+      "id": "sr_square_rounded_128",
+      "file": "slices/sr_square_rounded_128.png",
+      "source_file": "speedyrace/Backgrounds/SquareRounded128.png",
+      "group": "speedyrace",
+      "bbox": [
+        0,
+        0,
+        128,
+        128
+      ],
+      "width": 128,
+      "height": 128,
+      "category": "panel",
+      "slice_9": [
+        24,
+        24,
+        24,
+        24
+      ],
+      "is_white_mask_candidate": true
+    },
+    "sr_selecting_box": {
+      "id": "sr_selecting_box",
+      "file": "slices/sr_selecting_box.png",
+      "source_file": "speedyrace/Backgrounds/SelectingBox.png",
+      "group": "speedyrace",
+      "bbox": [
+        0,
+        0,
+        44,
+        44
+      ],
+      "width": 44,
+      "height": 44,
+      "category": "panel",
+      "slice_9": [
+        12,
+        12,
+        12,
+        12
+      ],
+      "is_white_mask_candidate": false
+    },
+    "sr_title_bg": {
+      "id": "sr_title_bg",
+      "file": "slices/sr_title_bg.png",
+      "source_file": "speedyrace/Backgrounds/TitleBG.png",
+      "group": "speedyrace",
+      "bbox": [
+        0,
+        0,
+        618,
+        74
+      ],
+      "width": 618,
+      "height": 74,
+      "category": "panel",
+      "slice_9": [
+        16,
+        40,
+        16,
+        40
+      ],
+      "is_white_mask_candidate": false
+    },
+    "sr_subtitle_bg": {
+      "id": "sr_subtitle_bg",
+      "file": "slices/sr_subtitle_bg.png",
+      "source_file": "speedyrace/Backgrounds/SubTitleBG.png",
+      "group": "speedyrace",
+      "bbox": [
+        0,
+        0,
+        38,
+        36
+      ],
+      "width": 38,
+      "height": 36,
+      "category": "panel",
+      "slice_9": [
+        10,
+        10,
+        10,
+        10
+      ],
+      "is_white_mask_candidate": false
+    },
+    "sr_blue_button": {
+      "id": "sr_blue_button",
+      "file": "slices/sr_blue_button.png",
+      "source_file": "speedyrace/Buttons/BlueButton.png",
+      "group": "speedyrace",
+      "bbox": [
+        0,
+        0,
+        280,
+        71
+      ],
+      "width": 280,
+      "height": 71,
+      "category": "button",
+      "slice_9": [
+        20,
+        28,
+        20,
+        28
+      ],
+      "is_white_mask_candidate": false
+    },
+    "sr_yellow_button": {
+      "id": "sr_yellow_button",
+      "file": "slices/sr_yellow_button.png",
+      "source_file": "speedyrace/Buttons/YellowButton.png",
+      "group": "speedyrace",
+      "bbox": [
+        0,
+        0,
+        280,
+        71
+      ],
+      "width": 280,
+      "height": 71,
+      "category": "button",
+      "slice_9": [
+        20,
+        28,
+        20,
+        28
+      ],
+      "is_white_mask_candidate": false
+    },
+    "sr_gray_button": {
+      "id": "sr_gray_button",
+      "file": "slices/sr_gray_button.png",
+      "source_file": "speedyrace/Buttons/GrayButton.png",
+      "group": "speedyrace",
+      "bbox": [
+        0,
+        0,
+        280,
+        71
+      ],
+      "width": 280,
+      "height": 71,
+      "category": "button",
+      "slice_9": [
+        20,
+        28,
+        20,
+        28
+      ],
+      "is_white_mask_candidate": false
+    },
+    "sr_button_bg": {
+      "id": "sr_button_bg",
+      "file": "slices/sr_button_bg.png",
+      "source_file": "speedyrace/Buttons/ButtonBG.png",
+      "group": "speedyrace",
+      "bbox": [
+        0,
+        0,
+        102,
+        102
+      ],
+      "width": 102,
+      "height": 102,
+      "category": "button",
+      "slice_9": [
+        24,
+        24,
+        24,
+        24
+      ],
+      "is_white_mask_candidate": false
+    },
+    "sr_btn_small_01": {
+      "id": "sr_btn_small_01",
+      "file": "slices/sr_btn_small_01.png",
+      "source_file": "speedyrace/Backgrounds/ui_btn_01_small_normal.png",
+      "group": "speedyrace",
+      "bbox": [
+        0,
+        0,
+        24,
+        40
+      ],
+      "width": 24,
+      "height": 40,
+      "category": "button",
+      "slice_9": [
+        10,
+        8,
+        10,
+        8
+      ],
+      "is_white_mask_candidate": true
+    },
+    "sr_btn_small_02": {
+      "id": "sr_btn_small_02",
+      "file": "slices/sr_btn_small_02.png",
+      "source_file": "speedyrace/Backgrounds/ui_btn_02_small_normal.png",
+      "group": "speedyrace",
+      "bbox": [
+        0,
+        0,
+        24,
+        40
+      ],
+      "width": 24,
+      "height": 40,
+      "category": "button",
+      "slice_9": [
+        10,
+        8,
+        10,
+        8
+      ],
+      "is_white_mask_candidate": false
+    },
+    "sr_btn_disable": {
+      "id": "sr_btn_disable",
+      "file": "slices/sr_btn_disable.png",
+      "source_file": "speedyrace/Backgrounds/btn_disable.png",
+      "group": "speedyrace",
+      "bbox": [
+        0,
+        0,
+        24,
+        40
+      ],
+      "width": 24,
+      "height": 40,
+      "category": "button",
+      "slice_9": [
+        10,
+        8,
+        10,
+        8
+      ],
+      "is_white_mask_candidate": false
+    },
+    "sr_cross_icon": {
+      "id": "sr_cross_icon",
+      "file": "slices/sr_cross_icon.png",
+      "source_file": "speedyrace/Icons/CrossIcon.png",
+      "group": "speedyrace",
+      "bbox": [
+        0,
+        0,
+        128,
+        128
+      ],
+      "width": 128,
+      "height": 128,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": true
+    },
+    "sr_close_icon": {
+      "id": "sr_close_icon",
+      "file": "slices/sr_close_icon.png",
+      "source_file": "speedyrace/Icons/CloseIcon.png",
+      "group": "speedyrace",
+      "bbox": [
+        0,
+        0,
+        44,
+        44
+      ],
+      "width": 44,
+      "height": 44,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "sr_icon_lock": {
+      "id": "sr_icon_lock",
+      "file": "slices/sr_icon_lock.png",
+      "source_file": "speedyrace/Icons/Icon_Lock.png",
+      "group": "speedyrace",
+      "bbox": [
+        0,
+        0,
+        256,
+        256
+      ],
+      "width": 256,
+      "height": 256,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "sr_tick_icon": {
+      "id": "sr_tick_icon",
+      "file": "slices/sr_tick_icon.png",
+      "source_file": "speedyrace/Icons/TickIcon.png",
+      "group": "speedyrace",
+      "bbox": [
+        0,
+        0,
+        256,
+        256
+      ],
+      "width": 256,
+      "height": 256,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "sr_gem": {
+      "id": "sr_gem",
+      "file": "slices/sr_gem.png",
+      "source_file": "speedyrace/Icons/Gem.png",
+      "group": "speedyrace",
+      "bbox": [
+        0,
+        0,
+        256,
+        256
+      ],
+      "width": 256,
+      "height": 256,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "sr_speed_boost": {
+      "id": "sr_speed_boost",
+      "file": "slices/sr_speed_boost.png",
+      "source_file": "speedyrace/Icons/SpeedBoost.png",
+      "group": "speedyrace",
+      "bbox": [
+        0,
+        0,
+        256,
+        256
+      ],
+      "width": 256,
+      "height": 256,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "sr_golden_ticket": {
+      "id": "sr_golden_ticket",
+      "file": "slices/sr_golden_ticket.png",
+      "source_file": "speedyrace/Icons/GoldenTicket.png",
+      "group": "speedyrace",
+      "bbox": [
+        0,
+        0,
+        256,
+        256
+      ],
+      "width": 256,
+      "height": 256,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "sr_tower_img": {
+      "id": "sr_tower_img",
+      "file": "slices/sr_tower_img.png",
+      "source_file": "speedyrace/Icons/tower_img.png",
+      "group": "speedyrace",
+      "bbox": [
+        0,
+        0,
+        184,
+        250
+      ],
+      "width": 184,
+      "height": 250,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "sr_pass_stamp": {
+      "id": "sr_pass_stamp",
+      "file": "slices/sr_pass_stamp.png",
+      "source_file": "speedyrace/Icons/PASS_Stamp.png",
+      "group": "speedyrace",
+      "bbox": [
+        0,
+        0,
+        64,
+        64
+      ],
+      "width": 64,
+      "height": 64,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "sr_in_progress_stamp": {
+      "id": "sr_in_progress_stamp",
+      "file": "slices/sr_in_progress_stamp.png",
+      "source_file": "speedyrace/Icons/IN_PROGRESS_Stamp.png",
+      "group": "speedyrace",
+      "bbox": [
+        0,
+        0,
+        64,
+        64
+      ],
+      "width": 64,
+      "height": 64,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "sr_kelly_stand": {
+      "id": "sr_kelly_stand",
+      "file": "slices/sr_kelly_stand.png",
+      "source_file": "speedyrace/../ItemIcon/Aura_Trail/IconKelly1.png",
+      "group": "speedyrace",
+      "bbox": [
+        0,
+        0,
+        75,
+        128
+      ],
+      "width": 75,
+      "height": 128,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "sr_kelly_run": {
+      "id": "sr_kelly_run",
+      "file": "slices/sr_kelly_run.png",
+      "source_file": "speedyrace/../ItemIcon/Aura_Trail/IconKelly2.png",
+      "group": "speedyrace",
+      "bbox": [
+        0,
+        0,
+        86,
+        128
+      ],
+      "width": 86,
+      "height": 128,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "sr_world_banner_1": {
+      "id": "sr_world_banner_1",
+      "file": "slices/sr_world_banner_1.png",
+      "source_file": "speedyrace/c:\\Users\\lephong.nguyen_ctv\\Desktop\\CraftlandProject\\UICreator\\assets\\generated\\world_banner_1_grassland.png",
+      "group": "speedyrace",
+      "bbox": [
+        0,
+        0,
+        586,
+        875
+      ],
+      "width": 586,
+      "height": 875,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "sr_world_banner_2": {
+      "id": "sr_world_banner_2",
+      "file": "slices/sr_world_banner_2.png",
+      "source_file": "speedyrace/c:\\Users\\lephong.nguyen_ctv\\Desktop\\CraftlandProject\\UICreator\\assets\\generated\\world_banner_2_savanna.png",
+      "group": "speedyrace",
+      "bbox": [
+        0,
+        0,
+        586,
+        875
+      ],
+      "width": 586,
+      "height": 875,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "sr_world_banner_3": {
+      "id": "sr_world_banner_3",
+      "file": "slices/sr_world_banner_3.png",
+      "source_file": "speedyrace/c:\\Users\\lephong.nguyen_ctv\\Desktop\\CraftlandProject\\UICreator\\assets\\generated\\world_banner_3_snow.png",
+      "group": "speedyrace",
+      "bbox": [
+        0,
+        0,
+        586,
+        875
+      ],
+      "width": 586,
+      "height": 875,
+      "category": "icon",
+      "slice_9": null,
       "is_white_mask_candidate": false
     }
   }
