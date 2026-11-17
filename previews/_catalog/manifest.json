@@ -1,7 +1,7 @@
 {
-  "input_dir": "Sprite sheets",
-  "total_sources": 58,
-  "total_slices": 579,
+  "input_dir": "c:/Users/lephong.nguyen_ctv/Desktop/CraftlandProject/UICreator/Sprite sheets",
+  "total_sources": 108,
+  "total_slices": 629,
   "contact_sheets": [
     "contact_sheets/contact_sheet_dialouge_ui_01.png",
     "contact_sheets/contact_sheet_dialouge_ui_02.png",
@@ -22,7 +22,9 @@
     "contact_sheets/contact_sheet_root_08.png",
     "contact_sheets/contact_sheet_root_09.png",
     "contact_sheets/contact_sheet_root_10.png",
-    "contact_sheets/contact_sheet_speedyrace_01.png"
+    "contact_sheets/contact_sheet_speedyrace_01.png",
+    "contact_sheets/contact_sheet_loot_forge_gun_01.png",
+    "contact_sheets/contact_sheet_loot_forge_gun_02.png"
   ],
   "sources": [
     {
@@ -1124,6 +1126,506 @@
       "slice_count": 1,
       "slice_ids": [
         "sr_world_banner_3"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/01_panel_modal.png",
+      "width": 298,
+      "height": 380,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_01_panel_modal"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/02_panel_row.png",
+      "width": 336,
+      "height": 212,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_02_panel_row"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/03_panel_sidebar.png",
+      "width": 192,
+      "height": 380,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_03_panel_sidebar"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/04_bar_track.png",
+      "width": 340,
+      "height": 73,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_04_bar_track"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/05_bar_fill.png",
+      "width": 340,
+      "height": 66,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_05_bar_fill"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/06_slot_common.png",
+      "width": 144,
+      "height": 144,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_06_slot_common"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/07_slot_uncommon.png",
+      "width": 144,
+      "height": 144,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_07_slot_uncommon"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/08_slot_rare.png",
+      "width": 144,
+      "height": 144,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_08_slot_rare"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/09_slot_epic.png",
+      "width": 144,
+      "height": 144,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_09_slot_epic"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/10_slot_legendary.png",
+      "width": 144,
+      "height": 144,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_10_slot_legendary"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/11_btn_yellow.png",
+      "width": 240,
+      "height": 163,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_11_btn_yellow"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/12_btn_green.png",
+      "width": 240,
+      "height": 162,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_12_btn_green"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/13_btn_blue.png",
+      "width": 240,
+      "height": 163,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_13_btn_blue"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/14_btn_red.png",
+      "width": 240,
+      "height": 155,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_14_btn_red"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/15_btn_tab_gold.png",
+      "width": 220,
+      "height": 143,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_15_btn_tab_gold"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/16_pill_dark.png",
+      "width": 220,
+      "height": 111,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_16_pill_dark"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/17_btn_close_x.png",
+      "width": 128,
+      "height": 128,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_17_btn_close_x"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/18_btn_nav_left.png",
+      "width": 95,
+      "height": 96,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_18_btn_nav_left"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/19_btn_nav_right.png",
+      "width": 95,
+      "height": 96,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_19_btn_nav_right"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/20_banner_rainbow.png",
+      "width": 240,
+      "height": 137,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_20_banner_rainbow"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/21_icon_shop.png",
+      "width": 128,
+      "height": 125,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_21_icon_shop"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/22_icon_backpack.png",
+      "width": 126,
+      "height": 128,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_22_icon_backpack"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/23_icon_index_book.png",
+      "width": 126,
+      "height": 128,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_23_icon_index_book"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/24_icon_rebirth.png",
+      "width": 122,
+      "height": 128,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_24_icon_rebirth"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/25_icon_anvil.png",
+      "width": 121,
+      "height": 128,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_25_icon_anvil"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/26_icon_gift.png",
+      "width": 119,
+      "height": 128,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_26_icon_gift"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/27_icon_coin.png",
+      "width": 126,
+      "height": 128,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_27_icon_coin"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/28_icon_ingot.png",
+      "width": 128,
+      "height": 106,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_28_icon_ingot"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/29_icon_firepower.png",
+      "width": 128,
+      "height": 128,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_29_icon_firepower"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/30_icon_firerate.png",
+      "width": 128,
+      "height": 112,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_30_icon_firerate"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/31_icon_forgespeed.png",
+      "width": 128,
+      "height": 126,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_31_icon_forgespeed"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/32_icon_padlock.png",
+      "width": 100,
+      "height": 128,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_32_icon_padlock"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/33_gun_revolver.png",
+      "width": 119,
+      "height": 128,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_33_gun_revolver"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/34_gun_smg.png",
+      "width": 128,
+      "height": 104,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_34_gun_smg"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/35_gun_assault_rifle.png",
+      "width": 128,
+      "height": 88,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_35_gun_assault_rifle"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/36_gun_plasma_hellfire.png",
+      "width": 128,
+      "height": 109,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_36_gun_plasma_hellfire"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/37_gun_minigun.png",
+      "width": 128,
+      "height": 106,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_37_gun_minigun"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/38_gun_railgun.png",
+      "width": 128,
+      "height": 110,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_38_gun_railgun"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/39_mod_iron_barrel.png",
+      "width": 128,
+      "height": 113,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_39_mod_iron_barrel"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/40_mod_plasma_core.png",
+      "width": 124,
+      "height": 128,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_40_mod_plasma_core"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/41_icon_power_emblem.png",
+      "width": 128,
+      "height": 126,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_41_icon_power_emblem"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/42_loot_claw.png",
+      "width": 105,
+      "height": 128,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_42_loot_claw"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/43_loot_fang.png",
+      "width": 128,
+      "height": 112,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_43_loot_fang"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/44_loot_eyeball.png",
+      "width": 127,
+      "height": 128,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_44_loot_eyeball"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/45_loot_rib_meat.png",
+      "width": 128,
+      "height": 124,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_45_loot_rib_meat"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/46_loot_old_rune.png",
+      "width": 127,
+      "height": 128,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_46_loot_old_rune"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/47_loot_giant_fist.png",
+      "width": 87,
+      "height": 128,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_47_loot_giant_fist"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/48_loot_scrap_gear.png",
+      "width": 128,
+      "height": 128,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_48_loot_scrap_gear"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/49_loot_plasma_cell.png",
+      "width": 103,
+      "height": 128,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_49_loot_plasma_cell"
+      ]
+    },
+    {
+      "source_file": "loot-forge-gun/50_loot_magma_core.png",
+      "width": 128,
+      "height": 127,
+      "dilate_used": 0,
+      "slice_count": 1,
+      "slice_ids": [
+        "lfg_50_loot_magma_core"
       ]
     }
   ],
@@ -11657,6 +12159,941 @@
       ],
       "width": 586,
       "height": 875,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "lfg_01_panel_modal": {
+      "id": "lfg_01_panel_modal",
+      "file": "slices/lfg_01_panel_modal.png",
+      "source_file": "loot-forge-gun/01_panel_modal.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        298,
+        380
+      ],
+      "width": 298,
+      "height": 380,
+      "category": "panel",
+      "slice_9": [
+        24,
+        24,
+        24,
+        24
+      ],
+      "is_white_mask_candidate": false
+    },
+    "lfg_02_panel_row": {
+      "id": "lfg_02_panel_row",
+      "file": "slices/lfg_02_panel_row.png",
+      "source_file": "loot-forge-gun/02_panel_row.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        336,
+        212
+      ],
+      "width": 336,
+      "height": 212,
+      "category": "panel",
+      "slice_9": [
+        14,
+        14,
+        14,
+        14
+      ],
+      "is_white_mask_candidate": false
+    },
+    "lfg_03_panel_sidebar": {
+      "id": "lfg_03_panel_sidebar",
+      "file": "slices/lfg_03_panel_sidebar.png",
+      "source_file": "loot-forge-gun/03_panel_sidebar.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        192,
+        380
+      ],
+      "width": 192,
+      "height": 380,
+      "category": "panel",
+      "slice_9": [
+        22,
+        22,
+        22,
+        22
+      ],
+      "is_white_mask_candidate": false
+    },
+    "lfg_04_bar_track": {
+      "id": "lfg_04_bar_track",
+      "file": "slices/lfg_04_bar_track.png",
+      "source_file": "loot-forge-gun/04_bar_track.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        340,
+        73
+      ],
+      "width": 340,
+      "height": 73,
+      "category": "panel",
+      "slice_9": [
+        12,
+        18,
+        12,
+        18
+      ],
+      "is_white_mask_candidate": false
+    },
+    "lfg_05_bar_fill": {
+      "id": "lfg_05_bar_fill",
+      "file": "slices/lfg_05_bar_fill.png",
+      "source_file": "loot-forge-gun/05_bar_fill.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        340,
+        66
+      ],
+      "width": 340,
+      "height": 66,
+      "category": "panel",
+      "slice_9": [
+        12,
+        18,
+        12,
+        18
+      ],
+      "is_white_mask_candidate": false
+    },
+    "lfg_06_slot_common": {
+      "id": "lfg_06_slot_common",
+      "file": "slices/lfg_06_slot_common.png",
+      "source_file": "loot-forge-gun/06_slot_common.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        144,
+        144
+      ],
+      "width": 144,
+      "height": 144,
+      "category": "panel",
+      "slice_9": [
+        18,
+        18,
+        18,
+        18
+      ],
+      "is_white_mask_candidate": false
+    },
+    "lfg_07_slot_uncommon": {
+      "id": "lfg_07_slot_uncommon",
+      "file": "slices/lfg_07_slot_uncommon.png",
+      "source_file": "loot-forge-gun/07_slot_uncommon.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        144,
+        144
+      ],
+      "width": 144,
+      "height": 144,
+      "category": "panel",
+      "slice_9": [
+        18,
+        18,
+        18,
+        18
+      ],
+      "is_white_mask_candidate": false
+    },
+    "lfg_08_slot_rare": {
+      "id": "lfg_08_slot_rare",
+      "file": "slices/lfg_08_slot_rare.png",
+      "source_file": "loot-forge-gun/08_slot_rare.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        144,
+        144
+      ],
+      "width": 144,
+      "height": 144,
+      "category": "panel",
+      "slice_9": [
+        18,
+        18,
+        18,
+        18
+      ],
+      "is_white_mask_candidate": false
+    },
+    "lfg_09_slot_epic": {
+      "id": "lfg_09_slot_epic",
+      "file": "slices/lfg_09_slot_epic.png",
+      "source_file": "loot-forge-gun/09_slot_epic.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        144,
+        144
+      ],
+      "width": 144,
+      "height": 144,
+      "category": "panel",
+      "slice_9": [
+        18,
+        18,
+        18,
+        18
+      ],
+      "is_white_mask_candidate": false
+    },
+    "lfg_10_slot_legendary": {
+      "id": "lfg_10_slot_legendary",
+      "file": "slices/lfg_10_slot_legendary.png",
+      "source_file": "loot-forge-gun/10_slot_legendary.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        144,
+        144
+      ],
+      "width": 144,
+      "height": 144,
+      "category": "panel",
+      "slice_9": [
+        18,
+        18,
+        18,
+        18
+      ],
+      "is_white_mask_candidate": false
+    },
+    "lfg_11_btn_yellow": {
+      "id": "lfg_11_btn_yellow",
+      "file": "slices/lfg_11_btn_yellow.png",
+      "source_file": "loot-forge-gun/11_btn_yellow.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        240,
+        163
+      ],
+      "width": 240,
+      "height": 163,
+      "category": "button",
+      "slice_9": [
+        20,
+        24,
+        20,
+        24
+      ],
+      "is_white_mask_candidate": false
+    },
+    "lfg_12_btn_green": {
+      "id": "lfg_12_btn_green",
+      "file": "slices/lfg_12_btn_green.png",
+      "source_file": "loot-forge-gun/12_btn_green.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        240,
+        162
+      ],
+      "width": 240,
+      "height": 162,
+      "category": "button",
+      "slice_9": [
+        20,
+        24,
+        20,
+        24
+      ],
+      "is_white_mask_candidate": false
+    },
+    "lfg_13_btn_blue": {
+      "id": "lfg_13_btn_blue",
+      "file": "slices/lfg_13_btn_blue.png",
+      "source_file": "loot-forge-gun/13_btn_blue.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        240,
+        163
+      ],
+      "width": 240,
+      "height": 163,
+      "category": "button",
+      "slice_9": [
+        20,
+        24,
+        20,
+        24
+      ],
+      "is_white_mask_candidate": false
+    },
+    "lfg_14_btn_red": {
+      "id": "lfg_14_btn_red",
+      "file": "slices/lfg_14_btn_red.png",
+      "source_file": "loot-forge-gun/14_btn_red.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        240,
+        155
+      ],
+      "width": 240,
+      "height": 155,
+      "category": "button",
+      "slice_9": [
+        20,
+        24,
+        20,
+        24
+      ],
+      "is_white_mask_candidate": false
+    },
+    "lfg_15_btn_tab_gold": {
+      "id": "lfg_15_btn_tab_gold",
+      "file": "slices/lfg_15_btn_tab_gold.png",
+      "source_file": "loot-forge-gun/15_btn_tab_gold.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        220,
+        143
+      ],
+      "width": 220,
+      "height": 143,
+      "category": "button",
+      "slice_9": [
+        20,
+        24,
+        20,
+        24
+      ],
+      "is_white_mask_candidate": false
+    },
+    "lfg_16_pill_dark": {
+      "id": "lfg_16_pill_dark",
+      "file": "slices/lfg_16_pill_dark.png",
+      "source_file": "loot-forge-gun/16_pill_dark.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        220,
+        111
+      ],
+      "width": 220,
+      "height": 111,
+      "category": "button",
+      "slice_9": [
+        16,
+        26,
+        16,
+        26
+      ],
+      "is_white_mask_candidate": false
+    },
+    "lfg_17_btn_close_x": {
+      "id": "lfg_17_btn_close_x",
+      "file": "slices/lfg_17_btn_close_x.png",
+      "source_file": "loot-forge-gun/17_btn_close_x.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        128,
+        128
+      ],
+      "width": 128,
+      "height": 128,
+      "category": "button",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "lfg_18_btn_nav_left": {
+      "id": "lfg_18_btn_nav_left",
+      "file": "slices/lfg_18_btn_nav_left.png",
+      "source_file": "loot-forge-gun/18_btn_nav_left.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        95,
+        96
+      ],
+      "width": 95,
+      "height": 96,
+      "category": "button",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "lfg_19_btn_nav_right": {
+      "id": "lfg_19_btn_nav_right",
+      "file": "slices/lfg_19_btn_nav_right.png",
+      "source_file": "loot-forge-gun/19_btn_nav_right.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        95,
+        96
+      ],
+      "width": 95,
+      "height": 96,
+      "category": "button",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "lfg_20_banner_rainbow": {
+      "id": "lfg_20_banner_rainbow",
+      "file": "slices/lfg_20_banner_rainbow.png",
+      "source_file": "loot-forge-gun/20_banner_rainbow.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        240,
+        137
+      ],
+      "width": 240,
+      "height": 137,
+      "category": "button",
+      "slice_9": [
+        18,
+        22,
+        18,
+        22
+      ],
+      "is_white_mask_candidate": false
+    },
+    "lfg_21_icon_shop": {
+      "id": "lfg_21_icon_shop",
+      "file": "slices/lfg_21_icon_shop.png",
+      "source_file": "loot-forge-gun/21_icon_shop.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        128,
+        125
+      ],
+      "width": 128,
+      "height": 125,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "lfg_22_icon_backpack": {
+      "id": "lfg_22_icon_backpack",
+      "file": "slices/lfg_22_icon_backpack.png",
+      "source_file": "loot-forge-gun/22_icon_backpack.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        126,
+        128
+      ],
+      "width": 126,
+      "height": 128,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "lfg_23_icon_index_book": {
+      "id": "lfg_23_icon_index_book",
+      "file": "slices/lfg_23_icon_index_book.png",
+      "source_file": "loot-forge-gun/23_icon_index_book.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        126,
+        128
+      ],
+      "width": 126,
+      "height": 128,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "lfg_24_icon_rebirth": {
+      "id": "lfg_24_icon_rebirth",
+      "file": "slices/lfg_24_icon_rebirth.png",
+      "source_file": "loot-forge-gun/24_icon_rebirth.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        122,
+        128
+      ],
+      "width": 122,
+      "height": 128,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "lfg_25_icon_anvil": {
+      "id": "lfg_25_icon_anvil",
+      "file": "slices/lfg_25_icon_anvil.png",
+      "source_file": "loot-forge-gun/25_icon_anvil.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        121,
+        128
+      ],
+      "width": 121,
+      "height": 128,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "lfg_26_icon_gift": {
+      "id": "lfg_26_icon_gift",
+      "file": "slices/lfg_26_icon_gift.png",
+      "source_file": "loot-forge-gun/26_icon_gift.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        119,
+        128
+      ],
+      "width": 119,
+      "height": 128,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "lfg_27_icon_coin": {
+      "id": "lfg_27_icon_coin",
+      "file": "slices/lfg_27_icon_coin.png",
+      "source_file": "loot-forge-gun/27_icon_coin.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        126,
+        128
+      ],
+      "width": 126,
+      "height": 128,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "lfg_28_icon_ingot": {
+      "id": "lfg_28_icon_ingot",
+      "file": "slices/lfg_28_icon_ingot.png",
+      "source_file": "loot-forge-gun/28_icon_ingot.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        128,
+        106
+      ],
+      "width": 128,
+      "height": 106,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "lfg_29_icon_firepower": {
+      "id": "lfg_29_icon_firepower",
+      "file": "slices/lfg_29_icon_firepower.png",
+      "source_file": "loot-forge-gun/29_icon_firepower.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        128,
+        128
+      ],
+      "width": 128,
+      "height": 128,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "lfg_30_icon_firerate": {
+      "id": "lfg_30_icon_firerate",
+      "file": "slices/lfg_30_icon_firerate.png",
+      "source_file": "loot-forge-gun/30_icon_firerate.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        128,
+        112
+      ],
+      "width": 128,
+      "height": 112,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "lfg_31_icon_forgespeed": {
+      "id": "lfg_31_icon_forgespeed",
+      "file": "slices/lfg_31_icon_forgespeed.png",
+      "source_file": "loot-forge-gun/31_icon_forgespeed.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        128,
+        126
+      ],
+      "width": 128,
+      "height": 126,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "lfg_32_icon_padlock": {
+      "id": "lfg_32_icon_padlock",
+      "file": "slices/lfg_32_icon_padlock.png",
+      "source_file": "loot-forge-gun/32_icon_padlock.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        100,
+        128
+      ],
+      "width": 100,
+      "height": 128,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "lfg_33_gun_revolver": {
+      "id": "lfg_33_gun_revolver",
+      "file": "slices/lfg_33_gun_revolver.png",
+      "source_file": "loot-forge-gun/33_gun_revolver.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        119,
+        128
+      ],
+      "width": 119,
+      "height": 128,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "lfg_34_gun_smg": {
+      "id": "lfg_34_gun_smg",
+      "file": "slices/lfg_34_gun_smg.png",
+      "source_file": "loot-forge-gun/34_gun_smg.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        128,
+        104
+      ],
+      "width": 128,
+      "height": 104,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "lfg_35_gun_assault_rifle": {
+      "id": "lfg_35_gun_assault_rifle",
+      "file": "slices/lfg_35_gun_assault_rifle.png",
+      "source_file": "loot-forge-gun/35_gun_assault_rifle.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        128,
+        88
+      ],
+      "width": 128,
+      "height": 88,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "lfg_36_gun_plasma_hellfire": {
+      "id": "lfg_36_gun_plasma_hellfire",
+      "file": "slices/lfg_36_gun_plasma_hellfire.png",
+      "source_file": "loot-forge-gun/36_gun_plasma_hellfire.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        128,
+        109
+      ],
+      "width": 128,
+      "height": 109,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "lfg_37_gun_minigun": {
+      "id": "lfg_37_gun_minigun",
+      "file": "slices/lfg_37_gun_minigun.png",
+      "source_file": "loot-forge-gun/37_gun_minigun.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        128,
+        106
+      ],
+      "width": 128,
+      "height": 106,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "lfg_38_gun_railgun": {
+      "id": "lfg_38_gun_railgun",
+      "file": "slices/lfg_38_gun_railgun.png",
+      "source_file": "loot-forge-gun/38_gun_railgun.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        128,
+        110
+      ],
+      "width": 128,
+      "height": 110,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "lfg_39_mod_iron_barrel": {
+      "id": "lfg_39_mod_iron_barrel",
+      "file": "slices/lfg_39_mod_iron_barrel.png",
+      "source_file": "loot-forge-gun/39_mod_iron_barrel.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        128,
+        113
+      ],
+      "width": 128,
+      "height": 113,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "lfg_40_mod_plasma_core": {
+      "id": "lfg_40_mod_plasma_core",
+      "file": "slices/lfg_40_mod_plasma_core.png",
+      "source_file": "loot-forge-gun/40_mod_plasma_core.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        124,
+        128
+      ],
+      "width": 124,
+      "height": 128,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "lfg_41_icon_power_emblem": {
+      "id": "lfg_41_icon_power_emblem",
+      "file": "slices/lfg_41_icon_power_emblem.png",
+      "source_file": "loot-forge-gun/41_icon_power_emblem.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        128,
+        126
+      ],
+      "width": 128,
+      "height": 126,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "lfg_42_loot_claw": {
+      "id": "lfg_42_loot_claw",
+      "file": "slices/lfg_42_loot_claw.png",
+      "source_file": "loot-forge-gun/42_loot_claw.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        105,
+        128
+      ],
+      "width": 105,
+      "height": 128,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "lfg_43_loot_fang": {
+      "id": "lfg_43_loot_fang",
+      "file": "slices/lfg_43_loot_fang.png",
+      "source_file": "loot-forge-gun/43_loot_fang.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        128,
+        112
+      ],
+      "width": 128,
+      "height": 112,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "lfg_44_loot_eyeball": {
+      "id": "lfg_44_loot_eyeball",
+      "file": "slices/lfg_44_loot_eyeball.png",
+      "source_file": "loot-forge-gun/44_loot_eyeball.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        127,
+        128
+      ],
+      "width": 127,
+      "height": 128,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "lfg_45_loot_rib_meat": {
+      "id": "lfg_45_loot_rib_meat",
+      "file": "slices/lfg_45_loot_rib_meat.png",
+      "source_file": "loot-forge-gun/45_loot_rib_meat.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        128,
+        124
+      ],
+      "width": 128,
+      "height": 124,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "lfg_46_loot_old_rune": {
+      "id": "lfg_46_loot_old_rune",
+      "file": "slices/lfg_46_loot_old_rune.png",
+      "source_file": "loot-forge-gun/46_loot_old_rune.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        127,
+        128
+      ],
+      "width": 127,
+      "height": 128,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "lfg_47_loot_giant_fist": {
+      "id": "lfg_47_loot_giant_fist",
+      "file": "slices/lfg_47_loot_giant_fist.png",
+      "source_file": "loot-forge-gun/47_loot_giant_fist.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        87,
+        128
+      ],
+      "width": 87,
+      "height": 128,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "lfg_48_loot_scrap_gear": {
+      "id": "lfg_48_loot_scrap_gear",
+      "file": "slices/lfg_48_loot_scrap_gear.png",
+      "source_file": "loot-forge-gun/48_loot_scrap_gear.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        128,
+        128
+      ],
+      "width": 128,
+      "height": 128,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "lfg_49_loot_plasma_cell": {
+      "id": "lfg_49_loot_plasma_cell",
+      "file": "slices/lfg_49_loot_plasma_cell.png",
+      "source_file": "loot-forge-gun/49_loot_plasma_cell.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        103,
+        128
+      ],
+      "width": 103,
+      "height": 128,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "lfg_50_loot_magma_core": {
+      "id": "lfg_50_loot_magma_core",
+      "file": "slices/lfg_50_loot_magma_core.png",
+      "source_file": "loot-forge-gun/50_loot_magma_core.png",
+      "group": "loot-forge-gun",
+      "bbox": [
+        0,
+        0,
+        128,
+        127
+      ],
+      "width": 128,
+      "height": 127,
       "category": "icon",
       "slice_9": null,
       "is_white_mask_candidate": false

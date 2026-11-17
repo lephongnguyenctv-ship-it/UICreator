@@ -1,0 +1,2381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Loot &amp; Forge Gun — Simulator UI Kit — Game UI Preview</title>
+  <link rel="stylesheet" href="./pixel-ui-kit.css?v=20261117_lfg50">
+  <style>
+    /* ======================================================================
+       Loot & Forge Gun — Glossy Cel-Shaded Mobile Simulator UI (4 Views)
+       ====================================================================== */
+
+    /* Atmospheric Roblox-simulator combat arena backdrop (hidden in wireframe) */
+    #game-canvas.scene-lfg-arena {
+      background:
+        radial-gradient(circle at 50% 44%, rgba(251, 146, 60, 0.22) 0%, rgba(99, 102, 241, 0.14) 38%, transparent 72%),
+        linear-gradient(180deg, #38bdf8 0%, #7dd3fc 26%, #4ade80 26.5%, #22c55e 48%, #475569 49%, #334155 78%, #1e293b 100%);
+    }
+
+    #game-canvas.scene-lfg-arena::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.18;
+      background-image:
+        linear-gradient(90deg, rgba(255, 255, 255, 0.14) 1px, transparent 1px),
+        linear-gradient(rgba(255, 255, 255, 0.14) 1px, transparent 1px);
+      background-size: 48px 48px;
+    }
+
+    .lfg-view {
+      position: absolute;
+      inset: 0;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      pointer-events: none;
+    }
+
+    .lfg-view > * {
+      pointer-events: auto;
+    }
+
+    /* Typography & Cel-Shaded Stroke Helpers */
+    body:not(.mode-wireframe) .lfg-stroke {
+      color: #ffffff;
+      text-shadow:
+        -1.5px -1.5px 0 #090b10,
+         1.5px -1.5px 0 #090b10,
+        -1.5px  1.5px 0 #090b10,
+         1.5px  1.5px 0 #090b10,
+         0      2px   0 #090b10;
+    }
+
+    body:not(.mode-wireframe) .lfg-stroke-gold {
+      color: #fde047;
+      text-shadow:
+        -1.5px -1.5px 0 #1f1203,
+         1.5px -1.5px 0 #1f1203,
+        -1.5px  1.5px 0 #1f1203,
+         1.5px  1.5px 0 #1f1203,
+         0      2px   0 #1f1203;
+    }
+
+    body:not(.mode-wireframe) .lfg-stroke-green {
+      color: #4ade80;
+      text-shadow:
+        -1.5px -1.5px 0 #052e16,
+         1.5px -1.5px 0 #052e16,
+        -1.5px  1.5px 0 #052e16,
+         1.5px  1.5px 0 #052e16,
+         0      2px   0 #052e16;
+    }
+
+    body:not(.mode-wireframe) .lfg-stroke-purple {
+      color: #e879f9;
+      text-shadow:
+        -1.5px -1.5px 0 #1e052b,
+         1.5px -1.5px 0 #1e052b,
+        -1.5px  1.5px 0 #1e052b,
+         1.5px  1.5px 0 #1e052b,
+         0      2px   0 #1e052b;
+    }
+
+    body:not(.mode-wireframe) .px-btn {
+      color: #ffffff;
+    }
+
+    /* Wireframe Placeholder Boxes */
+    .lfg-slot-ph {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      font-size: 10px;
+      line-height: 1.1;
+      font-weight: 700;
+      padding: 2px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .lfg-close-btn {
+      width: 42px;
+      height: 42px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      font-weight: 800;
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+
+    .lfg-close-img {
+      width: 40px;
+      height: 40px;
+      object-fit: contain;
+    }
+
+    .lfg-pill {
+      padding: 2px 8px;
+      height: 32px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 800;
+      line-height: 1.1;
+      white-space: nowrap;
+    }
+
+    .lfg-bar-track {
+      height: 22px;
+      width: 100%;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      overflow: hidden;
+      position: relative;
+    }
+
+    body.mode-wireframe .lfg-bar-track {
+      border: 1px solid #60a5fa;
+      background: rgba(15, 23, 42, 0.92);
+    }
+
+    .lfg-bar-fill {
+      height: 100%;
+      min-width: 14px;
+      box-sizing: border-box;
+    }
+
+    body.mode-wireframe .lfg-bar-fill {
+      background: rgba(96, 165, 250, 0.55);
+    }
+
+    .lfg-bar-fill--purple {
+      filter: hue-rotate(242deg) saturate(1.4);
+    }
+
+    .lfg-bar-fill--blue {
+      filter: hue-rotate(176deg) saturate(1.25);
+    }
+
+    .lfg-bar-fill--red {
+      filter: hue-rotate(-32deg) saturate(1.55);
+    }
+
+    /* ----------------------------------------------------------------------
+       Top-Left Resource Cluster & Upper-Left Nav (Mobile Thumb-Zone Safe)
+       ---------------------------------------------------------------------- */
+    .lfg-hud-top-row {
+      width: 100%;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .lfg-top-left-cluster {
+      width: 344px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .lfg-top-resource-strip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: nowrap;
+    }
+
+    .lfg-top-res-pill {
+      height: 36px;
+      padding: 2px 8px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .lfg-res-icon-img {
+      width: 20px;
+      height: 20px;
+    }
+
+    .lfg-season-pill {
+      height: 32px;
+      padding: 2px 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .lfg-boss-cluster {
+      width: 520px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .lfg-return-btn {
+      width: 156px;
+      height: 38px;
+      padding: 2px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .lfg-boss-bar-box {
+      width: 100%;
+      padding: 4px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .lfg-boss-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .lfg-top-utils {
+      width: 344px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .lfg-util-btn {
+      width: 36px;
+      height: 36px;
+      font-size: 10px;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2px;
+    }
+
+    /* Middle HUD Band: Upper-Left Menu Rail + Center Arena + Right Promos */
+    .lfg-hud-middle {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      padding-top: 8px;
+    }
+
+    .lfg-left-nav-wrap {
+      width: 168px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .lfg-nav-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+    }
+
+    .lfg-nav-tile {
+      height: 66px;
+      padding: 4px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      text-align: center;
+      cursor: pointer;
+    }
+
+    .lfg-nav-icon-img {
+      width: 28px;
+      height: 28px;
+    }
+
+    .lfg-nav-icon-ph {
+      width: 44px;
+      height: 28px;
+    }
+
+    .lfg-nav-label {
+      font-size: 10px;
+      font-weight: 800;
+      line-height: 1.05;
+    }
+
+    /* Simulated Gameplay Focal Props in Arena (hidden in wireframe) */
+    .lfg-arena-center {
+      margin: auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .lfg-arena-callout {
+      width: 420px;
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      text-align: center;
+    }
+
+    .lfg-arena-showcase {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      padding: 14px 24px;
+      background: radial-gradient(circle, rgba(15, 23, 42, 0.56) 0%, transparent 72%);
+      border-radius: 18px;
+      pointer-events: none;
+    }
+
+    .lfg-showcase-actor {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .lfg-right-rail {
+      width: 164px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .lfg-gift-card {
+      width: 104px;
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .lfg-promo-btn {
+      width: 156px;
+      height: 46px;
+      padding: 4px 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 900;
+      cursor: pointer;
+    }
+
+    .lfg-races-card {
+      width: 96px;
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    /* Bottom HUD: Clear Mobile Joystick (BL) & Attack (BR) Safe Zones */
+    .lfg-hud-bottom-bar {
+      width: 100%;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .lfg-thumb-safe-zone {
+      width: 240px;
+      height: 152px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+    }
+
+    .lfg-thumb-zone-box {
+      width: 100%;
+      height: 100%;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      text-align: center;
+      font-size: 11px;
+      font-weight: 700;
+      opacity: 0.85;
+    }
+
+    .lfg-center-hud-deck {
+      width: 720px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .lfg-buff-and-hotbar-row {
+      width: 100%;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .lfg-buff-column {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+    }
+
+    .lfg-buff-pills {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .lfg-power-readout {
+      height: 36px;
+      padding: 2px 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 14px;
+      font-weight: 900;
+    }
+
+    .lfg-hotbar-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .lfg-hotbar-slot {
+      width: 96px;
+      height: 84px;
+      padding: 4px 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      text-align: center;
+      cursor: pointer;
+    }
+
+    .lfg-hotbar-slot.is-equipped {
+      filter: brightness(1.08);
+    }
+
+    .lfg-hotbar-key-row {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 10px;
+      font-weight: 800;
+    }
+
+    .lfg-hotbar-name {
+      font-size: 10px;
+      font-weight: 800;
+      line-height: 1.1;
+      white-space: nowrap;
+    }
+
+    .lfg-xp-row {
+      width: 100%;
+      padding: 4px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .lfg-xp-label {
+      font-size: 13px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .lfg-xp-track-wrap {
+      flex: 1 1 auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .lfg-xp-val {
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .lfg-auto-badge {
+      height: 28px;
+      padding: 2px 8px;
+      font-size: 10px;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    /* ----------------------------------------------------------------------
+       VIEW 2: Gun Forge & Weapon Upgrade Workbench (forge)
+       ---------------------------------------------------------------------- */
+    .lfg-forge-backdrop {
+      padding: 16px 24px;
+    }
+
+    .lfg-forge-stage {
+      position: relative;
+      width: 1140px;
+      height: 668px;
+      display: flex;
+      align-items: stretch;
+      gap: 12px;
+      padding: 12px;
+    }
+
+    .lfg-forge-bg-tabs {
+      width: 128px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .lfg-station-tab {
+      height: 82px;
+      padding: 4px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      font-size: 11px;
+      font-weight: 800;
+      text-align: center;
+      cursor: pointer;
+    }
+
+    .lfg-forge-bg-grid-area {
+      flex: 1 1 auto;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .lfg-forge-bg-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .lfg-forge-bg-title {
+      font-size: 18px;
+      font-weight: 900;
+    }
+
+    .lfg-forge-bg-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .lfg-small-action {
+      height: 36px;
+      padding: 4px 12px;
+      font-size: 11px;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .lfg-bay-grid {
+      flex: 1 1 auto;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-rows: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .lfg-bay-card {
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      text-align: center;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .lfg-zone-strip {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .lfg-zone-chip {
+      height: 34px;
+      padding: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .lfg-forge-inspector-wrap {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      background: rgba(10, 14, 23, 0.72);
+      padding: 56px 16px 16px;
+      z-index: 30;
+    }
+
+    .lfg-inspector-modal {
+      width: 836px;
+      height: 542px;
+      padding: 8px 14px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    .lfg-insp-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    .lfg-insp-identity {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .lfg-insp-portrait {
+      width: 102px;
+      height: 102px;
+      padding: 4px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      font-size: 11px;
+      font-weight: 800;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .lfg-insp-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .lfg-insp-name-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .lfg-insp-title {
+      font-size: 24px;
+      font-weight: 900;
+      letter-spacing: 0.03em;
+    }
+
+    .lfg-bay-badge {
+      height: 30px;
+      padding: 2px 12px;
+      display: inline-flex;
+      align-items: center;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .lfg-insp-rarity {
+      font-size: 14px;
+      font-weight: 900;
+    }
+
+    .lfg-insp-dps {
+      font-size: 15px;
+      font-weight: 900;
+    }
+
+    .lfg-insp-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .lfg-cycle-btn {
+      width: 42px;
+      height: 42px;
+      font-size: 16px;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      cursor: pointer;
+    }
+
+    .lfg-cycle-img {
+      width: 38px;
+      height: 38px;
+      object-fit: contain;
+    }
+
+    .lfg-upgrade-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .lfg-upgrade-row {
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    .lfg-upg-icon {
+      width: 52px;
+      height: 52px;
+    }
+
+    .lfg-upg-info {
+      width: 224px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    .lfg-upg-title {
+      font-size: 14px;
+      font-weight: 900;
+    }
+
+    .lfg-upg-lv {
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .lfg-upg-delta {
+      flex: 1 1 auto;
+      text-align: center;
+      font-size: 18px;
+      font-weight: 900;
+    }
+
+    .lfg-ingot-btn {
+      width: 172px;
+      height: 48px;
+      padding: 4px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-size: 16px;
+      font-weight: 900;
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+
+    .lfg-module-footer {
+      display: flex;
+      align-items: stretch;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .lfg-module-box {
+      flex: 1 1 auto;
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .lfg-module-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .lfg-module-slot {
+      width: 68px;
+      height: 68px;
+      padding: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .lfg-module-details {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .lfg-module-kicker {
+      font-size: 11px;
+      font-weight: 800;
+      color: #cbd5e1;
+    }
+
+    .lfg-module-name {
+      font-size: 14px;
+      font-weight: 900;
+    }
+
+    .lfg-module-perk {
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .lfg-change-btn {
+      width: 124px;
+      height: 46px;
+      padding: 4px 8px;
+      font-size: 13px;
+      font-weight: 900;
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+
+    .lfg-module-actions {
+      width: 176px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .lfg-swap-btn,
+    .lfg-remove-btn {
+      width: 100%;
+      height: 38px;
+      padding: 4px 8px;
+      font-size: 13px;
+      font-weight: 900;
+      cursor: pointer;
+    }
+
+    /* ----------------------------------------------------------------------
+       VIEW 3: Gun & Loot Index Collection Modal (index)
+       ---------------------------------------------------------------------- */
+    .lfg-index-modal {
+      width: 1032px;
+      height: 636px;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .lfg-index-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    .lfg-index-title-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .lfg-index-book-icon {
+      width: 50px;
+      height: 50px;
+    }
+
+    .lfg-index-title-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .lfg-index-title {
+      font-size: 22px;
+      font-weight: 900;
+      line-height: 1.1;
+    }
+
+    .lfg-index-sub {
+      font-size: 12px;
+      font-weight: 700;
+      color: #e2e8f0;
+    }
+
+    .lfg-index-body {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      align-items: stretch;
+      gap: 14px;
+    }
+
+    .lfg-index-sidebar {
+      width: 190px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .lfg-index-tabs {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .lfg-index-tab {
+      height: 48px;
+      padding: 4px 8px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 8px;
+      font-size: 11px;
+      font-weight: 900;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .lfg-tab-icon {
+      width: 40px;
+      height: 28px;
+    }
+
+    .lfg-tab-icon-img {
+      width: 26px;
+      height: 26px;
+    }
+
+    .lfg-rookie-card {
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      text-align: center;
+    }
+
+    .lfg-rookie-lv {
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .lfg-rookie-rank {
+      font-size: 11px;
+      font-weight: 800;
+      color: #cbd5e1;
+    }
+
+    .lfg-rookie-reward-icon {
+      width: 40px;
+      height: 40px;
+    }
+
+    .lfg-claim-btn {
+      width: 100%;
+      height: 38px;
+      padding: 4px 8px;
+      font-size: 13px;
+      font-weight: 900;
+      cursor: pointer;
+    }
+
+    .lfg-index-main {
+      flex: 1 1 auto;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .lfg-milestone-bar {
+      padding: 6px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .lfg-found-count {
+      font-size: 15px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .lfg-milestone-mid {
+      flex: 1 1 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .lfg-milestone-goal {
+      font-size: 12px;
+      font-weight: 800;
+      text-align: center;
+    }
+
+    .lfg-milestone-pill {
+      height: 36px;
+      padding: 4px 14px;
+      display: inline-flex;
+      align-items: center;
+      font-size: 14px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .lfg-index-grid {
+      flex: 1 1 auto;
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      grid-template-rows: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .lfg-index-card {
+      padding: 4px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      gap: 2px;
+      text-align: center;
+      cursor: pointer;
+    }
+
+    .lfg-index-card.is-claimed {
+      filter: brightness(1.12);
+    }
+
+    .lfg-index-card-icon {
+      width: 58px;
+      height: 58px;
+    }
+
+    .lfg-silhouette {
+      filter: brightness(0) opacity(0.82);
+    }
+
+    .lfg-index-card-name {
+      font-size: 10px;
+      font-weight: 800;
+      line-height: 1.05;
+    }
+
+    .lfg-index-rarity-pill {
+      width: 100%;
+      padding: 2px 4px;
+      font-size: 10px;
+      font-weight: 800;
+      line-height: 1.05;
+      border-radius: 4px;
+      background: rgba(15, 23, 42, 0.78);
+    }
+
+    body.mode-wireframe .lfg-index-rarity-pill {
+      border: 1px solid #60a5fa;
+      border-radius: 0;
+    }
+
+    /* ----------------------------------------------------------------------
+       VIEW 4: Sell Loot / Scrap Dealer Modal (sell)
+       ---------------------------------------------------------------------- */
+    .lfg-sell-shell {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .lfg-sell-left-col {
+      width: 240px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .lfg-sell-modal {
+      width: 584px;
+      height: 626px;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 10px;
+      margin: auto;
+    }
+
+    .lfg-sell-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .lfg-sell-title-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .lfg-sell-coin-badge {
+      width: 44px;
+      height: 44px;
+    }
+
+    .lfg-sell-title {
+      font-size: 24px;
+      font-weight: 900;
+    }
+
+    .lfg-sell-list {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .lfg-sell-row {
+      flex: 1 1 0;
+      padding: 6px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .lfg-sell-row.is-sold {
+      opacity: 0.45;
+    }
+
+    .lfg-sell-item-box {
+      width: 68px;
+      height: 68px;
+      padding: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .lfg-sell-item-info {
+      flex: 1 1 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .lfg-sell-item-name {
+      font-size: 14px;
+      font-weight: 900;
+    }
+
+    .lfg-sell-price-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 16px;
+      font-weight: 900;
+    }
+
+    .lfg-coin-sm {
+      width: 24px;
+      height: 24px;
+    }
+
+    .lfg-sell-btn {
+      width: 170px;
+      height: 46px;
+      padding: 4px 8px;
+      font-size: 16px;
+      font-weight: 900;
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+
+    .lfg-sell-footer {
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    .lfg-wallet-total {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 20px;
+      font-weight: 900;
+    }
+
+    .lfg-sell-all-btn {
+      width: 210px;
+      height: 46px;
+      padding: 4px 8px;
+      font-size: 16px;
+      font-weight: 900;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body data-catalog-base="../_catalog/" data-default-mode="final">
+  <header class="workbench-bar">
+    <div class="workbench-title">
+      <span>Loot &amp; Forge Gun — Simulator UI Kit</span>
+      <span class="workbench-badge">1280×720 Mobile Simulator Preview</span>
+    </div>
+    <div class="workbench-controls">
+      <div class="wb-group">
+        <span class="wb-label">Mode</span>
+        <button class="wb-btn" data-wb-mode="wireframe">Wireframe</button>
+        <button class="wb-btn" data-wb-mode="edit">Edit UI</button>
+        <button class="wb-btn is-active" data-wb-mode="final">Interactive</button>
+      </div>
+      <div class="wb-group">
+        <span class="wb-label">View</span>
+        <button class="wb-btn is-active" data-ui-state-trigger="hud">Combat HUD</button>
+        <button class="wb-btn" data-ui-state-trigger="forge">Gun Forge</button>
+        <button class="wb-btn" data-ui-state-trigger="index">Gun &amp; Loot Index</button>
+        <button class="wb-btn" data-ui-state-trigger="sell">Sell Loot</button>
+      </div>
+      <div class="wb-group">
+        <span class="wb-label">Scale</span>
+        <button class="wb-btn" data-wb-scale="2">2x</button>
+        <button class="wb-btn is-active" data-wb-scale="3">3x</button>
+        <button class="wb-btn" data-wb-scale="4">4x</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="workbench-stage">
+    <div id="game-canvas" class="px-canvas scene-lfg-arena">
+
+      <!-- ==================================================================
+           VIEW 1: COMBAT & LOOTING HUD (hud) — Mobile Thumb-Zone Safe
+           ================================================================== -->
+      <div class="lfg-view is-active" data-ui-view="hud">
+        <!-- Top Row: Top-Left Bag/Core/Coin + Boss Bar + Top-Right Utils -->
+        <div class="px-hud-top lfg-hud-top-row">
+          <div class="lfg-top-left-cluster">
+            <div class="px-row lfg-top-resource-strip" style="gap: 6px;">
+              <div class="px-9slice lfg-top-res-pill" data-slice-id="lfg_16_pill_dark" data-slice-9="16,26,16,26" style="--skin-url: url('../_catalog/slices/lfg_16_pill_dark.png'); --pixel-scale: 0.35;">
+                <img class="px-icon lfg-res-icon-img" src="../_catalog/slices/lfg_22_icon_backpack.png" data-slice-id="lfg_22_icon_backpack" style="--w:20;--h:20;--pixel-scale:1;" data-render-mode="final" alt="Bag">
+                <div class="px-wire-box lfg-slot-ph" style="width: 34px; height: 22px;" data-render-mode="wireframe">[BAG]</div>
+                <span class="px-text-pixel lfg-stroke" data-hud-bag>4 / 9</span>
+              </div>
+              <div class="px-9slice lfg-top-res-pill" data-slice-id="lfg_16_pill_dark" data-slice-9="16,26,16,26" style="--skin-url: url('../_catalog/slices/lfg_16_pill_dark.png'); --pixel-scale: 0.35;">
+                <img class="px-icon lfg-res-icon-img" src="../_catalog/slices/lfg_28_icon_ingot.png" data-slice-id="lfg_28_icon_ingot" style="--w:20;--h:20;--pixel-scale:1;" data-render-mode="final" alt="Ingots">
+                <div class="px-wire-box lfg-slot-ph" style="width: 38px; height: 22px;" data-render-mode="wireframe">[CORE]</div>
+                <span class="px-text-pixel lfg-stroke-gold" data-hud-cores>1,450</span>
+              </div>
+              <div class="px-9slice lfg-top-res-pill" data-slice-id="lfg_16_pill_dark" data-slice-9="16,26,16,26" style="--skin-url: url('../_catalog/slices/lfg_16_pill_dark.png'); --pixel-scale: 0.35;">
+                <img class="px-icon lfg-res-icon-img" src="../_catalog/slices/lfg_27_icon_coin.png" data-slice-id="lfg_27_icon_coin" style="--w:20;--h:20;--pixel-scale:1;" data-render-mode="final" alt="Coins">
+                <div class="px-wire-box lfg-slot-ph" style="width: 38px; height: 22px;" data-render-mode="wireframe">[COIN]</div>
+                <span class="px-text-pixel lfg-stroke-gold" data-hud-coins>1.9M</span>
+              </div>
+            </div>
+            <div class="px-9slice lfg-season-pill" data-slice-id="lfg_16_pill_dark" data-slice-9="16,26,16,26" style="--skin-url: url('../_catalog/slices/lfg_16_pill_dark.png'); --pixel-scale: 0.32;">
+              <img class="px-icon lfg-res-icon-img" src="../_catalog/slices/lfg_24_icon_rebirth.png" data-slice-id="lfg_24_icon_rebirth" style="--w:20;--h:20;--pixel-scale:1;" data-render-mode="final" alt="Season 2">
+              <div class="px-wire-box lfg-slot-ph" style="width: 32px; height: 20px;" data-render-mode="wireframe">[S2]</div>
+              <span class="px-text-pixel lfg-stroke-purple">SEASON 2</span>
+            </div>
+          </div>
+
+          <div class="lfg-boss-cluster">
+            <button type="button" class="px-9slice px-btn px-text-pixel lfg-return-btn lfg-stroke" data-slice-id="lfg_16_pill_dark" data-slice-9="16,26,16,26" style="--skin-url: url('../_catalog/slices/lfg_16_pill_dark.png'); --pixel-scale: 0.38;" data-action="return-hub">Return</button>
+            <div class="px-9slice lfg-boss-bar-box" data-slice-id="lfg_02_panel_row" data-slice-9="14,14,14,14" style="--skin-url: url('../_catalog/slices/lfg_02_panel_row.png'); --pixel-scale: 0.4;">
+              <div class="lfg-boss-meta lfg-stroke">
+                <span>Dreadhelm Gun-Titan</span>
+                <span class="px-text-pixel">69.2M / 100M</span>
+              </div>
+              <div class="px-9slice lfg-bar-track" data-slice-id="lfg_04_bar_track" data-slice-9="12,18,12,18" style="--skin-url: url('../_catalog/slices/lfg_04_bar_track.png'); --pixel-scale: 0.35;">
+                <div class="px-9slice lfg-bar-fill lfg-bar-fill--red" data-slice-id="lfg_05_bar_fill" data-slice-9="12,18,12,18" style="--skin-url: url('../_catalog/slices/lfg_05_bar_fill.png'); width: 69%; --pixel-scale: 0.25;" data-border-overlap-ok="true"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="lfg-top-utils">
+            <div class="px-9slice lfg-util-btn" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../_catalog/slices/lfg_03_panel_sidebar.png'); --pixel-scale: 0.25;" title="Gift">
+              <img class="px-icon" src="../_catalog/slices/lfg_26_icon_gift.png" data-slice-id="lfg_26_icon_gift" style="--w:20;--h:20;--pixel-scale:1;" data-render-mode="final" alt="Gift">
+              <span data-render-mode="wireframe">[G]</span>
+            </div>
+            <div class="px-9slice lfg-util-btn" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../_catalog/slices/lfg_03_panel_sidebar.png'); --pixel-scale: 0.25;" title="Rebirth">
+              <img class="px-icon" src="../_catalog/slices/lfg_24_icon_rebirth.png" data-slice-id="lfg_24_icon_rebirth" style="--w:20;--h:20;--pixel-scale:1;" data-render-mode="final" alt="Rebirth">
+              <span data-render-mode="wireframe">[R]</span>
+            </div>
+            <div class="px-9slice lfg-util-btn" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../_catalog/slices/lfg_03_panel_sidebar.png'); --pixel-scale: 0.25;" title="Index">
+              <img class="px-icon" src="../_catalog/slices/lfg_23_icon_index_book.png" data-slice-id="lfg_23_icon_index_book" style="--w:20;--h:20;--pixel-scale:1;" data-render-mode="final" alt="Index">
+              <span data-render-mode="wireframe">[S]</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Middle Band: Upper-Left Menu Grid (Above Joystick) + Arena + Right Promos -->
+        <div class="lfg-hud-middle">
+          <aside class="lfg-left-nav-wrap">
+            <div class="px-grid lfg-nav-grid">
+              <button type="button" class="px-9slice px-btn lfg-nav-tile" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../_catalog/slices/lfg_03_panel_sidebar.png'); --pixel-scale: 0.35;" data-ui-state-trigger="sell">
+                <img class="px-icon lfg-nav-icon-img" src="../_catalog/slices/lfg_21_icon_shop.png" data-slice-id="lfg_21_icon_shop" style="--w:28;--h:28;--pixel-scale:1;" data-render-mode="final" alt="Shop">
+                <div class="px-wire-box lfg-slot-ph lfg-nav-icon-ph" data-render-mode="wireframe">[SHOP]</div>
+                <span class="lfg-nav-label lfg-stroke">Shop / Sell</span>
+              </button>
+              <button type="button" class="px-9slice px-btn lfg-nav-tile" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../_catalog/slices/lfg_03_panel_sidebar.png'); --pixel-scale: 0.35;" data-ui-state-trigger="forge">
+                <img class="px-icon lfg-nav-icon-img" src="../_catalog/slices/lfg_22_icon_backpack.png" data-slice-id="lfg_22_icon_backpack" style="--w:28;--h:28;--pixel-scale:1;" data-render-mode="final" alt="Backpack">
+                <div class="px-wire-box lfg-slot-ph lfg-nav-icon-ph" data-render-mode="wireframe">[BAG]</div>
+                <span class="lfg-nav-label lfg-stroke">Backpack</span>
+              </button>
+              <button type="button" class="px-9slice px-btn lfg-nav-tile" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../_catalog/slices/lfg_03_panel_sidebar.png'); --pixel-scale: 0.35;" data-ui-state-trigger="index">
+                <img class="px-icon lfg-nav-icon-img" src="../_catalog/slices/lfg_23_icon_index_book.png" data-slice-id="lfg_23_icon_index_book" style="--w:28;--h:28;--pixel-scale:1;" data-render-mode="final" alt="Index">
+                <div class="px-wire-box lfg-slot-ph lfg-nav-icon-ph" data-render-mode="wireframe">[BOOK]</div>
+                <span class="lfg-nav-label lfg-stroke">Index</span>
+              </button>
+              <button type="button" class="px-9slice px-btn lfg-nav-tile" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../_catalog/slices/lfg_03_panel_sidebar.png'); --pixel-scale: 0.35;" data-action="rebirth-preview">
+                <img class="px-icon lfg-nav-icon-img" src="../_catalog/slices/lfg_24_icon_rebirth.png" data-slice-id="lfg_24_icon_rebirth" style="--w:28;--h:28;--pixel-scale:1;" data-render-mode="final" alt="Rebirth">
+                <div class="px-wire-box lfg-slot-ph lfg-nav-icon-ph" data-render-mode="wireframe">[56%]</div>
+                <span class="lfg-nav-label lfg-stroke">Rebirth 56%</span>
+              </button>
+              <button type="button" class="px-9slice px-btn lfg-nav-tile" data-slice-id="lfg_15_btn_tab_gold" data-slice-9="20,24,20,24" style="--skin-url: url('../_catalog/slices/lfg_15_btn_tab_gold.png'); --pixel-scale: 0.35;" data-ui-state-trigger="forge">
+                <img class="px-icon lfg-nav-icon-img" src="../_catalog/slices/lfg_25_icon_anvil.png" data-slice-id="lfg_25_icon_anvil" style="--w:28;--h:28;--pixel-scale:1;" data-render-mode="final" alt="Gun Forge">
+                <div class="px-wire-box lfg-slot-ph lfg-nav-icon-ph" data-render-mode="wireframe">[FORGE]</div>
+                <span class="lfg-nav-label lfg-stroke">Gun Forge</span>
+              </button>
+            </div>
+          </aside>
+
+          <!-- Center Arena Viewport -->
+          <div class="lfg-arena-center">
+            <div class="px-wire-box lfg-arena-callout" data-render-mode="wireframe">
+              <span class="px-text-pixel">[3D COMBAT &amp; LOOT ARENA VIEWPORT]</span>
+              <span style="font-size: 12px;">Hero firing forged weapons at Boss + floating loot drops</span>
+            </div>
+            <div class="lfg-arena-showcase" data-render-mode="final" data-wireframe-hide="true">
+              <div class="lfg-showcase-actor">
+                <img class="px-icon" src="../_catalog/slices/lfg_36_gun_plasma_hellfire.png" data-slice-id="lfg_36_gun_plasma_hellfire" style="--w:112;--h:96;--pixel-scale:1;" alt="Plasma Hellfire">
+                <span class="px-text-pixel lfg-stroke-purple">+2.2K DMG</span>
+              </div>
+              <div class="lfg-showcase-actor">
+                <img class="px-icon" src="../_catalog/slices/lfg_50_loot_magma_core.png" data-slice-id="lfg_50_loot_magma_core" style="--w:96;--h:96;--pixel-scale:1;" alt="Magma Drop">
+                <span class="px-text-pixel lfg-stroke-gold">BOSS LOOT DROP</span>
+              </div>
+            </div>
+          </div>
+
+          <aside class="lfg-right-rail">
+            <div class="px-9slice lfg-gift-card" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../_catalog/slices/lfg_03_panel_sidebar.png'); --pixel-scale: 0.35;">
+              <img class="px-icon" src="../_catalog/slices/lfg_26_icon_gift.png" data-slice-id="lfg_26_icon_gift" style="--w:40;--h:40;--pixel-scale:1;" data-render-mode="final" alt="Gift Timer">
+              <div class="px-wire-box lfg-slot-ph" style="width: 44px; height: 40px;" data-render-mode="wireframe">[GIFT]</div>
+              <span class="px-text-pixel lfg-stroke">02:57</span>
+            </div>
+            <button type="button" class="px-9slice px-btn lfg-promo-btn lfg-stroke" data-slice-id="lfg_20_banner_rainbow" data-slice-9="18,22,18,22" style="--skin-url: url('../_catalog/slices/lfg_20_banner_rainbow.png'); --pixel-scale: 0.4;" data-action="promo-2x">
+              <img class="px-icon" src="../_catalog/slices/lfg_41_icon_power_emblem.png" data-slice-id="lfg_41_icon_power_emblem" style="--w:26;--h:26;--pixel-scale:1;" data-render-mode="final" alt="2x Power">
+              <div class="px-wire-box lfg-slot-ph" style="width: 32px; height: 24px;" data-render-mode="wireframe">[2X]</div>
+              <span>2x Power</span>
+            </button>
+            <button type="button" class="px-9slice px-btn lfg-races-card" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../_catalog/slices/lfg_03_panel_sidebar.png'); --pixel-scale: 0.35;" data-action="races-modal">
+              <img class="px-icon" src="../_catalog/slices/lfg_37_gun_minigun.png" data-slice-id="lfg_37_gun_minigun" style="--w:34;--h:30;--pixel-scale:1;" data-render-mode="final" alt="Arsenal">
+              <div class="px-wire-box lfg-slot-ph" style="width: 48px; height: 30px;" data-render-mode="wireframe">[CREST]</div>
+              <span class="lfg-stroke">RACES</span>
+            </button>
+          </aside>
+        </div>
+
+        <!-- Bottom Row: Clear Mobile Joystick Zone (BL) + Center Deck + Clear Attack Zone (BR) -->
+        <div class="px-hud-bottom lfg-hud-bottom-bar">
+          <!-- Bottom-Left Safe Zone (Clear in Interactive Mode) -->
+          <div class="lfg-thumb-safe-zone">
+            <div class="px-wire-box lfg-thumb-zone-box" data-render-mode="wireframe">
+              <span class="px-text-pixel">[MOBILE JOYSTICK ZONE]</span>
+              <span>Kept 100% clear for left-thumb virtual stick</span>
+            </div>
+          </div>
+
+          <div class="lfg-center-hud-deck">
+            <div class="lfg-buff-and-hotbar-row">
+              <div class="lfg-buff-column">
+                <div class="lfg-buff-pills">
+                  <div class="px-9slice lfg-pill lfg-stroke" data-slice-id="lfg_16_pill_dark" data-slice-9="16,26,16,26" style="--skin-url: url('../_catalog/slices/lfg_16_pill_dark.png'); --pixel-scale: 0.32;">TIME +26%</div>
+                  <div class="px-9slice lfg-pill lfg-stroke" data-slice-id="lfg_16_pill_dark" data-slice-9="16,26,16,26" style="--skin-url: url('../_catalog/slices/lfg_16_pill_dark.png'); --pixel-scale: 0.32;">FRIENDS +0%</div>
+                  <div class="px-9slice lfg-pill lfg-stroke-gold" data-slice-id="lfg_16_pill_dark" data-slice-9="16,26,16,26" style="--skin-url: url('../_catalog/slices/lfg_16_pill_dark.png'); --pixel-scale: 0.32;">x1.5 | +7.5%</div>
+                </div>
+                <div class="px-9slice lfg-power-readout" data-slice-id="lfg_16_pill_dark" data-slice-9="16,26,16,26" style="--skin-url: url('../_catalog/slices/lfg_16_pill_dark.png'); --pixel-scale: 0.35;">
+                  <img class="px-icon" src="../_catalog/slices/lfg_41_icon_power_emblem.png" data-slice-id="lfg_41_icon_power_emblem" style="--w:22;--h:22;--pixel-scale:1;" data-render-mode="final" alt="Power">
+                  <div class="px-wire-box lfg-slot-ph" style="width: 38px; height: 22px;" data-render-mode="wireframe">[PWR]</div>
+                  <span class="px-text-pixel lfg-stroke-gold">Power: 288.5K</span>
+                </div>
+              </div>
+
+              <div class="px-row lfg-hotbar-row">
+                <button type="button" class="px-9slice px-btn lfg-hotbar-slot is-equipped" data-slice-id="lfg_08_slot_rare" data-slice-9="18,18,18,18" style="--skin-url: url('../_catalog/slices/lfg_08_slot_rare.png'); --pixel-scale: 0.36;" data-item-slot="1">
+                  <div class="lfg-hotbar-key-row lfg-stroke"><span>EQUIP</span><span>[F]</span></div>
+                  <img class="px-icon" src="../_catalog/slices/lfg_36_gun_plasma_hellfire.png" data-slice-id="lfg_36_gun_plasma_hellfire" style="--w:34;--h:28;--pixel-scale:1;" data-render-mode="final" alt="Plasma Rifle">
+                  <div class="px-wire-box lfg-slot-ph" style="width: 36px; height: 24px;" data-render-mode="wireframe">[GUN]</div>
+                  <span class="lfg-hotbar-name lfg-stroke">Plasma Gun</span>
+                </button>
+                <button type="button" class="px-9slice px-btn lfg-hotbar-slot" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../_catalog/slices/lfg_03_panel_sidebar.png'); --pixel-scale: 0.34;" data-item-slot="2">
+                  <div class="lfg-hotbar-key-row lfg-stroke"><span>SLOT 2</span><span>[R]</span></div>
+                  <span class="lfg-hotbar-name lfg-stroke">EMPTY</span>
+                </button>
+                <button type="button" class="px-9slice px-btn lfg-hotbar-slot" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../_catalog/slices/lfg_03_panel_sidebar.png'); --pixel-scale: 0.34;" data-item-slot="3">
+                  <div class="lfg-hotbar-key-row lfg-stroke-gold"><span>+</span><span>[T]</span></div>
+                  <span class="lfg-hotbar-name lfg-stroke">EXTRA SLOT</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="px-9slice lfg-xp-row" data-slice-id="lfg_02_panel_row" data-slice-9="14,14,14,14" style="--skin-url: url('../_catalog/slices/lfg_02_panel_row.png'); --pixel-scale: 0.42;">
+              <span class="px-text-pixel lfg-xp-label lfg-stroke-purple">Level 71</span>
+              <div class="lfg-xp-track-wrap">
+                <div class="px-9slice lfg-bar-track" data-slice-id="lfg_04_bar_track" data-slice-9="12,18,12,18" style="--skin-url: url('../_catalog/slices/lfg_04_bar_track.png'); --pixel-scale: 0.35;">
+                  <div class="px-9slice lfg-bar-fill lfg-bar-fill--purple" data-slice-id="lfg_05_bar_fill" data-slice-9="12,18,12,18" style="--skin-url: url('../_catalog/slices/lfg_05_bar_fill.png'); width: 90%; --pixel-scale: 0.25;" data-border-overlap-ok="true"></div>
+                </div>
+                <span class="px-text-pixel lfg-xp-val lfg-stroke">23K / 25.3K</span>
+              </div>
+              <button type="button" class="px-9slice px-btn lfg-auto-badge lfg-stroke-green" data-slice-id="lfg_16_pill_dark" data-slice-9="16,26,16,26" style="--skin-url: url('../_catalog/slices/lfg_16_pill_dark.png'); --pixel-scale: 0.28;" data-action="toggle-auto">[G] AUTO ON</button>
+            </div>
+          </div>
+
+          <!-- Bottom-Right Safe Zone (Clear in Interactive Mode) -->
+          <div class="lfg-thumb-safe-zone">
+            <div class="px-wire-box lfg-thumb-zone-box" data-render-mode="wireframe">
+              <span class="px-text-pixel">[MOBILE ATTACK / ACTION]</span>
+              <span>Kept 100% clear for right-thumb shoot &amp; skill buttons</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================================================================
+           VIEW 2: GUN FORGE & WEAPON UPGRADE WORKBENCH (forge)
+           ================================================================== -->
+      <div class="px-modal-backdrop lfg-forge-backdrop" data-ui-view="forge">
+        <div class="px-9slice lfg-forge-stage" data-slice-id="lfg_01_panel_modal" data-slice-9="24,24,24,24" style="--skin-url: url('../_catalog/slices/lfg_01_panel_modal.png'); --pixel-scale: 0.65;">
+          <!-- Outer Workbench Tabs -->
+          <div class="px-stack lfg-forge-bg-tabs">
+            <div class="px-9slice lfg-station-tab lfg-stroke" data-slice-id="lfg_15_btn_tab_gold" data-slice-9="20,24,20,24" style="--skin-url: url('../_catalog/slices/lfg_15_btn_tab_gold.png'); --pixel-scale: 0.35;">
+              <img class="px-icon" src="../_catalog/slices/lfg_25_icon_anvil.png" data-slice-id="lfg_25_icon_anvil" style="--w:28;--h:28;--pixel-scale:1;" data-render-mode="final" alt="Bays">
+              <div class="px-wire-box lfg-slot-ph" style="width: 44px; height: 26px;" data-render-mode="wireframe">[BAY]</div>
+              <span>FORGE BAYS</span>
+            </div>
+            <div class="px-9slice lfg-station-tab lfg-stroke" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../_catalog/slices/lfg_03_panel_sidebar.png'); --pixel-scale: 0.35;">
+              <img class="px-icon" src="../_catalog/slices/lfg_29_icon_firepower.png" data-slice-id="lfg_29_icon_firepower" style="--w:28;--h:28;--pixel-scale:1;" data-render-mode="final" alt="Upgrades">
+              <div class="px-wire-box lfg-slot-ph" style="width: 44px; height: 26px;" data-render-mode="wireframe">[UPG]</div>
+              <span>UPGRADES</span>
+            </div>
+            <div class="px-9slice lfg-station-tab lfg-stroke" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../_catalog/slices/lfg_03_panel_sidebar.png'); --pixel-scale: 0.35;">
+              <img class="px-icon" src="../_catalog/slices/lfg_39_mod_iron_barrel.png" data-slice-id="lfg_39_mod_iron_barrel" style="--w:28;--h:28;--pixel-scale:1;" data-render-mode="final" alt="Barrels">
+              <div class="px-wire-box lfg-slot-ph" style="width: 44px; height: 26px;" data-render-mode="wireframe">[BRL]</div>
+              <span>BARRELS</span>
+            </div>
+            <button type="button" class="px-9slice px-btn lfg-station-tab lfg-stroke" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../_catalog/slices/lfg_03_panel_sidebar.png'); --pixel-scale: 0.35;" data-ui-state-trigger="index">
+              <img class="px-icon" src="../_catalog/slices/lfg_23_icon_index_book.png" data-slice-id="lfg_23_icon_index_book" style="--w:28;--h:28;--pixel-scale:1;" data-render-mode="final" alt="Index">
+              <div class="px-wire-box lfg-slot-ph" style="width: 44px; height: 26px;" data-render-mode="wireframe">[IDX]</div>
+              <span>INDEX</span>
+            </button>
+            <div class="px-9slice lfg-station-tab lfg-stroke" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../_catalog/slices/lfg_03_panel_sidebar.png'); --pixel-scale: 0.35;">
+              <img class="px-icon" src="../_catalog/slices/lfg_46_loot_old_rune.png" data-slice-id="lfg_46_loot_old_rune" style="--w:28;--h:28;--pixel-scale:1;" data-render-mode="final" alt="Zones">
+              <div class="px-wire-box lfg-slot-ph" style="width: 44px; height: 26px;" data-render-mode="wireframe">[ZNE]</div>
+              <span>ZONES</span>
+            </div>
+            <div class="px-9slice lfg-station-tab lfg-stroke" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../_catalog/slices/lfg_03_panel_sidebar.png'); --pixel-scale: 0.35;">
+              <img class="px-icon" src="../_catalog/slices/lfg_50_loot_magma_core.png" data-slice-id="lfg_50_loot_magma_core" style="--w:28;--h:28;--pixel-scale:1;" data-render-mode="final" alt="Smelter">
+              <div class="px-wire-box lfg-slot-ph" style="width: 44px; height: 26px;" data-render-mode="wireframe">[SMLT]</div>
+              <span>SMELTER</span>
+            </div>
+          </div>
+
+          <!-- Outer Workbench Background Grid -->
+          <div class="lfg-forge-bg-grid-area">
+            <div class="lfg-forge-bg-top">
+              <div class="px-text-pixel lfg-forge-bg-title lfg-stroke-gold">GUN FORGE — BAY OVERVIEW</div>
+              <div class="lfg-forge-bg-actions">
+                <div class="px-9slice lfg-small-action lfg-stroke" data-slice-id="lfg_13_btn_blue" data-slice-9="20,24,20,24" style="--skin-url: url('../_catalog/slices/lfg_13_btn_blue.png'); --pixel-scale: 0.35;">AUTO-FILL</div>
+                <div class="px-9slice lfg-small-action lfg-stroke" data-slice-id="lfg_12_btn_green" data-slice-9="20,24,20,24" style="--skin-url: url('../_catalog/slices/lfg_12_btn_green.png'); --pixel-scale: 0.35;">EQUIP BEST</div>
+              </div>
+            </div>
+            <div class="px-grid lfg-bay-grid">
+              <div class="px-9slice lfg-bay-card lfg-stroke" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../_catalog/slices/lfg_03_panel_sidebar.png'); --pixel-scale: 0.4;"><span>BAY 1</span><span>ACTIVE</span></div>
+              <div class="px-9slice lfg-bay-card lfg-stroke" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../_catalog/slices/lfg_03_panel_sidebar.png'); --pixel-scale: 0.4;"><span>BAY 2</span><span>ACTIVE</span></div>
+              <div class="px-9slice lfg-bay-card lfg-stroke" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../_catalog/slices/lfg_03_panel_sidebar.png'); --pixel-scale: 0.4;"><span>BAY 3</span><span>ACTIVE</span></div>
+              <div class="px-9slice lfg-bay-card lfg-stroke" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../_catalog/slices/lfg_03_panel_sidebar.png'); --pixel-scale: 0.4;">
+                <img class="px-icon" src="../_catalog/slices/lfg_32_icon_padlock.png" data-slice-id="lfg_32_icon_padlock" style="--w:34;--h:40;--pixel-scale:1;" data-render-mode="final" alt="Locked">
+                <span>BAY 6</span><span>LOCKED [ZONE 2]</span>
+              </div>
+              <div class="px-9slice lfg-bay-card lfg-stroke" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../_catalog/slices/lfg_03_panel_sidebar.png'); --pixel-scale: 0.4;"><span>BAY 4</span><span>SELECTED</span></div>
+              <div class="px-9slice lfg-bay-card lfg-stroke" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../_catalog/slices/lfg_03_panel_sidebar.png'); --pixel-scale: 0.4;"><span>BAY 5</span><span>ACTIVE</span></div>
+              <div class="px-9slice lfg-bay-card lfg-stroke" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../_catalog/slices/lfg_03_panel_sidebar.png'); --pixel-scale: 0.4;">
+                <img class="px-icon" src="../_catalog/slices/lfg_32_icon_padlock.png" data-slice-id="lfg_32_icon_padlock" style="--w:34;--h:40;--pixel-scale:1;" data-render-mode="final" alt="Locked">
+                <span>BAY 11</span><span>LOCKED</span>
+              </div>
+              <div class="px-9slice lfg-bay-card lfg-stroke" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../_catalog/slices/lfg_03_panel_sidebar.png'); --pixel-scale: 0.4;">
+                <img class="px-icon" src="../_catalog/slices/lfg_32_icon_padlock.png" data-slice-id="lfg_32_icon_padlock" style="--w:34;--h:40;--pixel-scale:1;" data-render-mode="final" alt="Locked">
+                <span>BAY 12</span><span>LOCKED [+2 BAYS]</span>
+              </div>
+            </div>
+            <div class="px-grid lfg-zone-strip">
+              <div class="px-9slice lfg-zone-chip lfg-stroke" data-slice-id="lfg_16_pill_dark" data-slice-9="16,26,16,26" style="--skin-url: url('../_catalog/slices/lfg_16_pill_dark.png'); --pixel-scale: 0.3;">ZONE 3</div>
+              <div class="px-9slice lfg-zone-chip lfg-stroke" data-slice-id="lfg_16_pill_dark" data-slice-9="16,26,16,26" style="--skin-url: url('../_catalog/slices/lfg_16_pill_dark.png'); --pixel-scale: 0.3;">ZONE 4</div>
+              <div class="px-9slice lfg-zone-chip lfg-stroke" data-slice-id="lfg_16_pill_dark" data-slice-9="16,26,16,26" style="--skin-url: url('../_catalog/slices/lfg_16_pill_dark.png'); --pixel-scale: 0.3;">ZONE 5</div>
+              <div class="px-9slice lfg-zone-chip lfg-stroke" data-slice-id="lfg_16_pill_dark" data-slice-9="16,26,16,26" style="--skin-url: url('../_catalog/slices/lfg_16_pill_dark.png'); --pixel-scale: 0.3;">ZONE 6</div>
+              <div class="px-9slice lfg-zone-chip lfg-stroke" data-slice-id="lfg_16_pill_dark" data-slice-9="16,26,16,26" style="--skin-url: url('../_catalog/slices/lfg_16_pill_dark.png'); --pixel-scale: 0.3;">ZONE 7</div>
+              <div class="px-9slice lfg-zone-chip lfg-stroke" data-slice-id="lfg_11_btn_yellow" data-slice-9="20,24,20,24" style="--skin-url: url('../_catalog/slices/lfg_11_btn_yellow.png'); --pixel-scale: 0.3;">+2 BAYS</div>
+            </div>
+          </div>
+
+          <!-- Foreground Gun Inspector Modal -->
+          <div class="lfg-forge-inspector-wrap">
+            <div class="px-9slice lfg-inspector-modal" data-slice-id="lfg_01_panel_modal" data-slice-9="24,24,24,24" style="--skin-url: url('../_catalog/slices/lfg_01_panel_modal.png'); --pixel-scale: 0.65;">
+              <div class="lfg-insp-header">
+                <div class="lfg-insp-identity">
+                  <div class="px-9slice lfg-insp-portrait" data-forge-slot-frame data-slice-id="lfg_09_slot_epic" data-slice-9="18,18,18,18" style="--skin-url: url('../_catalog/slices/lfg_09_slot_epic.png'); --pixel-scale: 0.45;">
+                    <img class="px-icon" data-forge-gun-img src="../_catalog/slices/lfg_36_gun_plasma_hellfire.png" data-slice-id="lfg_36_gun_plasma_hellfire" style="--w:72;--h:68;--pixel-scale:1;" data-render-mode="final" alt="Plasma Hellfire">
+                    <div class="px-wire-box lfg-slot-ph" style="width: 72px; height: 58px;" data-render-mode="wireframe">[EPIC GUN]</div>
+                    <span data-render-mode="wireframe">PLASMA</span>
+                  </div>
+                  <div class="lfg-insp-meta">
+                    <div class="lfg-insp-name-row">
+                      <span class="px-text-pixel lfg-insp-title lfg-stroke-purple" data-forge-gun-name>PLASMA HELLFIRE</span>
+                      <div class="px-9slice lfg-bay-badge lfg-stroke" data-slice-id="lfg_16_pill_dark" data-slice-9="16,26,16,26" style="--skin-url: url('../_catalog/slices/lfg_16_pill_dark.png'); --pixel-scale: 0.32;" data-forge-bay-label>BAY 4</div>
+                    </div>
+                    <span class="lfg-insp-rarity lfg-stroke-purple" data-forge-rarity>EPIC</span>
+                    <span class="px-text-pixel lfg-insp-dps lfg-stroke-gold" data-forge-dps>DPS 640</span>
+                  </div>
+                </div>
+                <div class="lfg-insp-controls">
+                  <button type="button" class="px-btn lfg-cycle-btn" data-action="prev-bay" aria-label="Previous Bay">
+                    <img class="px-icon lfg-cycle-img" src="../_catalog/slices/lfg_18_btn_nav_left.png" data-slice-id="lfg_18_btn_nav_left" style="--w:38;--h:38;--pixel-scale:1;" data-render-mode="final" alt="Prev">
+                    <span class="px-wire-box" style="width: 38px; height: 38px; display:flex; align-items:center; justify-content:center;" data-render-mode="wireframe">&lt;</span>
+                  </button>
+                  <button type="button" class="px-btn lfg-cycle-btn" data-action="next-bay" aria-label="Next Bay">
+                    <img class="px-icon lfg-cycle-img" src="../_catalog/slices/lfg_19_btn_nav_right.png" data-slice-id="lfg_19_btn_nav_right" style="--w:38;--h:38;--pixel-scale:1;" data-render-mode="final" alt="Next">
+                    <span class="px-wire-box" style="width: 38px; height: 38px; display:flex; align-items:center; justify-content:center;" data-render-mode="wireframe">&gt;</span>
+                  </button>
+                  <button type="button" class="px-btn lfg-close-btn" data-ui-state-trigger="hud" aria-label="Close Gun Forge">
+                    <img class="px-icon lfg-close-img" src="../_catalog/slices/lfg_17_btn_close_x.png" data-slice-id="lfg_17_btn_close_x" style="--w:40;--h:40;--pixel-scale:1;" data-render-mode="final" alt="Close">
+                    <span class="px-wire-box" style="width: 38px; height: 38px; display:flex; align-items:center; justify-content:center;" data-render-mode="wireframe">X</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- 3 Upgrade Stat Rows -->
+              <div class="px-stack lfg-upgrade-list">
+                <div class="px-9slice lfg-upgrade-row" data-slice-id="lfg_02_panel_row" data-slice-9="14,14,14,14" style="--skin-url: url('../_catalog/slices/lfg_02_panel_row.png'); --pixel-scale: 0.55;">
+                  <img class="px-icon lfg-upg-icon" src="../_catalog/slices/lfg_29_icon_firepower.png" data-slice-id="lfg_29_icon_firepower" style="--w:48;--h:48;--pixel-scale:1;" data-render-mode="final" alt="Firepower">
+                  <div class="px-wire-box lfg-slot-ph lfg-upg-icon" data-render-mode="wireframe">[HAMMER]</div>
+                  <div class="lfg-upg-info">
+                    <span class="lfg-upg-title lfg-stroke">FIREPOWER</span>
+                    <span class="lfg-upg-lv lfg-stroke" data-stat-lv="firepower">LV 7</span>
+                    <div class="px-9slice lfg-bar-track" data-slice-id="lfg_04_bar_track" data-slice-9="12,18,12,18" style="--skin-url: url('../_catalog/slices/lfg_04_bar_track.png'); --pixel-scale: 0.35;">
+                      <div class="px-9slice lfg-bar-fill" data-stat-bar="firepower" data-slice-id="lfg_05_bar_fill" data-slice-9="12,18,12,18" style="--skin-url: url('../_catalog/slices/lfg_05_bar_fill.png'); width: 45%; --pixel-scale: 0.25;" data-border-overlap-ok="true"></div>
+                    </div>
+                  </div>
+                  <div class="px-text-pixel lfg-upg-delta lfg-stroke-green" data-stat-delta="firepower">62 &gt; 67</div>
+                  <button type="button" class="px-9slice px-btn lfg-ingot-btn lfg-stroke" data-slice-id="lfg_12_btn_green" data-slice-9="20,24,20,24" style="--skin-url: url('../_catalog/slices/lfg_12_btn_green.png'); --pixel-scale: 0.42;" data-upgrade-stat="firepower">
+                    <img class="px-icon" src="../_catalog/slices/lfg_28_icon_ingot.png" data-slice-id="lfg_28_icon_ingot" style="--w:26;--h:22;--pixel-scale:1;" data-render-mode="final" alt="Ingot">
+                    <div class="px-wire-box lfg-slot-ph" style="width: 38px; height: 22px;" data-render-mode="wireframe">[ING]</div>
+                    <span data-stat-cost="firepower">135</span>
+                  </button>
+                </div>
+
+                <div class="px-9slice lfg-upgrade-row" data-slice-id="lfg_02_panel_row" data-slice-9="14,14,14,14" style="--skin-url: url('../_catalog/slices/lfg_02_panel_row.png'); --pixel-scale: 0.55;">
+                  <img class="px-icon lfg-upg-icon" src="../_catalog/slices/lfg_30_icon_firerate.png" data-slice-id="lfg_30_icon_firerate" style="--w:48;--h:44;--pixel-scale:1;" data-render-mode="final" alt="Fire Rate">
+                  <div class="px-wire-box lfg-slot-ph lfg-upg-icon" data-render-mode="wireframe">[BOOT]</div>
+                  <div class="lfg-upg-info">
+                    <span class="lfg-upg-title lfg-stroke">FIRE RATE</span>
+                    <span class="lfg-upg-lv lfg-stroke" data-stat-lv="firerate">LV 7</span>
+                    <div class="px-9slice lfg-bar-track" data-slice-id="lfg_04_bar_track" data-slice-9="12,18,12,18" style="--skin-url: url('../_catalog/slices/lfg_04_bar_track.png'); --pixel-scale: 0.35;">
+                      <div class="px-9slice lfg-bar-fill lfg-bar-fill--blue" data-stat-bar="firerate" data-slice-id="lfg_05_bar_fill" data-slice-9="12,18,12,18" style="--skin-url: url('../_catalog/slices/lfg_05_bar_fill.png'); width: 65%; --pixel-scale: 0.25;" data-border-overlap-ok="true"></div>
+                    </div>
+                  </div>
+                  <div class="px-text-pixel lfg-upg-delta lfg-stroke-green" data-stat-delta="firerate">x1.30 &gt; x1.35</div>
+                  <button type="button" class="px-9slice px-btn lfg-ingot-btn lfg-stroke" data-slice-id="lfg_12_btn_green" data-slice-9="20,24,20,24" style="--skin-url: url('../_catalog/slices/lfg_12_btn_green.png'); --pixel-scale: 0.42;" data-upgrade-stat="firerate">
+                    <img class="px-icon" src="../_catalog/slices/lfg_28_icon_ingot.png" data-slice-id="lfg_28_icon_ingot" style="--w:26;--h:22;--pixel-scale:1;" data-render-mode="final" alt="Ingot">
+                    <div class="px-wire-box lfg-slot-ph" style="width: 38px; height: 22px;" data-render-mode="wireframe">[ING]</div>
+                    <span data-stat-cost="firerate">193</span>
+                  </button>
+                </div>
+
+                <div class="px-9slice lfg-upgrade-row" data-slice-id="lfg_02_panel_row" data-slice-9="14,14,14,14" style="--skin-url: url('../_catalog/slices/lfg_02_panel_row.png'); --pixel-scale: 0.55;">
+                  <img class="px-icon lfg-upg-icon" src="../_catalog/slices/lfg_31_icon_forgespeed.png" data-slice-id="lfg_31_icon_forgespeed" style="--w:48;--h:48;--pixel-scale:1;" data-render-mode="final" alt="Forge Speed">
+                  <div class="px-wire-box lfg-slot-ph lfg-upg-icon" data-render-mode="wireframe">[FRGE]</div>
+                  <div class="lfg-upg-info">
+                    <span class="lfg-upg-title lfg-stroke">FORGE SPEED</span>
+                    <span class="lfg-upg-lv lfg-stroke" data-stat-lv="forgespeed">LV 3</span>
+                    <div class="px-9slice lfg-bar-track" data-slice-id="lfg_04_bar_track" data-slice-9="12,18,12,18" style="--skin-url: url('../_catalog/slices/lfg_04_bar_track.png'); --pixel-scale: 0.35;">
+                      <div class="px-9slice lfg-bar-fill" data-stat-bar="forgespeed" data-slice-id="lfg_05_bar_fill" data-slice-9="12,18,12,18" style="--skin-url: url('../_catalog/slices/lfg_05_bar_fill.png'); width: 25%; --pixel-scale: 0.25;" data-border-overlap-ok="true"></div>
+                    </div>
+                  </div>
+                  <div class="px-text-pixel lfg-upg-delta lfg-stroke-green" data-stat-delta="forgespeed">x1.08 &gt; x1.12</div>
+                  <button type="button" class="px-9slice px-btn lfg-ingot-btn lfg-stroke" data-slice-id="lfg_12_btn_green" data-slice-9="20,24,20,24" style="--skin-url: url('../_catalog/slices/lfg_12_btn_green.png'); --pixel-scale: 0.42;" data-upgrade-stat="forgespeed">
+                    <img class="px-icon" src="../_catalog/slices/lfg_28_icon_ingot.png" data-slice-id="lfg_28_icon_ingot" style="--w:26;--h:22;--pixel-scale:1;" data-render-mode="final" alt="Ingot">
+                    <div class="px-wire-box lfg-slot-ph" style="width: 38px; height: 22px;" data-render-mode="wireframe">[ING]</div>
+                    <span data-stat-cost="forgespeed">911</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Bottom Barrel / Attachment Module Bar -->
+              <div class="lfg-module-footer">
+                <div class="px-9slice lfg-module-box" data-slice-id="lfg_02_panel_row" data-slice-9="14,14,14,14" style="--skin-url: url('../_catalog/slices/lfg_02_panel_row.png'); --pixel-scale: 0.55;">
+                  <div class="lfg-module-left">
+                    <div class="px-9slice lfg-module-slot" data-slice-id="lfg_06_slot_common" data-slice-9="18,18,18,18" style="--skin-url: url('../_catalog/slices/lfg_06_slot_common.png'); --pixel-scale: 0.38;">
+                      <img class="px-icon" data-module-img src="../_catalog/slices/lfg_39_mod_iron_barrel.png" data-slice-id="lfg_39_mod_iron_barrel" style="--w:44;--h:40;--pixel-scale:1;" data-render-mode="final" alt="Module">
+                      <div class="px-wire-box lfg-slot-ph" style="width: 52px; height: 48px;" data-render-mode="wireframe">[BRL]</div>
+                    </div>
+                    <div class="lfg-module-details">
+                      <span class="lfg-module-kicker">BARREL MODULE</span>
+                      <span class="lfg-module-name lfg-stroke" data-module-name>RIVETED IRON BARREL</span>
+                      <span class="lfg-module-perk lfg-stroke-gold" data-module-perk>FIREPOWER x1.15 | SWIFT +5%</span>
+                    </div>
+                  </div>
+                  <button type="button" class="px-9slice px-btn lfg-change-btn lfg-stroke" data-slice-id="lfg_13_btn_blue" data-slice-9="20,24,20,24" style="--skin-url: url('../_catalog/slices/lfg_13_btn_blue.png'); --pixel-scale: 0.4;" data-action="change-module">CHANGE</button>
+                </div>
+                <div class="lfg-module-actions">
+                  <button type="button" class="px-9slice px-btn lfg-swap-btn lfg-stroke" data-slice-id="lfg_13_btn_blue" data-slice-9="20,24,20,24" style="--skin-url: url('../_catalog/slices/lfg_13_btn_blue.png'); --pixel-scale: 0.38;" data-action="swap-gun">SWAP</button>
+                  <button type="button" class="px-9slice px-btn lfg-remove-btn lfg-stroke" data-slice-id="lfg_14_btn_red" data-slice-9="20,24,20,24" style="--skin-url: url('../_catalog/slices/lfg_14_btn_red.png'); --pixel-scale: 0.38;" data-action="remove-gun">REMOVE</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================================================================
+           VIEW 3: GUN & LOOT INDEX MODAL (index)
+           ================================================================== -->
+      <div class="px-modal-backdrop" data-ui-view="index">
+        <div class="px-9slice lfg-index-modal" data-slice-id="lfg_01_panel_modal" data-slice-9="24,24,24,24" style="--skin-url: url('../_catalog/slices/lfg_01_panel_modal.png'); --pixel-scale: 0.65;">
+          <div class="lfg-index-header">
+            <div class="lfg-index-title-group">
+              <img class="px-icon lfg-index-book-icon" src="../_catalog/slices/lfg_23_icon_index_book.png" data-slice-id="lfg_23_icon_index_book" style="--w:48;--h:48;--pixel-scale:1;" data-render-mode="final" alt="Index Tome">
+              <div class="px-wire-box lfg-slot-ph lfg-index-book-icon" data-render-mode="wireframe">[TOME]</div>
+              <div class="lfg-index-title-stack">
+                <span class="px-text-pixel lfg-index-title lfg-stroke">INDEX</span>
+                <span class="lfg-index-sub">Find guns &amp; loot to fill your Index. Tap a found item to claim its bonus FOREVER!</span>
+              </div>
+            </div>
+            <button type="button" class="px-btn lfg-close-btn" data-ui-state-trigger="hud" aria-label="Close Index">
+              <img class="px-icon lfg-close-img" src="../_catalog/slices/lfg_17_btn_close_x.png" data-slice-id="lfg_17_btn_close_x" style="--w:40;--h:40;--pixel-scale:1;" data-render-mode="final" alt="Close">
+              <span class="px-wire-box" style="width: 38px; height: 38px; display:flex; align-items:center; justify-content:center;" data-render-mode="wireframe">X</span>
+            </button>
+          </div>
+
+          <div class="lfg-index-body">
+            <!-- Left Sidebar: Category Tabs + Rookie Level Claim Card -->
+            <aside class="lfg-index-sidebar">
+              <div class="px-stack lfg-index-tabs">
+                <button type="button" class="px-9slice px-btn lfg-index-tab lfg-stroke" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../_catalog/slices/lfg_03_panel_sidebar.png'); --pixel-scale: 0.32;" data-index-tab="plasma">
+                  <img class="px-icon lfg-tab-icon-img" src="../_catalog/slices/lfg_36_gun_plasma_hellfire.png" data-slice-id="lfg_36_gun_plasma_hellfire" style="--w:26;--h:22;--pixel-scale:1;" data-render-mode="final" alt="Plasma Guns">
+                  <div class="px-wire-box lfg-slot-ph lfg-tab-icon" data-render-mode="wireframe">[PLS]</div>
+                  <span>PLASMA GUNS</span>
+                </button>
+                <button type="button" class="px-9slice px-btn lfg-index-tab lfg-stroke" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../_catalog/slices/lfg_03_panel_sidebar.png'); --pixel-scale: 0.32;" data-index-tab="firearms">
+                  <img class="px-icon lfg-tab-icon-img" src="../_catalog/slices/lfg_35_gun_assault_rifle.png" data-slice-id="lfg_35_gun_assault_rifle" style="--w:26;--h:20;--pixel-scale:1;" data-render-mode="final" alt="Firearms">
+                  <div class="px-wire-box lfg-slot-ph lfg-tab-icon" data-render-mode="wireframe">[GUN]</div>
+                  <span>FIREARMS</span>
+                </button>
+                <button type="button" class="px-9slice px-btn lfg-index-tab lfg-stroke" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../_catalog/slices/lfg_03_panel_sidebar.png'); --pixel-scale: 0.32;" data-index-tab="modules">
+                  <img class="px-icon lfg-tab-icon-img" src="../_catalog/slices/lfg_40_mod_plasma_core.png" data-slice-id="lfg_40_mod_plasma_core" style="--w:26;--h:26;--pixel-scale:1;" data-render-mode="final" alt="Modules">
+                  <div class="px-wire-box lfg-slot-ph lfg-tab-icon" data-render-mode="wireframe">[MOD]</div>
+                  <span>MODULES</span>
+                </button>
+                <button type="button" class="px-9slice px-btn lfg-index-tab lfg-stroke" data-slice-id="lfg_15_btn_tab_gold" data-slice-9="20,24,20,24" style="--skin-url: url('../_catalog/slices/lfg_15_btn_tab_gold.png'); --pixel-scale: 0.36;" data-index-tab="loot">
+                  <img class="px-icon lfg-tab-icon-img" src="../_catalog/slices/lfg_50_loot_magma_core.png" data-slice-id="lfg_50_loot_magma_core" style="--w:26;--h:26;--pixel-scale:1;" data-render-mode="final" alt="Loot">
+                  <div class="px-wire-box lfg-slot-ph lfg-tab-icon" data-render-mode="wireframe">[LOOT]</div>
+                  <span>LOOT</span>
+                </button>
+              </div>
+
+              <div class="px-9slice lfg-rookie-card" data-slice-id="lfg_02_panel_row" data-slice-9="14,14,14,14" style="--skin-url: url('../_catalog/slices/lfg_02_panel_row.png'); --pixel-scale: 0.45;">
+                <span class="px-text-pixel lfg-rookie-lv lfg-stroke-gold" data-rookie-lv>LEVEL 0</span>
+                <span class="lfg-rookie-rank" data-rookie-rank>ROOKIE</span>
+                <div class="px-9slice lfg-bar-track" data-slice-id="lfg_04_bar_track" data-slice-9="12,18,12,18" style="--skin-url: url('../_catalog/slices/lfg_04_bar_track.png'); --pixel-scale: 0.35;">
+                  <div class="px-9slice lfg-bar-fill lfg-bar-fill--blue" data-slice-id="lfg_05_bar_fill" data-slice-9="12,18,12,18" style="--skin-url: url('../_catalog/slices/lfg_05_bar_fill.png'); width: 100%; --pixel-scale: 0.25;" data-border-overlap-ok="true"></div>
+                </div>
+                <span style="font-size: 11px; font-weight: 800;" class="lfg-stroke">25/25 XP</span>
+                <span style="font-size: 10px; font-weight: 700; color: #cbd5e1;">LEVEL 1 REWARD</span>
+                <img class="px-icon lfg-rookie-reward-icon" src="../_catalog/slices/lfg_22_icon_backpack.png" data-slice-id="lfg_22_icon_backpack" style="--w:38;--h:38;--pixel-scale:1;" data-render-mode="final" alt="Bag Reward">
+                <div class="px-wire-box lfg-slot-ph lfg-rookie-reward-icon" data-render-mode="wireframe">[BAG]</div>
+                <span style="font-size: 12px; font-weight: 900;" class="lfg-stroke">+1 BAG SLOT</span>
+                <button type="button" class="px-9slice px-btn lfg-claim-btn lfg-stroke" data-slice-id="lfg_12_btn_green" data-slice-9="20,24,20,24" style="--skin-url: url('../_catalog/slices/lfg_12_btn_green.png'); --pixel-scale: 0.38;" data-action="claim-index-level">CLAIM!</button>
+              </div>
+            </aside>
+
+            <!-- Right Collection Grid (6x3 = 18 Cards) -->
+            <div class="lfg-index-main">
+              <div class="px-9slice lfg-milestone-bar" data-slice-id="lfg_02_panel_row" data-slice-9="14,14,14,14" style="--skin-url: url('../_catalog/slices/lfg_02_panel_row.png'); --pixel-scale: 0.45;">
+                <span class="px-text-pixel lfg-found-count lfg-stroke-gold" data-index-found>FOUND 7/81</span>
+                <div class="lfg-milestone-mid">
+                  <span class="lfg-milestone-goal lfg-stroke">Find 8 loot: +1 BAG SLOT</span>
+                  <div class="px-9slice lfg-bar-track" data-slice-id="lfg_04_bar_track" data-slice-9="12,18,12,18" style="--skin-url: url('../_catalog/slices/lfg_04_bar_track.png'); --pixel-scale: 0.35;">
+                    <div class="px-9slice lfg-bar-fill" data-slice-id="lfg_05_bar_fill" data-slice-9="12,18,12,18" style="--skin-url: url('../_catalog/slices/lfg_05_bar_fill.png'); width: 87%; --pixel-scale: 0.25;" data-border-overlap-ok="true"></div>
+                  </div>
+                </div>
+                <div class="px-9slice px-text-pixel lfg-milestone-pill lfg-stroke" data-slice-id="lfg_16_pill_dark" data-slice-9="16,26,16,26" style="--skin-url: url('../_catalog/slices/lfg_16_pill_dark.png'); --pixel-scale: 0.32;">7 / 8</div>
+              </div>
+
+              <div class="px-grid lfg-index-grid" data-index-grid>
+                <!-- 18 Cards matching Reference Screenshot 2 + Loot & Forge Gun items -->
+                <div class="px-9slice lfg-index-card" data-slice-id="lfg_06_slot_common" data-slice-9="18,18,18,18" style="--skin-url: url('../_catalog/slices/lfg_06_slot_common.png'); --pixel-scale: 0.4;" data-item-slot="idx-1">
+                  <img class="px-icon lfg-index-card-icon" src="../_catalog/slices/lfg_33_gun_revolver.png" data-slice-id="lfg_33_gun_revolver" style="--w:54;--h:54;--pixel-scale:1;" data-render-mode="final" alt="Scrap Revolver">
+                  <div class="px-wire-box lfg-slot-ph lfg-index-card-icon" data-render-mode="wireframe">[REV]</div>
+                  <span class="lfg-index-card-name lfg-stroke">Scrap Revolver</span>
+                  <div class="lfg-index-rarity-pill lfg-stroke">COMMON</div>
+                </div>
+                <div class="px-9slice lfg-index-card" data-slice-id="lfg_06_slot_common" data-slice-9="18,18,18,18" style="--skin-url: url('../_catalog/slices/lfg_06_slot_common.png'); --pixel-scale: 0.4;" data-item-slot="idx-2">
+                  <img class="px-icon lfg-index-card-icon lfg-silhouette" src="../_catalog/slices/lfg_48_loot_scrap_gear.png" data-slice-id="lfg_48_loot_scrap_gear" style="--w:54;--h:54;--pixel-scale:1;" data-render-mode="final" alt="Unknown">
+                  <div class="px-wire-box lfg-slot-ph lfg-index-card-icon" data-render-mode="wireframe">[???]</div>
+                  <span class="lfg-index-card-name lfg-stroke">???</span>
+                  <div class="lfg-index-rarity-pill lfg-stroke">COMMON</div>
+                </div>
+                <div class="px-9slice lfg-index-card" data-slice-id="lfg_06_slot_common" data-slice-9="18,18,18,18" style="--skin-url: url('../_catalog/slices/lfg_06_slot_common.png'); --pixel-scale: 0.4;" data-item-slot="idx-3">
+                  <img class="px-icon lfg-index-card-icon lfg-silhouette" src="../_catalog/slices/lfg_39_mod_iron_barrel.png" data-slice-id="lfg_39_mod_iron_barrel" style="--w:54;--h:54;--pixel-scale:1;" data-render-mode="final" alt="Unknown">
+                  <div class="px-wire-box lfg-slot-ph lfg-index-card-icon" data-render-mode="wireframe">[???]</div>
+                  <span class="lfg-index-card-name lfg-stroke">???</span>
+                  <div class="lfg-index-rarity-pill lfg-stroke">COMMON</div>
+                </div>
+                <div class="px-9slice lfg-index-card" data-slice-id="lfg_07_slot_uncommon" data-slice-9="18,18,18,18" style="--skin-url: url('../_catalog/slices/lfg_07_slot_uncommon.png'); --pixel-scale: 0.4;" data-item-slot="idx-4">
+                  <img class="px-icon lfg-index-card-icon" src="../_catalog/slices/lfg_42_loot_claw.png" data-slice-id="lfg_42_loot_claw" style="--w:54;--h:54;--pixel-scale:1;" data-render-mode="final" alt="Monster Claw">
+                  <div class="px-wire-box lfg-slot-ph lfg-index-card-icon" data-render-mode="wireframe">[CLAW]</div>
+                  <span class="lfg-index-card-name lfg-stroke">Monster Claw</span>
+                  <div class="lfg-index-rarity-pill lfg-stroke">UNCOMMON</div>
+                </div>
+                <div class="px-9slice lfg-index-card" data-slice-id="lfg_07_slot_uncommon" data-slice-9="18,18,18,18" style="--skin-url: url('../_catalog/slices/lfg_07_slot_uncommon.png'); --pixel-scale: 0.4;" data-item-slot="idx-5">
+                  <img class="px-icon lfg-index-card-icon" src="../_catalog/slices/lfg_43_loot_fang.png" data-slice-id="lfg_43_loot_fang" style="--w:54;--h:54;--pixel-scale:1;" data-render-mode="final" alt="Beast Fang">
+                  <div class="px-wire-box lfg-slot-ph lfg-index-card-icon" data-render-mode="wireframe">[FANG]</div>
+                  <span class="lfg-index-card-name lfg-stroke">Beast Fang</span>
+                  <div class="lfg-index-rarity-pill lfg-stroke">UNCOMMON</div>
+                </div>
+                <div class="px-9slice lfg-index-card" data-slice-id="lfg_07_slot_uncommon" data-slice-9="18,18,18,18" style="--skin-url: url('../_catalog/slices/lfg_07_slot_uncommon.png'); --pixel-scale: 0.4;" data-item-slot="idx-6">
+                  <img class="px-icon lfg-index-card-icon" src="../_catalog/slices/lfg_44_loot_eyeball.png" data-slice-id="lfg_44_loot_eyeball" style="--w:54;--h:54;--pixel-scale:1;" data-render-mode="final" alt="Eyeball">
+                  <div class="px-wire-box lfg-slot-ph lfg-index-card-icon" data-render-mode="wireframe">[EYE]</div>
+                  <span class="lfg-index-card-name lfg-stroke">Eyeball</span>
+                  <div class="lfg-index-rarity-pill lfg-stroke">UNCOMMON</div>
+                </div>
+
+                <!-- Row 2 -->
+                <div class="px-9slice lfg-index-card" data-slice-id="lfg_07_slot_uncommon" data-slice-9="18,18,18,18" style="--skin-url: url('../_catalog/slices/lfg_07_slot_uncommon.png'); --pixel-scale: 0.4;" data-item-slot="idx-7">
+                  <img class="px-icon lfg-index-card-icon" src="../_catalog/slices/lfg_45_loot_rib_meat.png" data-slice-id="lfg_45_loot_rib_meat" style="--w:54;--h:54;--pixel-scale:1;" data-render-mode="final" alt="Rib Meat">
+                  <div class="px-wire-box lfg-slot-ph lfg-index-card-icon" data-render-mode="wireframe">[RIB]</div>
+                  <span class="lfg-index-card-name lfg-stroke">Rib Meat</span>
+                  <div class="lfg-index-rarity-pill lfg-stroke">UNCOMMON</div>
+                </div>
+                <div class="px-9slice lfg-index-card" data-slice-id="lfg_08_slot_rare" data-slice-9="18,18,18,18" style="--skin-url: url('../_catalog/slices/lfg_08_slot_rare.png'); --pixel-scale: 0.4;" data-item-slot="idx-8">
+                  <img class="px-icon lfg-index-card-icon" src="../_catalog/slices/lfg_46_loot_old_rune.png" data-slice-id="lfg_46_loot_old_rune" style="--w:54;--h:54;--pixel-scale:1;" data-render-mode="final" alt="Old Rune">
+                  <div class="px-wire-box lfg-slot-ph lfg-index-card-icon" data-render-mode="wireframe">[RUNE]</div>
+                  <span class="lfg-index-card-name lfg-stroke">Old Rune</span>
+                  <div class="lfg-index-rarity-pill lfg-stroke">RARE</div>
+                </div>
+                <div class="px-9slice lfg-index-card" data-slice-id="lfg_08_slot_rare" data-slice-9="18,18,18,18" style="--skin-url: url('../_catalog/slices/lfg_08_slot_rare.png'); --pixel-scale: 0.4;" data-item-slot="idx-9">
+                  <img class="px-icon lfg-index-card-icon lfg-silhouette" src="../_catalog/slices/lfg_34_gun_smg.png" data-slice-id="lfg_34_gun_smg" style="--w:54;--h:54;--pixel-scale:1;" data-render-mode="final" alt="Unknown">
+                  <div class="px-wire-box lfg-slot-ph lfg-index-card-icon" data-render-mode="wireframe">[???]</div>
+                  <span class="lfg-index-card-name lfg-stroke">???</span>
+                  <div class="lfg-index-rarity-pill lfg-stroke">RARE</div>
+                </div>
+                <div class="px-9slice lfg-index-card" data-slice-id="lfg_09_slot_epic" data-slice-9="18,18,18,18" style="--skin-url: url('../_catalog/slices/lfg_09_slot_epic.png'); --pixel-scale: 0.4;" data-item-slot="idx-10">
+                  <img class="px-icon lfg-index-card-icon" src="../_catalog/slices/lfg_47_loot_giant_fist.png" data-slice-id="lfg_47_loot_giant_fist" style="--w:54;--h:54;--pixel-scale:1;" data-render-mode="final" alt="Giant Fist">
+                  <div class="px-wire-box lfg-slot-ph lfg-index-card-icon" data-render-mode="wireframe">[FIST]</div>
+                  <span class="lfg-index-card-name lfg-stroke">Giant Fist</span>
+                  <div class="lfg-index-rarity-pill lfg-stroke">EPIC</div>
+                </div>
+                <div class="px-9slice lfg-index-card" data-slice-id="lfg_08_slot_rare" data-slice-9="18,18,18,18" style="--skin-url: url('../_catalog/slices/lfg_08_slot_rare.png'); --pixel-scale: 0.4;" data-item-slot="idx-11">
+                  <img class="px-icon lfg-index-card-icon lfg-silhouette" src="../_catalog/slices/lfg_35_gun_assault_rifle.png" data-slice-id="lfg_35_gun_assault_rifle" style="--w:54;--h:54;--pixel-scale:1;" data-render-mode="final" alt="Unknown">
+                  <div class="px-wire-box lfg-slot-ph lfg-index-card-icon" data-render-mode="wireframe">[???]</div>
+                  <span class="lfg-index-card-name lfg-stroke">???</span>
+                  <div class="lfg-index-rarity-pill lfg-stroke">RARE</div>
+                </div>
+                <div class="px-9slice lfg-index-card" data-slice-id="lfg_08_slot_rare" data-slice-9="18,18,18,18" style="--skin-url: url('../_catalog/slices/lfg_08_slot_rare.png'); --pixel-scale: 0.4;" data-item-slot="idx-12">
+                  <img class="px-icon lfg-index-card-icon lfg-silhouette" src="../_catalog/slices/lfg_49_loot_plasma_cell.png" data-slice-id="lfg_49_loot_plasma_cell" style="--w:54;--h:54;--pixel-scale:1;" data-render-mode="final" alt="Unknown">
+                  <div class="px-wire-box lfg-slot-ph lfg-index-card-icon" data-render-mode="wireframe">[???]</div>
+                  <span class="lfg-index-card-name lfg-stroke">???</span>
+                  <div class="lfg-index-rarity-pill lfg-stroke">RARE</div>
+                </div>
+
+                <!-- Row 3 -->
+                <div class="px-9slice lfg-index-card" data-slice-id="lfg_08_slot_rare" data-slice-9="18,18,18,18" style="--skin-url: url('../_catalog/slices/lfg_08_slot_rare.png'); --pixel-scale: 0.4;" data-item-slot="idx-13">
+                  <img class="px-icon lfg-index-card-icon lfg-silhouette" src="../_catalog/slices/lfg_40_mod_plasma_core.png" data-slice-id="lfg_40_mod_plasma_core" style="--w:54;--h:54;--pixel-scale:1;" data-render-mode="final" alt="Unknown">
+                  <div class="px-wire-box lfg-slot-ph lfg-index-card-icon" data-render-mode="wireframe">[???]</div>
+                  <span class="lfg-index-card-name lfg-stroke">???</span>
+                  <div class="lfg-index-rarity-pill lfg-stroke">RARE</div>
+                </div>
+                <div class="px-9slice lfg-index-card" data-slice-id="lfg_09_slot_epic" data-slice-9="18,18,18,18" style="--skin-url: url('../_catalog/slices/lfg_09_slot_epic.png'); --pixel-scale: 0.4;" data-item-slot="idx-14">
+                  <img class="px-icon lfg-index-card-icon" src="../_catalog/slices/lfg_36_gun_plasma_hellfire.png" data-slice-id="lfg_36_gun_plasma_hellfire" style="--w:54;--h:54;--pixel-scale:1;" data-render-mode="final" alt="Plasma Hellfire">
+                  <div class="px-wire-box lfg-slot-ph lfg-index-card-icon" data-render-mode="wireframe">[PLSM]</div>
+                  <span class="lfg-index-card-name lfg-stroke">Plasma Hellfire</span>
+                  <div class="lfg-index-rarity-pill lfg-stroke">EPIC</div>
+                </div>
+                <div class="px-9slice lfg-index-card" data-slice-id="lfg_09_slot_epic" data-slice-9="18,18,18,18" style="--skin-url: url('../_catalog/slices/lfg_09_slot_epic.png'); --pixel-scale: 0.4;" data-item-slot="idx-15">
+                  <img class="px-icon lfg-index-card-icon lfg-silhouette" src="../_catalog/slices/lfg_38_gun_railgun.png" data-slice-id="lfg_38_gun_railgun" style="--w:54;--h:54;--pixel-scale:1;" data-render-mode="final" alt="Unknown">
+                  <div class="px-wire-box lfg-slot-ph lfg-index-card-icon" data-render-mode="wireframe">[???]</div>
+                  <span class="lfg-index-card-name lfg-stroke">???</span>
+                  <div class="lfg-index-rarity-pill lfg-stroke">EPIC</div>
+                </div>
+                <div class="px-9slice lfg-index-card" data-slice-id="lfg_09_slot_epic" data-slice-9="18,18,18,18" style="--skin-url: url('../_catalog/slices/lfg_09_slot_epic.png'); --pixel-scale: 0.4;" data-item-slot="idx-16">
+                  <img class="px-icon lfg-index-card-icon lfg-silhouette" src="../_catalog/slices/lfg_49_loot_plasma_cell.png" data-slice-id="lfg_49_loot_plasma_cell" style="--w:54;--h:54;--pixel-scale:1;" data-render-mode="final" alt="Unknown">
+                  <div class="px-wire-box lfg-slot-ph lfg-index-card-icon" data-render-mode="wireframe">[???]</div>
+                  <span class="lfg-index-card-name lfg-stroke">???</span>
+                  <div class="lfg-index-rarity-pill lfg-stroke">EPIC</div>
+                </div>
+                <div class="px-9slice lfg-index-card" data-slice-id="lfg_09_slot_epic" data-slice-9="18,18,18,18" style="--skin-url: url('../_catalog/slices/lfg_09_slot_epic.png'); --pixel-scale: 0.4;" data-item-slot="idx-17">
+                  <img class="px-icon lfg-index-card-icon lfg-silhouette" src="../_catalog/slices/lfg_48_loot_scrap_gear.png" data-slice-id="lfg_48_loot_scrap_gear" style="--w:54;--h:54;--pixel-scale:1;" data-render-mode="final" alt="Unknown">
+                  <div class="px-wire-box lfg-slot-ph lfg-index-card-icon" data-render-mode="wireframe">[???]</div>
+                  <span class="lfg-index-card-name lfg-stroke">???</span>
+                  <div class="lfg-index-rarity-pill lfg-stroke">EPIC</div>
+                </div>
+                <div class="px-9slice lfg-index-card" data-slice-id="lfg_10_slot_legendary" data-slice-9="18,18,18,18" style="--skin-url: url('../_catalog/slices/lfg_10_slot_legendary.png'); --pixel-scale: 0.4;" data-item-slot="idx-18">
+                  <img class="px-icon lfg-index-card-icon lfg-silhouette" src="../_catalog/slices/lfg_37_gun_minigun.png" data-slice-id="lfg_37_gun_minigun" style="--w:54;--h:54;--pixel-scale:1;" data-render-mode="final" alt="Unknown">
+                  <div class="px-wire-box lfg-slot-ph lfg-index-card-icon" data-render-mode="wireframe">[???]</div>
+                  <span class="lfg-index-card-name lfg-stroke">???</span>
+                  <div class="lfg-index-rarity-pill lfg-stroke-gold">LEGENDARY</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================================================================
+           VIEW 4: SELL LOOT / SCRAP DEALER MODAL (sell)
+           ================================================================== -->
+      <div class="px-modal-backdrop" data-ui-view="sell">
+        <div class="lfg-sell-shell">
+          <!-- Upper-Left HUD Resources & Nav flanking Sell Modal -->
+          <div class="lfg-sell-left-col">
+            <div class="px-row lfg-top-resource-strip" style="gap: 5px;">
+              <div class="px-9slice lfg-top-res-pill" data-slice-id="lfg_16_pill_dark" data-slice-9="16,26,16,26" style="--skin-url: url('../_catalog/slices/lfg_16_pill_dark.png'); --pixel-scale: 0.32;">
+                <img class="px-icon lfg-res-icon-img" src="../_catalog/slices/lfg_22_icon_backpack.png" data-slice-id="lfg_22_icon_backpack" style="--w:18;--h:18;--pixel-scale:1;" data-render-mode="final" alt="Bag">
+                <div class="px-wire-box lfg-slot-ph" style="width: 34px; height: 20px;" data-render-mode="wireframe">[BAG]</div>
+                <span class="px-text-pixel lfg-stroke" data-sell-bag>4 / 9</span>
+              </div>
+              <div class="px-9slice lfg-top-res-pill" data-slice-id="lfg_16_pill_dark" data-slice-9="16,26,16,26" style="--skin-url: url('../_catalog/slices/lfg_16_pill_dark.png'); --pixel-scale: 0.32;">
+                <img class="px-icon lfg-res-icon-img" src="../_catalog/slices/lfg_27_icon_coin.png" data-slice-id="lfg_27_icon_coin" style="--w:18;--h:18;--pixel-scale:1;" data-render-mode="final" alt="Coins">
+                <div class="px-wire-box lfg-slot-ph" style="width: 38px; height: 20px;" data-render-mode="wireframe">[COIN]</div>
+                <span class="px-text-pixel lfg-stroke-gold" data-sell-top-coins>1.9M</span>
+              </div>
+            </div>
+            <div class="px-grid lfg-nav-grid" style="width: 168px;">
+              <button type="button" class="px-9slice px-btn lfg-nav-tile" data-slice-id="lfg_15_btn_tab_gold" data-slice-9="20,24,20,24" style="--skin-url: url('../_catalog/slices/lfg_15_btn_tab_gold.png'); --pixel-scale: 0.32;" data-ui-state-trigger="sell">
+                <img class="px-icon lfg-nav-icon-img" src="../_catalog/slices/lfg_21_icon_shop.png" data-slice-id="lfg_21_icon_shop" style="--w:26;--h:26;--pixel-scale:1;" data-render-mode="final" alt="Shop">
+                <div class="px-wire-box lfg-slot-ph lfg-nav-icon-ph" data-render-mode="wireframe">[SHOP]</div>
+                <span class="lfg-nav-label lfg-stroke">Shop</span>
+              </button>
+              <button type="button" class="px-9slice px-btn lfg-nav-tile" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../_catalog/slices/lfg_03_panel_sidebar.png'); --pixel-scale: 0.32;" data-ui-state-trigger="forge">
+                <img class="px-icon lfg-nav-icon-img" src="../_catalog/slices/lfg_22_icon_backpack.png" data-slice-id="lfg_22_icon_backpack" style="--w:26;--h:26;--pixel-scale:1;" data-render-mode="final" alt="Backpack">
+                <div class="px-wire-box lfg-slot-ph lfg-nav-icon-ph" data-render-mode="wireframe">[BAG]</div>
+                <span class="lfg-nav-label lfg-stroke">Backpack</span>
+              </button>
+              <button type="button" class="px-9slice px-btn lfg-nav-tile" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../_catalog/slices/lfg_03_panel_sidebar.png'); --pixel-scale: 0.32;" data-ui-state-trigger="index">
+                <img class="px-icon lfg-nav-icon-img" src="../_catalog/slices/lfg_23_icon_index_book.png" data-slice-id="lfg_23_icon_index_book" style="--w:26;--h:26;--pixel-scale:1;" data-render-mode="final" alt="Index">
+                <div class="px-wire-box lfg-slot-ph lfg-nav-icon-ph" data-render-mode="wireframe">[BOOK]</div>
+                <span class="lfg-nav-label lfg-stroke">Index</span>
+              </button>
+              <button type="button" class="px-9slice px-btn lfg-nav-tile" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../_catalog/slices/lfg_03_panel_sidebar.png'); --pixel-scale: 0.32;" data-ui-state-trigger="forge">
+                <img class="px-icon lfg-nav-icon-img" src="../_catalog/slices/lfg_25_icon_anvil.png" data-slice-id="lfg_25_icon_anvil" style="--w:26;--h:26;--pixel-scale:1;" data-render-mode="final" alt="Gun Forge">
+                <div class="px-wire-box lfg-slot-ph lfg-nav-icon-ph" data-render-mode="wireframe">[FORGE]</div>
+                <span class="lfg-nav-label lfg-stroke">Gun Forge</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Centered Sell Modal -->
+          <div class="px-9slice lfg-sell-modal" data-slice-id="lfg_01_panel_modal" data-slice-9="24,24,24,24" style="--skin-url: url('../_catalog/slices/lfg_01_panel_modal.png'); --pixel-scale: 0.65;">
+            <div class="lfg-sell-header">
+              <div class="lfg-sell-title-group">
+                <img class="px-icon lfg-sell-coin-badge" src="../_catalog/slices/lfg_27_icon_coin.png" data-slice-id="lfg_27_icon_coin" style="--w:42;--h:42;--pixel-scale:1;" data-render-mode="final" alt="Coin">
+                <div class="px-wire-box lfg-slot-ph lfg-sell-coin-badge" data-render-mode="wireframe">[COIN]</div>
+                <span class="px-text-pixel lfg-sell-title lfg-stroke">Sell</span>
+              </div>
+              <button type="button" class="px-btn lfg-close-btn" data-ui-state-trigger="hud" aria-label="Close Sell Modal">
+                <img class="px-icon lfg-close-img" src="../_catalog/slices/lfg_17_btn_close_x.png" data-slice-id="lfg_17_btn_close_x" style="--w:40;--h:40;--pixel-scale:1;" data-render-mode="final" alt="Close">
+                <span class="px-wire-box" style="width: 38px; height: 38px; display:flex; align-items:center; justify-content:center;" data-render-mode="wireframe">X</span>
+              </button>
+            </div>
+
+            <div class="px-stack lfg-sell-list">
+              <div class="px-9slice lfg-sell-row" data-slice-id="lfg_02_panel_row" data-slice-9="14,14,14,14" style="--skin-url: url('../_catalog/slices/lfg_02_panel_row.png'); --pixel-scale: 0.52;" data-sell-item="claw" data-sell-value="37">
+                <div class="px-9slice lfg-sell-item-box" data-slice-id="lfg_07_slot_uncommon" data-slice-9="18,18,18,18" style="--skin-url: url('../_catalog/slices/lfg_07_slot_uncommon.png'); --pixel-scale: 0.38;">
+                  <img class="px-icon" src="../_catalog/slices/lfg_42_loot_claw.png" data-slice-id="lfg_42_loot_claw" style="--w:44;--h:44;--pixel-scale:1;" data-render-mode="final" alt="Monster Claw">
+                  <div class="px-wire-box lfg-slot-ph" style="width: 52px; height: 48px;" data-render-mode="wireframe">[CLAW]</div>
+                </div>
+                <div class="lfg-sell-item-info">
+                  <span class="lfg-sell-item-name lfg-stroke-green">Monster Claw x1</span>
+                  <div class="lfg-sell-price-row">
+                    <img class="px-icon lfg-coin-sm" src="../_catalog/slices/lfg_27_icon_coin.png" data-slice-id="lfg_27_icon_coin" style="--w:22;--h:22;--pixel-scale:1;" data-render-mode="final" alt="Coin">
+                    <div class="px-wire-box lfg-slot-ph lfg-coin-sm" data-render-mode="wireframe">[$]</div>
+                    <span class="px-text-pixel lfg-stroke">37</span>
+                  </div>
+                </div>
+                <button type="button" class="px-9slice px-btn lfg-sell-btn lfg-stroke" data-slice-id="lfg_11_btn_yellow" data-slice-9="20,24,20,24" style="--skin-url: url('../_catalog/slices/lfg_11_btn_yellow.png'); --pixel-scale: 0.42;" data-sell-row="claw">SELL</button>
+              </div>
+
+              <div class="px-9slice lfg-sell-row" data-slice-id="lfg_02_panel_row" data-slice-9="14,14,14,14" style="--skin-url: url('../_catalog/slices/lfg_02_panel_row.png'); --pixel-scale: 0.52;" data-sell-item="eye" data-sell-value="72">
+                <div class="px-9slice lfg-sell-item-box" data-slice-id="lfg_07_slot_uncommon" data-slice-9="18,18,18,18" style="--skin-url: url('../_catalog/slices/lfg_07_slot_uncommon.png'); --pixel-scale: 0.38;">
+                  <img class="px-icon" src="../_catalog/slices/lfg_44_loot_eyeball.png" data-slice-id="lfg_44_loot_eyeball" style="--w:44;--h:44;--pixel-scale:1;" data-render-mode="final" alt="Eyeball">
+                  <div class="px-wire-box lfg-slot-ph" style="width: 52px; height: 48px;" data-render-mode="wireframe">[EYE]</div>
+                </div>
+                <div class="lfg-sell-item-info">
+                  <span class="lfg-sell-item-name lfg-stroke-green">Eyeball x1</span>
+                  <div class="lfg-sell-price-row">
+                    <img class="px-icon lfg-coin-sm" src="../_catalog/slices/lfg_27_icon_coin.png" data-slice-id="lfg_27_icon_coin" style="--w:22;--h:22;--pixel-scale:1;" data-render-mode="final" alt="Coin">
+                    <div class="px-wire-box lfg-slot-ph lfg-coin-sm" data-render-mode="wireframe">[$]</div>
+                    <span class="px-text-pixel lfg-stroke">72</span>
+                  </div>
+                </div>
+                <button type="button" class="px-9slice px-btn lfg-sell-btn lfg-stroke" data-slice-id="lfg_11_btn_yellow" data-slice-9="20,24,20,24" style="--skin-url: url('../_catalog/slices/lfg_11_btn_yellow.png'); --pixel-scale: 0.42;" data-sell-row="eye">SELL</button>
+              </div>
+
+              <div class="px-9slice lfg-sell-row" data-slice-id="lfg_02_panel_row" data-slice-9="14,14,14,14" style="--skin-url: url('../_catalog/slices/lfg_02_panel_row.png'); --pixel-scale: 0.52;" data-sell-item="rib" data-sell-value="93">
+                <div class="px-9slice lfg-sell-item-box" data-slice-id="lfg_07_slot_uncommon" data-slice-9="18,18,18,18" style="--skin-url: url('../_catalog/slices/lfg_07_slot_uncommon.png'); --pixel-scale: 0.38;">
+                  <img class="px-icon" src="../_catalog/slices/lfg_45_loot_rib_meat.png" data-slice-id="lfg_45_loot_rib_meat" style="--w:44;--h:44;--pixel-scale:1;" data-render-mode="final" alt="Rib Meat">
+                  <div class="px-wire-box lfg-slot-ph" style="width: 52px; height: 48px;" data-render-mode="wireframe">[RIB]</div>
+                </div>
+                <div class="lfg-sell-item-info">
+                  <span class="lfg-sell-item-name lfg-stroke-green">Rib Meat x3</span>
+                  <div class="lfg-sell-price-row">
+                    <img class="px-icon lfg-coin-sm" src="../_catalog/slices/lfg_27_icon_coin.png" data-slice-id="lfg_27_icon_coin" style="--w:22;--h:22;--pixel-scale:1;" data-render-mode="final" alt="Coin">
+                    <div class="px-wire-box lfg-slot-ph lfg-coin-sm" data-render-mode="wireframe">[$]</div>
+                    <span class="px-text-pixel lfg-stroke">93</span>
+                  </div>
+                </div>
+                <button type="button" class="px-9slice px-btn lfg-sell-btn lfg-stroke" data-slice-id="lfg_11_btn_yellow" data-slice-9="20,24,20,24" style="--skin-url: url('../_catalog/slices/lfg_11_btn_yellow.png'); --pixel-scale: 0.42;" data-sell-row="rib">SELL</button>
+              </div>
+
+              <div class="px-9slice lfg-sell-row" data-slice-id="lfg_02_panel_row" data-slice-9="14,14,14,14" style="--skin-url: url('../_catalog/slices/lfg_02_panel_row.png'); --pixel-scale: 0.52;" data-sell-item="rune" data-sell-value="145">
+                <div class="px-9slice lfg-sell-item-box" data-slice-id="lfg_08_slot_rare" data-slice-9="18,18,18,18" style="--skin-url: url('../_catalog/slices/lfg_08_slot_rare.png'); --pixel-scale: 0.38;">
+                  <img class="px-icon" src="../_catalog/slices/lfg_46_loot_old_rune.png" data-slice-id="lfg_46_loot_old_rune" style="--w:44;--h:44;--pixel-scale:1;" data-render-mode="final" alt="Old Rune">
+                  <div class="px-wire-box lfg-slot-ph" style="width: 52px; height: 48px;" data-render-mode="wireframe">[RUNE]</div>
+                </div>
+                <div class="lfg-sell-item-info">
+                  <span class="lfg-sell-item-name lfg-stroke">Old Rune x1</span>
+                  <div class="lfg-sell-price-row">
+                    <img class="px-icon lfg-coin-sm" src="../_catalog/slices/lfg_27_icon_coin.png" data-slice-id="lfg_27_icon_coin" style="--w:22;--h:22;--pixel-scale:1;" data-render-mode="final" alt="Coin">
+                    <div class="px-wire-box lfg-slot-ph lfg-coin-sm" data-render-mode="wireframe">[$]</div>
+                    <span class="px-text-pixel lfg-stroke">145</span>
+                  </div>
+                </div>
+                <button type="button" class="px-9slice px-btn lfg-sell-btn lfg-stroke" data-slice-id="lfg_11_btn_yellow" data-slice-9="20,24,20,24" style="--skin-url: url('../_catalog/slices/lfg_11_btn_yellow.png'); --pixel-scale: 0.42;" data-sell-row="rune">SELL</button>
+              </div>
+            </div>
+
+            <div class="px-9slice lfg-sell-footer" data-slice-id="lfg_02_panel_row" data-slice-9="14,14,14,14" style="--skin-url: url('../_catalog/slices/lfg_02_panel_row.png'); --pixel-scale: 0.45;">
+              <div class="lfg-wallet-total">
+                <img class="px-icon" src="../_catalog/slices/lfg_27_icon_coin.png" data-slice-id="lfg_27_icon_coin" style="--w:34;--h:34;--pixel-scale:1;" data-render-mode="final" alt="Wallet Coin">
+                <div class="px-wire-box lfg-slot-ph" style="width: 44px; height: 34px;" data-render-mode="wireframe">[COIN]</div>
+                <span class="px-text-pixel lfg-stroke-gold" data-sell-wallet>1,900,000</span>
+              </div>
+              <button type="button" class="px-9slice px-btn lfg-sell-all-btn lfg-stroke" data-slice-id="lfg_11_btn_yellow" data-slice-9="20,24,20,24" style="--skin-url: url('../_catalog/slices/lfg_11_btn_yellow.png'); --pixel-scale: 0.42;" data-action="sell-all">SELL ALL</button>
+            </div>
+          </div>
+
+          <!-- Right HUD Rail flanking Sell Modal -->
+          <aside class="lfg-right-rail" style="width: 240px;">
+            <div class="px-9slice lfg-gift-card" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../_catalog/slices/lfg_03_panel_sidebar.png'); --pixel-scale: 0.35;">
+              <img class="px-icon" src="../_catalog/slices/lfg_26_icon_gift.png" data-slice-id="lfg_26_icon_gift" style="--w:40;--h:40;--pixel-scale:1;" data-render-mode="final" alt="Gift Timer">
+              <div class="px-wire-box lfg-slot-ph" style="width: 44px; height: 40px;" data-render-mode="wireframe">[GIFT]</div>
+              <span class="px-text-pixel lfg-stroke">12:40</span>
+            </div>
+            <button type="button" class="px-9slice px-btn lfg-promo-btn lfg-stroke" data-slice-id="lfg_20_banner_rainbow" data-slice-9="18,22,18,22" style="--skin-url: url('../_catalog/slices/lfg_20_banner_rainbow.png'); --pixel-scale: 0.4;" data-action="promo-2x">
+              <img class="px-icon" src="../_catalog/slices/lfg_41_icon_power_emblem.png" data-slice-id="lfg_41_icon_power_emblem" style="--w:26;--h:26;--pixel-scale:1;" data-render-mode="final" alt="2x Power">
+              <div class="px-wire-box lfg-slot-ph" style="width: 32px; height: 24px;" data-render-mode="wireframe">[2X]</div>
+              <span>2x Power</span>
+            </button>
+            <button type="button" class="px-9slice px-btn lfg-races-card" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../_catalog/slices/lfg_03_panel_sidebar.png'); --pixel-scale: 0.35;" data-action="races-modal">
+              <img class="px-icon" src="../_catalog/slices/lfg_37_gun_minigun.png" data-slice-id="lfg_37_gun_minigun" style="--w:34;--h:30;--pixel-scale:1;" data-render-mode="final" alt="Races">
+              <div class="px-wire-box lfg-slot-ph" style="width: 48px; height: 30px;" data-render-mode="wireframe">[CREST]</div>
+              <span class="lfg-stroke">RACES</span>
+            </button>
+          </aside>
+        </div>
+      </div>
+
+    </div>
+
+    <section id="wb-behavior-drawer" class="workbench-drawer is-open" aria-label="Element Behavior Specification">
+      <h3>Element Behavior Specification (Grouped by Interaction Role)</h3>
+      <table class="behavior-table">
+        <thead>
+          <tr>
+            <th>Element / Group</th>
+            <th>View</th>
+            <th>Count</th>
+            <th>Behavior Description</th>
+          </tr>
+        </thead>
+        <tbody id="wb-behavior-body">
+          <tr>
+            <td><strong>Top-Left Resource Strip</strong> <span class="behavior-group-tag">Group</span></td>
+            <td><span class="behavior-view-badge">hud</span> / <span class="behavior-view-badge">sell</span></td>
+            <td>3</td>
+            <td>Moved to top-left to keep the bottom-left mobile joystick corner clear: displays live Bag capacity (<code>4/9</code>), Forge Ingots (<code>1,450</code>), and Coins (<code>1.9M</code>).</td>
+          </tr>
+          <tr>
+            <td><strong>Mobile Thumb Safe Zones</strong> <span class="behavior-group-tag">Group</span></td>
+            <td><span class="behavior-view-badge">hud</span></td>
+            <td>2</td>
+            <td>Bottom-left corner is kept completely unobstructed for the mobile virtual joystick; bottom-right corner is kept clear for attack/shoot/skill controls.</td>
+          </tr>
+          <tr>
+            <td><strong>HUD Upper-Left Nav Buttons</strong> <span class="behavior-group-tag">Group</span></td>
+            <td><span class="behavior-view-badge">hud</span> / <span class="behavior-view-badge">sell</span></td>
+            <td>5</td>
+            <td>Anchored above the joystick zone: opens <code>sell</code> (Shop), <code>forge</code> (Backpack / Gun Forge), or <code>index</code> (Index), or previews Rebirth progress (<code>56%</code>).</td>
+          </tr>
+          <tr>
+            <td><strong>Boss HP &amp; Return Header</strong> <span class="behavior-group-tag">Group</span></td>
+            <td><span class="behavior-view-badge">hud</span></td>
+            <td>2</td>
+            <td>Displays active world boss HP (<code>Dreadhelm Gun-Titan 69.2M / 100M</code>) and allows returning from the boss arena.</td>
+          </tr>
+          <tr>
+            <td><strong>Weapon Hotbar Slots (F / R / T)</strong> <span class="behavior-group-tag">Group</span></td>
+            <td><span class="behavior-view-badge">hud</span></td>
+            <td>3</td>
+            <td>Centered above the XP bar: selects active forged firearm slots (<code>[F] Plasma Rifle</code>, <code>[R] EMPTY</code>) or unlocks an extra weapon slot (<code>[T]</code>).</td>
+          </tr>
+          <tr>
+            <td><strong>Forge Stat Upgrade Rows</strong> <span class="behavior-group-tag">Group</span></td>
+            <td><span class="behavior-view-badge">forge</span></td>
+            <td>3</td>
+            <td>Displays <code>FIREPOWER</code>, <code>FIRE RATE</code>, and <code>FORGE SPEED</code> levels, stat delta (e.g. <code>62 &gt; 67</code>), and green Forge Ingot purchase buttons that increment stats and DPS when clicked.</td>
+          </tr>
+          <tr>
+            <td><strong>Barrel Module &amp; Bay Actions</strong> <span class="behavior-group-tag">Group</span></td>
+            <td><span class="behavior-view-badge">forge</span></td>
+            <td>5</td>
+            <td>Cycles Forge Bays (<code>&lt;</code> / <code>&gt;</code>), swaps between <code>RIVETED IRON BARREL</code> and <code>HEX PLASMA CORE</code> via <code>CHANGE</code>, or closes back to HUD.</td>
+          </tr>
+          <tr>
+            <td><strong>Index Category Tabs &amp; Reward Card</strong> <span class="behavior-group-tag">Group</span></td>
+            <td><span class="behavior-view-badge">index</span></td>
+            <td>5</td>
+            <td>Filters the 6×3 collection grid across <code>PLASMA GUNS</code>, <code>FIREARMS</code>, <code>MODULES</code>, and <code>LOOT</code>, while the Rookie card claims the <code>+1 BAG SLOT</code> level milestone reward.</td>
+          </tr>
+          <tr>
+            <td><strong>Index Rarity Collection Cards</strong> <span class="behavior-group-tag">Group</span></td>
+            <td><span class="behavior-view-badge">index</span></td>
+            <td>18</td>
+            <td>Color-coded rarity slots (<code>COMMON</code>–<code>LEGENDARY</code>) showing discovered loot/guns and silhouetted <code>???</code> targets; tapping found cards toggles bonus claim state.</td>
+          </tr>
+          <tr>
+            <td><strong>Sell Loot Rows &amp; Sell All Footer</strong> <span class="behavior-group-tag">Group</span></td>
+            <td><span class="behavior-view-badge">sell</span></td>
+            <td>5</td>
+            <td>Sells individual monster/scrap drops or uses <code>SELL ALL</code> to convert remaining bag loot into Coins and sync the top-left counters.</td>
+          </tr>
+          <tr>
+            <td><strong>Modal Close Buttons (X)</strong> <span class="behavior-group-tag">Group</span></td>
+            <td><span class="behavior-view-badge">forge</span> / <span class="behavior-view-badge">index</span> / <span class="behavior-view-badge">sell</span></td>
+            <td>3</td>
+            <td>Closes the active modal overlay and returns immediately to the main <code>hud</code> view.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="wb-manifest-drawer" class="workbench-drawer" aria-label="Sprite Asset Manifest">
+      <h3>Sprite Asset Manifest (Auto-scanned from #game-canvas)</h3>
+      <table class="manifest-table">
+        <thead>
+          <tr>
+            <th>Preview</th>
+            <th>Slice ID</th>
+            <th>Role</th>
+            <th>Source PNG</th>
+            <th>Native Size</th>
+            <th>9-Slice</th>
+          </tr>
+        </thead>
+        <tbody id="wb-manifest-body"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="../_catalog/catalog-data.js?v=20261117_lfg50"></script>
+  <script src="../_catalog/previews-data.js?v=20261117_lfg50"></script>
+  <script src="./ui-edits.js?v=20261117_lfg50"></script>
+  <script src="./pixel-ui-kit.js?v=20261117_lfg50"></script>
+  <script>
+    (function () {
+      'use strict';
+
+      function isWireframe() {
+        return Boolean(window.PixelUI && typeof window.PixelUI.isWireframeMode === 'function' && window.PixelUI.isWireframeMode());
+      }
+
+      function sliceUrl(id) {
+        const cat = window.SPRITE_CATALOG && window.SPRITE_CATALOG.slices;
+        return cat && cat[id] ? '../_catalog/' + cat[id].file : '';
+      }
+
+      // Interactive State
+      const sim = {
+        wallet: 1900000,
+        ingots: 1450,
+        bagUsed: 4,
+        bagCap: 9,
+        bayIdx: 3,
+        moduleIdx: 0,
+        stats: {
+          firepower: { lv: 7, val: 62, step: 5, cost: 135, pct: 45 },
+          firerate: { lv: 7, val: 1.30, step: 0.05, cost: 193, pct: 65 },
+          forgespeed: { lv: 3, val: 1.08, step: 0.04, cost: 911, pct: 25 },
+        },
+        bays: [
+          { bay: 'BAY 1', name: 'RUSTY REVOLVER', rarity: 'COMMON', slot: 'lfg_06_slot_common', gun: 'lfg_33_gun_revolver', dps: 145 },
+          { bay: 'BAY 2', name: 'COBALT DRUM SMG', rarity: 'UNCOMMON', slot: 'lfg_07_slot_uncommon', gun: 'lfg_34_gun_smg', dps: 280 },
+          { bay: 'BAY 3', name: 'EMERALD CARBINE', rarity: 'RARE', slot: 'lfg_08_slot_rare', gun: 'lfg_35_gun_assault_rifle', dps: 430 },
+          { bay: 'BAY 4', name: 'PLASMA HELLFIRE', rarity: 'EPIC', slot: 'lfg_09_slot_epic', gun: 'lfg_36_gun_plasma_hellfire', dps: 640 },
+          { bay: 'BAY 5', name: 'SOLAR MINIGUN', rarity: 'LEGENDARY', slot: 'lfg_10_slot_legendary', gun: 'lfg_37_gun_minigun', dps: 1240 },
+        ],
+        modules: [
+          { name: 'RIVETED IRON BARREL', perk: 'FIREPOWER x1.15 | SWIFT +5%', img: 'lfg_39_mod_iron_barrel' },
+          { name: 'HEX PLASMA CORE', perk: 'FIRE RATE x1.25 | OVERCHARGE +12%', img: 'lfg_40_mod_plasma_core' },
+        ],
+      };
+
+      function fmtCompact(n) {
+        if (n >= 1000000) return (n / 1000000).toFixed(2).replace(/\.00$/, '') + 'M';
+        return n.toLocaleString('en-US');
+      }
+
+      function syncCounters() {
+        document.querySelectorAll('[data-hud-bag],[data-sell-bag]').forEach(el => {
+          el.textContent = sim.bagUsed + ' / ' + sim.bagCap;
+        });
+        document.querySelectorAll('[data-hud-cores]').forEach(el => {
+          el.textContent = sim.ingots.toLocaleString('en-US');
+        });
+        document.querySelectorAll('[data-hud-coins],[data-sell-top-coins]').forEach(el => {
+          el.textContent = fmtCompact(sim.wallet);
+        });
+        document.querySelectorAll('[data-sell-wallet]').forEach(el => {
+          el.textContent = sim.wallet.toLocaleString('en-US');
+        });
+      }
+
+      function syncBayView() {
+        const b = sim.bays[sim.bayIdx];
+        const nameEl = document.querySelector('[data-forge-gun-name]');
+        const bayEl = document.querySelector('[data-forge-bay-label]');
+        const rarEl = document.querySelector('[data-forge-rarity]');
+        const dpsEl = document.querySelector('[data-forge-dps]');
+        const imgEl = document.querySelector('[data-forge-gun-img]');
+        const frameEl = document.querySelector('[data-forge-slot-frame]');
+        if (nameEl) nameEl.textContent = b.name;
+        if (bayEl) bayEl.textContent = b.bay;
+        if (rarEl) rarEl.textContent = b.rarity;
+        if (dpsEl) dpsEl.textContent = 'DPS ' + (b.dps + (sim.stats.firepower.lv - 7) * 28);
+        if (imgEl) {
+          imgEl.setAttribute('data-slice-id', b.gun);
+          const u = sliceUrl(b.gun);
+          if (u) imgEl.src = u;
+        }
+        if (frameEl) {
+          frameEl.setAttribute('data-slice-id', b.slot);
+          const u = sliceUrl(b.slot);
+          if (u) frameEl.style.setProperty('--skin-url', 'url("' + u + '")');
+        }
+      }
+
+      // Wire interactive buttons (guarded in wireframe mode)
+      document.addEventListener('click', function (ev) {
+        if (isWireframe()) return;
+
+        const upgBtn = ev.target.closest('[data-upgrade-stat]');
+        if (upgBtn) {
+          const key = upgBtn.getAttribute('data-upgrade-stat');
+          const st = sim.stats[key];
+          if (st && sim.ingots >= st.cost) {
+            sim.ingots -= st.cost;
+            st.lv += 1;
+            st.val = Number((st.val + st.step).toFixed(2));
+            st.cost = Math.round(st.cost * 1.18);
+            st.pct = Math.min(100, st.pct + 10);
+            const lvEl = document.querySelector('[data-stat-lv="' + key + '"]');
+            const dEl = document.querySelector('[data-stat-delta="' + key + '"]');
+            const cEl = document.querySelector('[data-stat-cost="' + key + '"]');
+            const bEl = document.querySelector('[data-stat-bar="' + key + '"]');
+            if (lvEl) lvEl.textContent = 'LV ' + st.lv;
+            if (cEl) cEl.textContent = String(st.cost);
+            if (bEl) bEl.style.width = st.pct + '%';
+            if (dEl) {
+              dEl.textContent =
+                key === 'firepower'
+                  ? st.val + ' > ' + (st.val + st.step)
+                  : 'x' + st.val.toFixed(2) + ' > x' + (st.val + st.step).toFixed(2);
+            }
+            syncCounters();
+            syncBayView();
+          }
+          return;
+        }
+
+        const actionBtn = ev.target.closest('[data-action]');
+        if (actionBtn) {
+          const act = actionBtn.getAttribute('data-action');
+          if (act === 'prev-bay') {
+            sim.bayIdx = (sim.bayIdx - 1 + sim.bays.length) % sim.bays.length;
+            syncBayView();
+          } else if (act === 'next-bay') {
+            sim.bayIdx = (sim.bayIdx + 1) % sim.bays.length;
+            syncBayView();
+          } else if (act === 'change-module' || act === 'swap-gun') {
+            sim.moduleIdx = (sim.moduleIdx + 1) % sim.modules.length;
+            const mod = sim.modules[sim.moduleIdx];
+            const nEl = document.querySelector('[data-module-name]');
+            const pEl = document.querySelector('[data-module-perk]');
+            const iEl = document.querySelector('[data-module-img]');
+            if (nEl) nEl.textContent = mod.name;
+            if (pEl) pEl.textContent = mod.perk;
+            if (iEl) {
+              iEl.setAttribute('data-slice-id', mod.img);
+              const u = sliceUrl(mod.img);
+              if (u) iEl.src = u;
+            }
+          } else if (act === 'claim-index-level') {
+            sim.bagCap += 1;
+            const lvEl = document.querySelector('[data-rookie-lv]');
+            const rkEl = document.querySelector('[data-rookie-rank]');
+            if (lvEl) lvEl.textContent = 'LEVEL 1';
+            if (rkEl) rkEl.textContent = 'CLAIMED!';
+            actionBtn.textContent = 'CLAIMED';
+            syncCounters();
+          } else if (act === 'sell-all') {
+            let gained = 0;
+            document.querySelectorAll('[data-sell-item]').forEach(row => {
+              if (!row.classList.contains('is-sold')) {
+                gained += Number(row.getAttribute('data-sell-value') || '0');
+                row.classList.add('is-sold');
+                const btn = row.querySelector('[data-sell-row]');
+                if (btn) btn.textContent = 'SOLD';
+              }
+            });
+            sim.wallet += gained;
+            sim.bagUsed = 0;
+            syncCounters();
+          } else if (act === 'toggle-auto') {
+            const on = actionBtn.textContent.includes('ON');
+            actionBtn.textContent = on ? '[G] AUTO OFF' : '[G] AUTO ON';
+          }
+          return;
+        }
+
+        const sellRowBtn = ev.target.closest('[data-sell-row]');
+        if (sellRowBtn) {
+          const row = sellRowBtn.closest('[data-sell-item]');
+          if (row && !row.classList.contains('is-sold')) {
+            row.classList.add('is-sold');
+            sellRowBtn.textContent = 'SOLD';
+            sim.wallet += Number(row.getAttribute('data-sell-value') || '0');
+            sim.bagUsed = Math.max(0, sim.bagUsed - 1);
+            syncCounters();
+          }
+          return;
+        }
+
+        const idxTab = ev.target.closest('[data-index-tab]');
+        if (idxTab) {
+          document.querySelectorAll('[data-index-tab]').forEach(t => {
+            const id = t === idxTab ? 'lfg_15_btn_tab_gold' : 'lfg_03_panel_sidebar';
+            t.setAttribute('data-slice-id', id);
+            const u = sliceUrl(id);
+            if (u) t.style.setProperty('--skin-url', 'url("' + u + '")');
+          });
+          return;
+        }
+
+        const card = ev.target.closest('.lfg-index-card');
+        if (card && !card.querySelector('.lfg-silhouette')) {
+          card.classList.toggle('is-claimed');
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
