@@ -15,6 +15,8 @@ param(
     [int]$Colors = 192,
     [switch]$Lossless,
     [switch]$KeepFull,
+    [switch]$PowerOfTwo,
+    [ValidateSet('resize','pad')][string]$PotMode = 'resize',
     [string]$PreviewPath = ''
 )
 
@@ -181,6 +183,21 @@ public static class UiAssetProcessor {
         return "white";
     }
 
+    private static int NearestPow2(int n) {
+        if (n <= 2) return 2;
+        int lo = 2;
+        while (lo * 2 <= n) lo *= 2;
+        int hi = lo * 2;
+        return (n - lo) < (hi - n) ? lo : hi;
+    }
+
+    private static int NextPow2(int n) {
+        if (n <= 2) return 2;
+        int p = 2;
+        while (p < n) p *= 2;
+        return p;
+    }
+
     public static string ExtractAndResize(
         string inputPath,
         string rgbaOutPath,
@@ -190,7 +207,9 @@ public static class UiAssetProcessor {
         int size,
         int margin,
         int padding,
-        bool keepAllComponents
+        bool keepAllComponents,
+        bool powerOfTwo,
+        string potMode
     ) {
         using (var src = new Bitmap(inputPath)) {
             int w = src.Width;
@@ -419,6 +438,9 @@ public static class UiAssetProcessor {
                     Bitmap finalBmp;
                     if (aspect == "square") {
                         int targetSize = size > 0 ? size : Math.Max(cw, ch);
+                        if (powerOfTwo) {
+                            targetSize = potMode == "pad" ? NextPow2(targetSize) : NearestPow2(targetSize);
+                        }
                         int maxSide = Math.Max(cw, ch);
                         int marginScaled = (int)Math.Round(margin * ((double)maxSide / targetSize));
                         int squareSide = maxSide + 2 * marginScaled;
@@ -433,13 +455,33 @@ public static class UiAssetProcessor {
                         }
                     } else {
                         // Preserve aspect ratio
+                        int dstW = cw;
+                        int dstH = ch;
                         if (size > 0 && Math.Max(cw, ch) != size) {
                             double scale = (double)size / Math.Max(cw, ch);
-                            int dstW = Math.Max(1, (int)Math.Round(cw * scale));
-                            int dstH = Math.Max(1, (int)Math.Round(ch * scale));
-                            finalBmp = DownsampleBicubicSharper(cropped, dstW, dstH);
+                            dstW = Math.Max(1, (int)Math.Round(cw * scale));
+                            dstH = Math.Max(1, (int)Math.Round(ch * scale));
+                        }
+                        if (powerOfTwo) {
+                            if (potMode == "pad") {
+                                int potW = NextPow2(dstW);
+                                int potH = NextPow2(dstH);
+                                using (var resized = (dstW != cw || dstH != ch) ? DownsampleBicubicSharper(cropped, dstW, dstH) : new Bitmap(cropped)) {
+                                    finalBmp = new Bitmap(potW, potH, PixelFormat.Format32bppArgb);
+                                    using (var gp = Graphics.FromImage(finalBmp)) {
+                                        gp.Clear(Color.Transparent);
+                                        int ox = (potW - dstW) / 2;
+                                        int oy = (potH - dstH) / 2;
+                                        gp.DrawImage(resized, new Rectangle(ox, oy, dstW, dstH), new Rectangle(0, 0, dstW, dstH), GraphicsUnit.Pixel);
+                                    }
+                                }
+                            } else {
+                                int potW = NearestPow2(dstW);
+                                int potH = NearestPow2(dstH);
+                                finalBmp = (potW != cw || potH != ch) ? DownsampleBicubicSharper(cropped, potW, potH) : new Bitmap(cropped);
+                            }
                         } else {
-                            finalBmp = new Bitmap(cropped);
+                            finalBmp = (dstW != cw || dstH != ch) ? DownsampleBicubicSharper(cropped, dstW, dstH) : new Bitmap(cropped);
                         }
                     }
 
@@ -521,7 +563,9 @@ try {
         $Size,
         $Margin,
         $Padding,
-        [bool]$KeepAllComponents
+        [bool]$KeepAllComponents,
+        [bool]$PowerOfTwo,
+        $PotMode
     )
     Write-Output $summary
 

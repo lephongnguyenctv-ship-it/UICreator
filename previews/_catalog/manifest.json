@@ -1161,7 +1161,7 @@
     {
       "source_file": "loot-forge-gun/04_bar_track.png",
       "width": 340,
-      "height": 73,
+      "height": 72,
       "dilate_used": 0,
       "slice_count": 1,
       "slice_ids": [
@@ -1180,8 +1180,8 @@
     },
     {
       "source_file": "loot-forge-gun/06_slot_common.png",
-      "width": 144,
-      "height": 144,
+      "width": 128,
+      "height": 128,
       "dilate_used": 0,
       "slice_count": 1,
       "slice_ids": [
@@ -1190,8 +1190,8 @@
     },
     {
       "source_file": "loot-forge-gun/07_slot_uncommon.png",
-      "width": 144,
-      "height": 144,
+      "width": 128,
+      "height": 128,
       "dilate_used": 0,
       "slice_count": 1,
       "slice_ids": [
@@ -1200,8 +1200,8 @@
     },
     {
       "source_file": "loot-forge-gun/08_slot_rare.png",
-      "width": 144,
-      "height": 144,
+      "width": 128,
+      "height": 128,
       "dilate_used": 0,
       "slice_count": 1,
       "slice_ids": [
@@ -1210,8 +1210,8 @@
     },
     {
       "source_file": "loot-forge-gun/09_slot_epic.png",
-      "width": 144,
-      "height": 144,
+      "width": 128,
+      "height": 128,
       "dilate_used": 0,
       "slice_count": 1,
       "slice_ids": [
@@ -1220,8 +1220,8 @@
     },
     {
       "source_file": "loot-forge-gun/10_slot_legendary.png",
-      "width": 144,
-      "height": 144,
+      "width": 128,
+      "height": 128,
       "dilate_used": 0,
       "slice_count": 1,
       "slice_ids": [
@@ -1231,7 +1231,7 @@
     {
       "source_file": "loot-forge-gun/11_btn_yellow.png",
       "width": 240,
-      "height": 163,
+      "height": 162,
       "dilate_used": 0,
       "slice_count": 1,
       "slice_ids": [
@@ -1251,7 +1251,7 @@
     {
       "source_file": "loot-forge-gun/13_btn_blue.png",
       "width": 240,
-      "height": 163,
+      "height": 162,
       "dilate_used": 0,
       "slice_count": 1,
       "slice_ids": [
@@ -1261,7 +1261,7 @@
     {
       "source_file": "loot-forge-gun/14_btn_red.png",
       "width": 240,
-      "height": 155,
+      "height": 154,
       "dilate_used": 0,
       "slice_count": 1,
       "slice_ids": [
@@ -1271,7 +1271,7 @@
     {
       "source_file": "loot-forge-gun/15_btn_tab_gold.png",
       "width": 220,
-      "height": 143,
+      "height": 142,
       "dilate_used": 0,
       "slice_count": 1,
       "slice_ids": [
@@ -1281,7 +1281,7 @@
     {
       "source_file": "loot-forge-gun/16_pill_dark.png",
       "width": 220,
-      "height": 111,
+      "height": 112,
       "dilate_used": 0,
       "slice_count": 1,
       "slice_ids": [
@@ -1300,8 +1300,8 @@
     },
     {
       "source_file": "loot-forge-gun/18_btn_nav_left.png",
-      "width": 95,
-      "height": 96,
+      "width": 128,
+      "height": 128,
       "dilate_used": 0,
       "slice_count": 1,
       "slice_ids": [
@@ -1310,8 +1310,8 @@
     },
     {
       "source_file": "loot-forge-gun/19_btn_nav_right.png",
-      "width": 95,
-      "height": 96,
+      "width": 128,
+      "height": 128,
       "dilate_used": 0,
       "slice_count": 1,
       "slice_ids": [
@@ -1321,7 +1321,7 @@
     {
       "source_file": "loot-forge-gun/20_banner_rainbow.png",
       "width": 240,
-      "height": 137,
+      "height": 138,
       "dilate_used": 0,
       "slice_count": 1,
       "slice_ids": [
@@ -1331,7 +1331,7 @@
     {
       "source_file": "loot-forge-gun/21_icon_shop.png",
       "width": 128,
-      "height": 125,
+      "height": 128,
       "dilate_used": 0,
       "slice_count": 1,
       "slice_ids": [
@@ -1340,7 +1340,7 @@
     },
     {
       "source_file": "loot-forge-gun/22_icon_backpack.png",
-      "width": 126,
+      "width": 128,
       "height": 128,
       "dilate_used": 0,
       "slice_count": 1,
@@ -1350,7 +1350,7 @@
     },
     {
       "source_file": "loot-forge-gun/23_icon_index_book.png",
-      "width": 126,
+      "width": 128,
       "height": 128,
       "dilate_used": 0,
       "slice_count": 1,
@@ -1360,7 +1360,7 @@
     },
     {
       "source_file": "loot-forge-gun/24_icon_rebirth.png",
-      "width": 122,
+      "width": 128,
       "height": 128,
       "dilate_used": 0,
       "slice_count": 1,
@@ -1370,7 +1370,7 @@
     },
     {
       "source_file": "loot-forge-gun/25_icon_anvil.png",
-      "width": 121,
+      "width": 128,
       "height": 128,
       "dilate_used": 0,
       "slice_count": 1,
@@ -1380,7 +1380,7 @@
     },
     {
       "source_file": "loot-forge-gun/26_icon_gift.png",
-      "width": 119,
+      "width": 128,
       "height": 128,
       "dilate_used": 0,
       "slice_count": 1,
@@ -1390,7 +1390,7 @@
     },
     {
       "source_file": "loot-forge-gun/27_icon_coin.png",
-      "width": 126,
+      "width": 128,
       "height": 128,
       "dilate_used": 0,
       "slice_count": 1,
@@ -1401,7 +1401,7 @@
     {
       "source_file": "loot-forge-gun/28_icon_ingot.png",
       "width": 128,
-      "height": 106,
+      "height": 128,
       "dilate_used": 0,
       "slice_count": 1,
       "slice_ids": [
@@ -1421,7 +1421,7 @@
     {
       "source_file": "loot-forge-gun/30_icon_firerate.png",
       "width": 128,
-      "height": 112,
+      "height": 128,
       "dilate_used": 0,
       "slice_count": 1,
       "slice_ids": [
@@ -1431,7 +1431,7 @@
     {
       "source_file": "loot-forge-gun/31_icon_forgespeed.png",
       "width": 128,
-      "height": 126,
+      "height": 128,
       "dilate_used": 0,
       "slice_count": 1,
       "slice_ids": [
@@ -1440,7 +1440,7 @@
     },
     {
       "source_file": "loot-forge-gun/32_icon_padlock.png",
-      "width": 100,
+      "width": 128,
       "height": 128,
       "dilate_used": 0,
       "slice_count": 1,
@@ -1450,7 +1450,7 @@
     },
     {
       "source_file": "loot-forge-gun/33_gun_revolver.png",
-      "width": 119,
+      "width": 128,
       "height": 128,
       "dilate_used": 0,
       "slice_count": 1,
@@ -1461,7 +1461,7 @@
     {
       "source_file": "loot-forge-gun/34_gun_smg.png",
       "width": 128,
-      "height": 104,
+      "height": 128,
       "dilate_used": 0,
       "slice_count": 1,
       "slice_ids": [
@@ -1471,7 +1471,7 @@
     {
       "source_file": "loot-forge-gun/35_gun_assault_rifle.png",
       "width": 128,
-      "height": 88,
+      "height": 128,
       "dilate_used": 0,
       "slice_count": 1,
       "slice_ids": [
@@ -1481,7 +1481,7 @@
     {
       "source_file": "loot-forge-gun/36_gun_plasma_hellfire.png",
       "width": 128,
-      "height": 109,
+      "height": 128,
       "dilate_used": 0,
       "slice_count": 1,
       "slice_ids": [
@@ -1491,7 +1491,7 @@
     {
       "source_file": "loot-forge-gun/37_gun_minigun.png",
       "width": 128,
-      "height": 106,
+      "height": 128,
       "dilate_used": 0,
       "slice_count": 1,
       "slice_ids": [
@@ -1501,7 +1501,7 @@
     {
       "source_file": "loot-forge-gun/38_gun_railgun.png",
       "width": 128,
-      "height": 110,
+      "height": 128,
       "dilate_used": 0,
       "slice_count": 1,
       "slice_ids": [
@@ -1511,7 +1511,7 @@
     {
       "source_file": "loot-forge-gun/39_mod_iron_barrel.png",
       "width": 128,
-      "height": 113,
+      "height": 128,
       "dilate_used": 0,
       "slice_count": 1,
       "slice_ids": [
@@ -1520,7 +1520,7 @@
     },
     {
       "source_file": "loot-forge-gun/40_mod_plasma_core.png",
-      "width": 124,
+      "width": 128,
       "height": 128,
       "dilate_used": 0,
       "slice_count": 1,
@@ -1531,7 +1531,7 @@
     {
       "source_file": "loot-forge-gun/41_icon_power_emblem.png",
       "width": 128,
-      "height": 126,
+      "height": 128,
       "dilate_used": 0,
       "slice_count": 1,
       "slice_ids": [
@@ -1540,7 +1540,7 @@
     },
     {
       "source_file": "loot-forge-gun/42_loot_claw.png",
-      "width": 105,
+      "width": 128,
       "height": 128,
       "dilate_used": 0,
       "slice_count": 1,
@@ -1551,7 +1551,7 @@
     {
       "source_file": "loot-forge-gun/43_loot_fang.png",
       "width": 128,
-      "height": 112,
+      "height": 128,
       "dilate_used": 0,
       "slice_count": 1,
       "slice_ids": [
@@ -1560,7 +1560,7 @@
     },
     {
       "source_file": "loot-forge-gun/44_loot_eyeball.png",
-      "width": 127,
+      "width": 128,
       "height": 128,
       "dilate_used": 0,
       "slice_count": 1,
@@ -1571,7 +1571,7 @@
     {
       "source_file": "loot-forge-gun/45_loot_rib_meat.png",
       "width": 128,
-      "height": 124,
+      "height": 128,
       "dilate_used": 0,
       "slice_count": 1,
       "slice_ids": [
@@ -1580,7 +1580,7 @@
     },
     {
       "source_file": "loot-forge-gun/46_loot_old_rune.png",
-      "width": 127,
+      "width": 128,
       "height": 128,
       "dilate_used": 0,
       "slice_count": 1,
@@ -1590,7 +1590,7 @@
     },
     {
       "source_file": "loot-forge-gun/47_loot_giant_fist.png",
-      "width": 87,
+      "width": 128,
       "height": 128,
       "dilate_used": 0,
       "slice_count": 1,
@@ -1610,7 +1610,7 @@
     },
     {
       "source_file": "loot-forge-gun/49_loot_plasma_cell.png",
-      "width": 103,
+      "width": 128,
       "height": 128,
       "dilate_used": 0,
       "slice_count": 1,
@@ -1621,7 +1621,7 @@
     {
       "source_file": "loot-forge-gun/50_loot_magma_core.png",
       "width": 128,
-      "height": 127,
+      "height": 128,
       "dilate_used": 0,
       "slice_count": 1,
       "slice_ids": [
@@ -12238,10 +12238,10 @@
         0,
         0,
         340,
-        73
+        72
       ],
       "width": 340,
-      "height": 73,
+      "height": 72,
       "category": "panel",
       "slice_9": [
         12,
@@ -12281,17 +12281,17 @@
       "bbox": [
         0,
         0,
-        144,
-        144
+        128,
+        128
       ],
-      "width": 144,
-      "height": 144,
+      "width": 128,
+      "height": 128,
       "category": "panel",
       "slice_9": [
-        18,
-        18,
-        18,
-        18
+        16,
+        16,
+        16,
+        16
       ],
       "is_white_mask_candidate": false
     },
@@ -12303,17 +12303,17 @@
       "bbox": [
         0,
         0,
-        144,
-        144
+        128,
+        128
       ],
-      "width": 144,
-      "height": 144,
+      "width": 128,
+      "height": 128,
       "category": "panel",
       "slice_9": [
-        18,
-        18,
-        18,
-        18
+        16,
+        16,
+        16,
+        16
       ],
       "is_white_mask_candidate": false
     },
@@ -12325,17 +12325,17 @@
       "bbox": [
         0,
         0,
-        144,
-        144
+        128,
+        128
       ],
-      "width": 144,
-      "height": 144,
+      "width": 128,
+      "height": 128,
       "category": "panel",
       "slice_9": [
-        18,
-        18,
-        18,
-        18
+        16,
+        16,
+        16,
+        16
       ],
       "is_white_mask_candidate": false
     },
@@ -12347,17 +12347,17 @@
       "bbox": [
         0,
         0,
-        144,
-        144
+        128,
+        128
       ],
-      "width": 144,
-      "height": 144,
+      "width": 128,
+      "height": 128,
       "category": "panel",
       "slice_9": [
-        18,
-        18,
-        18,
-        18
+        16,
+        16,
+        16,
+        16
       ],
       "is_white_mask_candidate": false
     },
@@ -12369,17 +12369,17 @@
       "bbox": [
         0,
         0,
-        144,
-        144
+        128,
+        128
       ],
-      "width": 144,
-      "height": 144,
+      "width": 128,
+      "height": 128,
       "category": "panel",
       "slice_9": [
-        18,
-        18,
-        18,
-        18
+        16,
+        16,
+        16,
+        16
       ],
       "is_white_mask_candidate": false
     },
@@ -12392,10 +12392,10 @@
         0,
         0,
         240,
-        163
+        162
       ],
       "width": 240,
-      "height": 163,
+      "height": 162,
       "category": "button",
       "slice_9": [
         20,
@@ -12436,10 +12436,10 @@
         0,
         0,
         240,
-        163
+        162
       ],
       "width": 240,
-      "height": 163,
+      "height": 162,
       "category": "button",
       "slice_9": [
         20,
@@ -12458,10 +12458,10 @@
         0,
         0,
         240,
-        155
+        154
       ],
       "width": 240,
-      "height": 155,
+      "height": 154,
       "category": "button",
       "slice_9": [
         20,
@@ -12480,16 +12480,16 @@
         0,
         0,
         220,
-        143
+        142
       ],
       "width": 220,
-      "height": 143,
+      "height": 142,
       "category": "button",
       "slice_9": [
-        20,
-        24,
-        20,
-        24
+        0,
+        0,
+        0,
+        0
       ],
       "is_white_mask_candidate": false
     },
@@ -12502,10 +12502,10 @@
         0,
         0,
         220,
-        111
+        112
       ],
       "width": 220,
-      "height": 111,
+      "height": 112,
       "category": "button",
       "slice_9": [
         16,
@@ -12540,11 +12540,11 @@
       "bbox": [
         0,
         0,
-        95,
-        96
+        128,
+        128
       ],
-      "width": 95,
-      "height": 96,
+      "width": 128,
+      "height": 128,
       "category": "button",
       "slice_9": null,
       "is_white_mask_candidate": false
@@ -12557,11 +12557,11 @@
       "bbox": [
         0,
         0,
-        95,
-        96
+        128,
+        128
       ],
-      "width": 95,
-      "height": 96,
+      "width": 128,
+      "height": 128,
       "category": "button",
       "slice_9": null,
       "is_white_mask_candidate": false
@@ -12575,10 +12575,10 @@
         0,
         0,
         240,
-        137
+        138
       ],
       "width": 240,
-      "height": 137,
+      "height": 138,
       "category": "button",
       "slice_9": [
         18,
@@ -12597,10 +12597,10 @@
         0,
         0,
         128,
-        125
+        128
       ],
       "width": 128,
-      "height": 125,
+      "height": 128,
       "category": "icon",
       "slice_9": null,
       "is_white_mask_candidate": false
@@ -12613,10 +12613,10 @@
       "bbox": [
         0,
         0,
-        126,
+        128,
         128
       ],
-      "width": 126,
+      "width": 128,
       "height": 128,
       "category": "icon",
       "slice_9": null,
@@ -12630,10 +12630,10 @@
       "bbox": [
         0,
         0,
-        126,
+        128,
         128
       ],
-      "width": 126,
+      "width": 128,
       "height": 128,
       "category": "icon",
       "slice_9": null,
@@ -12647,10 +12647,10 @@
       "bbox": [
         0,
         0,
-        122,
+        128,
         128
       ],
-      "width": 122,
+      "width": 128,
       "height": 128,
       "category": "icon",
       "slice_9": null,
@@ -12664,10 +12664,10 @@
       "bbox": [
         0,
         0,
-        121,
+        128,
         128
       ],
-      "width": 121,
+      "width": 128,
       "height": 128,
       "category": "icon",
       "slice_9": null,
@@ -12681,10 +12681,10 @@
       "bbox": [
         0,
         0,
-        119,
+        128,
         128
       ],
-      "width": 119,
+      "width": 128,
       "height": 128,
       "category": "icon",
       "slice_9": null,
@@ -12698,10 +12698,10 @@
       "bbox": [
         0,
         0,
-        126,
+        128,
         128
       ],
-      "width": 126,
+      "width": 128,
       "height": 128,
       "category": "icon",
       "slice_9": null,
@@ -12716,10 +12716,10 @@
         0,
         0,
         128,
-        106
+        128
       ],
       "width": 128,
-      "height": 106,
+      "height": 128,
       "category": "icon",
       "slice_9": null,
       "is_white_mask_candidate": false
@@ -12750,10 +12750,10 @@
         0,
         0,
         128,
-        112
+        128
       ],
       "width": 128,
-      "height": 112,
+      "height": 128,
       "category": "icon",
       "slice_9": null,
       "is_white_mask_candidate": false
@@ -12767,10 +12767,10 @@
         0,
         0,
         128,
-        126
+        128
       ],
       "width": 128,
-      "height": 126,
+      "height": 128,
       "category": "icon",
       "slice_9": null,
       "is_white_mask_candidate": false
@@ -12783,10 +12783,10 @@
       "bbox": [
         0,
         0,
-        100,
+        128,
         128
       ],
-      "width": 100,
+      "width": 128,
       "height": 128,
       "category": "icon",
       "slice_9": null,
@@ -12800,10 +12800,10 @@
       "bbox": [
         0,
         0,
-        119,
+        128,
         128
       ],
-      "width": 119,
+      "width": 128,
       "height": 128,
       "category": "icon",
       "slice_9": null,
@@ -12818,10 +12818,10 @@
         0,
         0,
         128,
-        104
+        128
       ],
       "width": 128,
-      "height": 104,
+      "height": 128,
       "category": "icon",
       "slice_9": null,
       "is_white_mask_candidate": false
@@ -12835,10 +12835,10 @@
         0,
         0,
         128,
-        88
+        128
       ],
       "width": 128,
-      "height": 88,
+      "height": 128,
       "category": "icon",
       "slice_9": null,
       "is_white_mask_candidate": false
@@ -12852,10 +12852,10 @@
         0,
         0,
         128,
-        109
+        128
       ],
       "width": 128,
-      "height": 109,
+      "height": 128,
       "category": "icon",
       "slice_9": null,
       "is_white_mask_candidate": false
@@ -12869,10 +12869,10 @@
         0,
         0,
         128,
-        106
+        128
       ],
       "width": 128,
-      "height": 106,
+      "height": 128,
       "category": "icon",
       "slice_9": null,
       "is_white_mask_candidate": false
@@ -12886,10 +12886,10 @@
         0,
         0,
         128,
-        110
+        128
       ],
       "width": 128,
-      "height": 110,
+      "height": 128,
       "category": "icon",
       "slice_9": null,
       "is_white_mask_candidate": false
@@ -12903,10 +12903,10 @@
         0,
         0,
         128,
-        113
+        128
       ],
       "width": 128,
-      "height": 113,
+      "height": 128,
       "category": "icon",
       "slice_9": null,
       "is_white_mask_candidate": false
@@ -12919,10 +12919,10 @@
       "bbox": [
         0,
         0,
-        124,
+        128,
         128
       ],
-      "width": 124,
+      "width": 128,
       "height": 128,
       "category": "icon",
       "slice_9": null,
@@ -12937,10 +12937,10 @@
         0,
         0,
         128,
-        126
+        128
       ],
       "width": 128,
-      "height": 126,
+      "height": 128,
       "category": "icon",
       "slice_9": null,
       "is_white_mask_candidate": false
@@ -12953,10 +12953,10 @@
       "bbox": [
         0,
         0,
-        105,
+        128,
         128
       ],
-      "width": 105,
+      "width": 128,
       "height": 128,
       "category": "icon",
       "slice_9": null,
@@ -12971,10 +12971,10 @@
         0,
         0,
         128,
-        112
+        128
       ],
       "width": 128,
-      "height": 112,
+      "height": 128,
       "category": "icon",
       "slice_9": null,
       "is_white_mask_candidate": false
@@ -12987,10 +12987,10 @@
       "bbox": [
         0,
         0,
-        127,
+        128,
         128
       ],
-      "width": 127,
+      "width": 128,
       "height": 128,
       "category": "icon",
       "slice_9": null,
@@ -13005,10 +13005,10 @@
         0,
         0,
         128,
-        124
+        128
       ],
       "width": 128,
-      "height": 124,
+      "height": 128,
       "category": "icon",
       "slice_9": null,
       "is_white_mask_candidate": false
@@ -13021,10 +13021,10 @@
       "bbox": [
         0,
         0,
-        127,
+        128,
         128
       ],
-      "width": 127,
+      "width": 128,
       "height": 128,
       "category": "icon",
       "slice_9": null,
@@ -13038,10 +13038,10 @@
       "bbox": [
         0,
         0,
-        87,
+        128,
         128
       ],
-      "width": 87,
+      "width": 128,
       "height": 128,
       "category": "icon",
       "slice_9": null,
@@ -13072,10 +13072,10 @@
       "bbox": [
         0,
         0,
-        103,
+        128,
         128
       ],
-      "width": 103,
+      "width": 128,
       "height": 128,
       "category": "icon",
       "slice_9": null,
@@ -13090,10 +13090,10 @@
         0,
         0,
         128,
-        127
+        128
       ],
       "width": 128,
-      "height": 127,
+      "height": 128,
       "category": "icon",
       "slice_9": null,
       "is_white_mask_candidate": false

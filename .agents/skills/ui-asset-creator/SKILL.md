@@ -69,6 +69,8 @@ node ".agents/skills/ui-asset-creator/scripts/compress_png.mjs" "<input.png>" "<
 | `-Colors` | `192` | Max palette entries passed to `compress_png.mjs` (up to `256`). |
 | `-Lossless` | `$false` | Skip PNG8 quantization and save 32-bit RGBA PNG directly. |
 | `-KeepFull` | `$false` | Also save `<output_dir>/<name>_full.png` full-resolution 32-bit RGBA cutout. |
+| `-PowerOfTwo` | `$false` | Snap output width and height to powers of 2 (`2, 4, 8, ..., 256, 512, ...`). |
+| `-PotMode` | `resize` | `resize` (Bicubic Sharper to nearest POT `W×H`) or `pad` (center on transparent next-POT canvas without stretching). |
 | `-PreviewPath` | `""` | Write a 3-panel visual QA image (dark UI, checkerboard, purple UI) from the final output. |
 
 ---

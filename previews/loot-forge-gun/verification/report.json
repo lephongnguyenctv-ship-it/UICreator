@@ -1,10 +1,10 @@
 {
   "status": "PASSED",
   "page": "previews/loot-forge-gun/index.html",
-  "timestamp": "2026-11-17T06:40:16.401Z",
+  "timestamp": "2026-11-17T07:25:15.678Z",
   "summary": {
     "statesTested": 8,
-    "totalAssetsVerified": 127,
+    "totalAssetsVerified": 84,
     "consoleErrors": 0,
     "brokenAssets": 0,
     "pixelatedViolations": 0,
@@ -22,7 +22,7 @@
         "width": 1280,
         "height": 720
       },
-      "assetsChecked": 27,
+      "assetsChecked": 19,
       "brokenAssets": [],
       "pixelatedViolations": [],
       "viewportDefects": [],
@@ -37,7 +37,7 @@
         "width": 1280,
         "height": 720
       },
-      "assetsChecked": 33,
+      "assetsChecked": 20,
       "brokenAssets": [],
       "pixelatedViolations": [],
       "viewportDefects": [],
@@ -52,7 +52,7 @@
         "width": 1280,
         "height": 720
       },
-      "assetsChecked": 38,
+      "assetsChecked": 25,
       "brokenAssets": [],
       "pixelatedViolations": [],
       "viewportDefects": [],
@@ -67,7 +67,7 @@
         "width": 1280,
         "height": 720
       },
-      "assetsChecked": 29,
+      "assetsChecked": 20,
       "brokenAssets": [],
       "pixelatedViolations": [],
       "viewportDefects": [],
