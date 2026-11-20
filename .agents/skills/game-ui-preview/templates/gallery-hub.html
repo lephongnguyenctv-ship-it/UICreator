@@ -1077,7 +1077,12 @@
           slicesGrid.innerHTML = filteredSlices.length
             ? filteredSlices
                 .map(rec => {
-                  const imgSrc = `./_catalog/${rec.file}`;
+                  const f = String(rec.file || '');
+                  const imgSrc = /^(https?:|data:|\/|\.\.\/)/.test(f)
+                    ? f
+                    : (f.startsWith('assets/') || f.startsWith('Sprite sheets/'))
+                      ? `../${f}`
+                      : `./_catalog/${f}`;
                   const slice9 = Array.isArray(rec.slice_9) ? `9s:[${rec.slice_9.join(',')}]` : rec.category;
                   return `
                     <div class="sprite-card" data-lightbox-src="${esc(imgSrc)}" data-lightbox-title="${esc(rec.id)} (${rec.width}x${rec.height} · ${esc(rec.source_file)})">

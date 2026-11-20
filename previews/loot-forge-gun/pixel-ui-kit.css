@@ -972,8 +972,40 @@ body.clean-mode {
   font-size: 11px;
   color: var(--px-workbench-muted);
   font-weight: 500;
-  cursor: ew-resize;
   user-select: none;
+}
+
+.wb-tf-input-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  width: 100%;
+}
+
+.wb-tf-scrub-edge {
+  position: absolute;
+  left: -2px;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: ew-resize;
+  z-index: 3;
+  border-radius: 3px 0 0 3px;
+  user-select: none;
+}
+
+.wb-tf-scrub-edge:hover::after,
+.is-scrubbing > .wb-tf-scrub-edge::after,
+.is-scrubbing .wb-tf-scrub-edge::after {
+  content: '';
+  position: absolute;
+  left: 1px;
+  top: 2px;
+  bottom: 2px;
+  width: 2px;
+  background: #38bdf8;
+  border-radius: 1px;
 }
 
 .wb-tf-num-cell input {
@@ -987,7 +1019,7 @@ body.clean-mode {
   font-family: var(--px-font-pixel);
   font-size: 12px;
   padding: 2px 6px;
-  cursor: ew-resize;
+  cursor: text;
 }
 
 .wb-tf-num-cell input:focus {
@@ -1049,6 +1081,7 @@ body.clean-mode {
 }
 
 .wb-tf-axis-field {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -1072,17 +1105,11 @@ body.clean-mode {
   border-left: 2px solid #22c55e;
 }
 
-.wb-tf-vec-row[data-tf-scrub] .wb-tf-vec-label {
-  cursor: ew-resize;
-  user-select: none;
-}
-
 .wb-tf-axis-tag {
   font-size: 11px;
   font-weight: 600;
   color: #94a3b8;
   flex-shrink: 0;
-  cursor: ew-resize;
   user-select: none;
 }
 
@@ -1097,7 +1124,7 @@ body.clean-mode {
   text-align: right;
   outline: none;
   padding: 0;
-  cursor: ew-resize;
+  cursor: text;
 }
 
 .wb-tf-axis-field input:focus {
@@ -1134,7 +1161,7 @@ body.clean-mode {
   font-size: 12px;
   padding: 2px 6px;
   color-scheme: dark;
-  cursor: ew-resize;
+  cursor: text;
 }
 
 .wb-tf-rotate-input:focus {

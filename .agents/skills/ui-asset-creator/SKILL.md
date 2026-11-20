@@ -33,7 +33,7 @@ End-to-end 4-step workflow for creating transparent, game-ready UI icons, sprite
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File ".agents/skills/ui-asset-creator/scripts/process_asset.ps1" `
   -InputPath "<raw_image_path>" `
-  -OutputPath "assets/generated/<asset_slug>.png" `
+  -OutputPath "assets/<project>/<asset_slug>.png" `
   -PreviewPath "<scratch_dir>/<asset_slug>_preview.png"
 ```
 
@@ -42,7 +42,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File ".agents/skills/ui-asset-cre
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File ".agents/skills/ui-asset-creator/scripts/process_asset.ps1" `
   -InputPath "<raw_image_path>" `
-  -OutputPath "assets/generated/<panel_slug>.png" `
+  -OutputPath "assets/<project>/<panel_slug>.png" `
   -Aspect preserve `
   -Size 512 `
   -PreviewPath "<scratch_dir>/<panel_slug>_preview.png"
@@ -77,8 +77,4 @@ node ".agents/skills/ui-asset-creator/scripts/compress_png.mjs" "<input.png>" "<
 
 ## Optional `game-ui-preview` Integration
 
-By default, processed assets go to `assets/generated/<name>.png` so existing packs in `Sprite sheets/` stay clean. If the user wants newly generated assets usable inside `game-ui-preview` HTML prototypes, save or copy them into the target sprite folder and re-run:
-
-```powershell
-python .agents/skills/game-ui-preview/scripts/slice_sprites.py --input "<sprite_folder>" --output "previews/_catalog"
-```
+By default, processed assets go directly into `assets/<project>/<name>.png` (e.g. `assets/speedyrace/`, `assets/loot-forge-gun/`, or `assets/shared/`) so every sprite has a single source of truth with zero duplicate copies in `previews/`. To register newly generated assets into the `game-ui-preview` catalog, add them to `previews/_catalog/manifest.json` / `catalog-data.js` pointing directly to `assets/<project>/<name>.png` (or run `slice_sprites.py --input "assets/<project>" --project "<project>" --output "previews/_catalog"`).

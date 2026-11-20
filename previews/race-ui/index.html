@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SpeedyRace — Race Event HUD &amp; Modals — Game UI Preview</title>
+  <link rel="stylesheet" href="./pixel-ui-kit.css">
+  <style>
+    /* ======================================================================
+       SpeedyRace — Race Event HUD & Modals (Minimal-Panel HUD + Wireframe)
+       ====================================================================== */
+
+    .race-view-layer {
+      position: absolute;
+      inset: 0;
+      padding: 16px 22px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      pointer-events: none;
+    }
+
+    .race-view-layer > * {
+      pointer-events: auto;
+    }
+
+    .race-top-bar {
+      width: 100%;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      pointer-events: none;
+    }
+
+    .race-top-bar > * {
+      pointer-events: auto;
+    }
+
+    /* ----------------------------------------------------------------------
+       Top-Left: Unframed Mario Kart Rank Sprite (1st-10th), No Panel, No /12
+       ---------------------------------------------------------------------- */
+    .rank-cluster {
+      width: 104px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .rank-emblem-btn {
+      width: 96px;
+      height: 96px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      cursor: pointer;
+    }
+
+    body:not(.mode-wireframe) .rank-emblem-btn {
+      border: none;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .rank-icon-img {
+      width: 92px;
+      height: 92px;
+      object-fit: contain;
+    }
+
+    body:not(.mode-wireframe) .rank-icon-img {
+      filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.55));
+    }
+
+    /* ----------------------------------------------------------------------
+       Top-Center: Timer Capsule + Attached Ahead / Status Sub-Pill (Text Panels)
+       ---------------------------------------------------------------------- */
+    .timer-cluster {
+      width: 264px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .timer-capsule {
+      width: 252px;
+      height: 54px;
+      padding: 2px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      color: #ffffff;
+    }
+
+    .timer-icon-sm {
+      width: 26px;
+      height: 26px;
+      flex-shrink: 0;
+    }
+
+    .timer-value {
+      font-size: 26px;
+      line-height: 1.1;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+      color: #ffffff;
+      text-shadow: 0 2px 0 rgba(0, 0, 0, 0.75);
+    }
+
+    .ahead-pill {
+      min-width: 214px;
+      max-width: 264px;
+      height: 32px;
+      padding: 2px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-size: 13px;
+      line-height: 1.15;
+      white-space: nowrap;
+      color: #fff600;
+      text-shadow: 0 1px 0 rgba(0, 0, 0, 0.85);
+    }
+
+    .ahead-pill.is-status-ready {
+      color: #fde047;
+    }
+
+    .ahead-pill.is-status-closing {
+      color: #86efac;
+    }
+
+    /* ----------------------------------------------------------------------
+       Top-Right: Leave Icon Button Panel + Plain Outlined "EXIT" Text Below
+       ---------------------------------------------------------------------- */
+    .exit-cluster-btn {
+      width: 72px;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      background: transparent;
+      border: none;
+    }
+
+    .exit-icon-frame {
+      width: 60px;
+      height: 60px;
+      padding: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .exit-icon-img {
+      width: 34px;
+      height: 34px;
+    }
+
+    .exit-plain-label {
+      width: 64px;
+      min-height: 18px;
+      text-align: center;
+      font-size: 13px;
+      line-height: 1.2;
+      letter-spacing: 0.06em;
+      color: #ffffff;
+      background: transparent;
+      border: none;
+      text-shadow:
+        -1.5px -1.5px 0 #0a0a00,
+         1.5px -1.5px 0 #0a0a00,
+        -1.5px  1.5px 0 #0a0a00,
+         1.5px  1.5px 0 #0a0a00,
+         0      2px   0 #0a0a00;
+    }
+
+    /* ----------------------------------------------------------------------
+       Left Upper-Half: Simplistic Vertical Progress Ladder (No Panel)
+       - Dashes ONLY at Start (stage 0) & End (stage 15)
+       - 14 small semi-transparent dots for stages 1..14
+       - Larger diamond icons for racers + compact outlined names
+       ---------------------------------------------------------------------- */
+    .progress-panel {
+      position: absolute;
+      left: 24px;
+      top: 132px;
+      width: 148px;
+      height: 312px;
+      z-index: 12;
+      pointer-events: none;
+    }
+
+    body:not(.mode-wireframe) .progress-panel {
+      border: none;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .ladder-track-line {
+      position: absolute;
+      left: 16px;
+      top: 16px;
+      width: 2px;
+      height: 280px;
+      background: rgba(255, 255, 255, 0.88);
+      box-shadow: 0 0 2px rgba(0, 0, 0, 0.7);
+    }
+
+    .ladder-cap-dash {
+      position: absolute;
+      left: 6px;
+      width: 22px;
+      height: 3px;
+      background: #ffffff;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
+    }
+
+    .ladder-cap-dash.is-end {
+      top: 15px;
+    }
+
+    .ladder-cap-dash.is-start {
+      top: 294px;
+    }
+
+    .ladder-stage-dot {
+      position: absolute;
+      left: 14.5px;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.4);
+    }
+
+    .ladder-row {
+      position: absolute;
+      left: 10px;
+      width: 134px;
+      height: 22px;
+      padding: 0 4px 0 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    body:not(.mode-wireframe) .ladder-row {
+      border: none;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .ladder-diamond {
+      width: 14px;
+      height: 14px;
+      flex-shrink: 0;
+      background: #90ee90;
+      clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+      filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.85));
+    }
+
+    .ladder-row.is-ready-dot .ladder-diamond {
+      background: #ffffff;
+    }
+
+    .ladder-row.is-me .ladder-diamond {
+      background: #3da5ff;
+    }
+
+    .ladder-name {
+      flex: 1;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-size: 11px;
+      line-height: 1.2;
+      color: #ffffff;
+      text-shadow:
+        -1px -1px 0 #0a0a00,
+         1px -1px 0 #0a0a00,
+        -1px  1px 0 #0a0a00,
+         1px  1px 0 #0a0a00;
+    }
+
+    .ladder-row.is-me .ladder-name {
+      font-size: 12px;
+      font-weight: 700;
+      color: #3da5ff;
+    }
+
+    /* ----------------------------------------------------------------------
+       Center Ready Countdown (Unframed Floating Text — No Panel)
+       ---------------------------------------------------------------------- */
+    .countdown-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      z-index: 15;
+    }
+
+    .countdown-card {
+      width: 240px;
+      height: 164px;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      color: #ffffff;
+    }
+
+    body:not(.mode-wireframe) .countdown-card {
+      border: none;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .countdown-num {
+      font-size: 88px;
+      line-height: 1.15;
+      min-height: 102px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff600;
+      text-shadow:
+        -3px -3px 0 #0a0a00,
+         3px -3px 0 #0a0a00,
+        -3px  3px 0 #0a0a00,
+         3px  3px 0 #0a0a00,
+         0    5px 0 #0a0a00;
+    }
+
+    .countdown-sub {
+      font-size: 16px;
+      line-height: 1.2;
+      letter-spacing: 0.1em;
+      color: #ffffff;
+      text-shadow:
+        -2px -2px 0 #0a0a00,
+         2px -2px 0 #0a0a00,
+        -2px  2px 0 #0a0a00,
+         2px  2px 0 #0a0a00,
+         0    3px 0 #0a0a00;
+    }
+
+    /* ----------------------------------------------------------------------
+       Modals: Exit Confirm & Race Result (bg_team_dark shell)
+       ---------------------------------------------------------------------- */
+    .race-modal-backdrop {
+      z-index: 25;
+      background: rgba(10, 14, 23, 0.72);
+    }
+
+    .exit-confirm-modal {
+      width: 520px;
+      min-height: 290px;
+      padding: 14px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      color: #f8fafc;
+    }
+
+    .modal-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      min-height: 38px;
+    }
+
+    .modal-title-lg {
+      font-size: 24px;
+      line-height: 1.15;
+      letter-spacing: 0.04em;
+      text-align: center;
+      color: #fff600;
+      text-shadow: 0 2px 0 rgba(0, 0, 0, 0.75);
+    }
+
+    .result-title-gold {
+      color: #ffc94a;
+    }
+
+    .modal-divider {
+      height: 2px;
+      width: 100%;
+      background: rgba(190, 190, 190, 0.45);
+      flex-shrink: 0;
+    }
+
+    body.mode-wireframe .modal-divider {
+      background: rgba(96, 165, 250, 0.55);
+    }
+
+    .confirm-desc-box {
+      padding: 12px 16px;
+      min-height: 82px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      font-size: 15px;
+      line-height: 1.35;
+      color: #f8fafc;
+    }
+
+    .modal-footer-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    .modal-action-btn {
+      width: 210px;
+      height: 60px;
+      padding: 4px 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      line-height: 1.15;
+      color: #0a0a00;
+      letter-spacing: 0.04em;
+    }
+
+    /* Finished Result Modal */
+    .result-modal {
+      width: 560px;
+      min-height: 458px;
+      padding: 12px 18px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      color: #f8fafc;
+    }
+
+    .result-confetti-icon {
+      width: 32px;
+      height: 32px;
+      flex-shrink: 0;
+    }
+
+    .result-hero-card {
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      color: #f8fafc;
+    }
+
+    body:not(.mode-wireframe) .result-hero-card {
+      background-color: rgba(58, 78, 115, 0.65);
+    }
+
+    .result-rank-col {
+      width: 164px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .result-rank-img {
+      width: 96px;
+      height: 96px;
+      object-fit: contain;
+    }
+
+    body:not(.mode-wireframe) .result-rank-img {
+      filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.55));
+    }
+
+    .result-place-badge {
+      width: 152px;
+      height: 30px;
+      padding: 2px 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      line-height: 1.1;
+      white-space: nowrap;
+      color: #fff600;
+    }
+
+    .result-stats-col {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .result-stat-box {
+      padding: 6px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      color: #f8fafc;
+    }
+
+    .result-stat-label {
+      font-size: 11px;
+      line-height: 1.1;
+      color: #cbd5e1;
+    }
+
+    .result-stat-val-lg {
+      font-size: 24px;
+      line-height: 1.15;
+      color: #ffffff;
+    }
+
+    .result-stat-val-md {
+      font-size: 16px;
+      line-height: 1.2;
+      color: #ffc94a;
+    }
+
+    .result-reward-box {
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      color: #f8fafc;
+    }
+
+    .reward-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .reward-gem-icon {
+      width: 34px;
+      height: 34px;
+      flex-shrink: 0;
+    }
+
+    .reward-amount-txt {
+      font-size: 20px;
+      line-height: 1.15;
+      white-space: nowrap;
+      color: #38bdf8;
+      text-shadow: 0 2px 0 rgba(0, 0, 0, 0.75);
+    }
+
+    .reward-mail-pill {
+      padding: 4px 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      line-height: 1.15;
+      white-space: nowrap;
+      color: #86efac;
+    }
+
+    .reward-mail-icon {
+      width: 22px;
+      height: 22px;
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body data-catalog-base="../_catalog/" data-default-mode="final">
+  <header class="workbench-bar">
+    <div class="workbench-title">
+      <span>SpeedyRace — Race Event HUD &amp; Modals</span>
+      <span class="workbench-badge">1280×720 Pixel UI Preview</span>
+    </div>
+    <div class="workbench-controls">
+      <div class="wb-group">
+        <span class="wb-label">Mode</span>
+        <button class="wb-btn" data-wb-mode="wireframe">Wireframe</button>
+        <button class="wb-btn" data-wb-mode="edit">Edit UI</button>
+        <button class="wb-btn is-active" data-wb-mode="final">Interactive</button>
+      </div>
+      <div class="wb-group">
+        <span class="wb-label">View</span>
+        <button class="wb-btn is-active" data-ui-state-trigger="countdown">Ready Countdown</button>
+        <button class="wb-btn" data-ui-state-trigger="racing">In-Race HUD</button>
+        <button class="wb-btn" data-ui-state-trigger="exit_confirm">Leave Race?</button>
+        <button class="wb-btn" data-ui-state-trigger="finished">Race Finished!</button>
+      </div>
+      <div class="wb-group">
+        <span class="wb-label">Scale</span>
+        <button class="wb-btn" data-wb-scale="2">2x</button>
+        <button class="wb-btn is-active" data-wb-scale="3">3x</button>
+        <button class="wb-btn" data-wb-scale="4">4x</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="workbench-stage">
+    <div id="game-canvas" class="px-canvas scene-night">
+
+      <!-- ================================================================
+           VIEW 1: READY COUNTDOWN (Frozen at Start, 3..2..1..GO!)
+           ================================================================ -->
+      <div class="px-hud-layer race-view-layer is-active" data-ui-view="countdown">
+        <div class="px-hud-top race-top-bar">
+          <!-- Top-Left: Unframed Mario Kart Rank Sprite (click to cycle 1st-10th) -->
+          <div class="rank-cluster">
+            <button type="button" class="px-btn px-wire-box rank-emblem-btn" data-rank-cycle="true" data-rank-index="1" aria-label="Rank Emblem (Click to cycle 1st to 10th)">
+              <img class="px-icon rank-icon-img" data-slice-id="sr_rank_1" style="--w:92;--h:92;--pixel-scale:1;" alt="1st Place">
+            </button>
+          </div>
+
+          <!-- Top-Center: Timer Capsule + Ready Status Sub-Pill -->
+          <div class="timer-cluster">
+            <div class="px-9slice timer-capsule" data-slice-id="sr_bg_menu_dark" data-slice-9="8,8,8,8" style="--pixel-scale: 1;">
+              <img class="px-icon timer-icon-sm" data-slice-id="sr_timer_icon" style="--w:26;--h:26;--pixel-scale:1;" alt="Timer">
+              <span class="px-text-pixel timer-value">02:00.00</span>
+            </div>
+            <div class="px-9slice px-text-pixel ahead-pill is-status-ready" data-slice-id="sr_bg_menu_dark" data-slice-9="6,8,6,8" style="--pixel-scale: 1;">Waiting for GO...</div>
+          </div>
+
+          <!-- Top-Right: Exit Icon Panel Button + Plain EXIT Text Below -->
+          <button type="button" class="px-btn exit-cluster-btn" data-ui-state-trigger="exit_confirm" aria-label="Exit Race">
+            <div class="px-9slice exit-icon-frame" data-slice-id="sr_bg_menu_dark" data-slice-9="8,8,8,8" style="--pixel-scale: 1;">
+              <img class="px-icon exit-icon-img" data-slice-id="sr_quit_icon" style="--w:34;--h:34;--pixel-scale:1;" alt="Leave">
+            </div>
+            <span class="px-text-pixel exit-plain-label">EXIT</span>
+          </button>
+        </div>
+
+        <!-- Left Upper-Half: Simplistic Vertical Progress Ladder -->
+        <div class="px-wire-box progress-panel" aria-label="Race Progress Ladder">
+          <div class="ladder-track-line"></div>
+          <div class="ladder-cap-dash is-end"></div>
+          <div class="ladder-cap-dash is-start"></div>
+          <div class="ladder-stage-dot" style="top: 32px;"></div>
+          <div class="ladder-stage-dot" style="top: 51px;"></div>
+          <div class="ladder-stage-dot" style="top: 69px;"></div>
+          <div class="ladder-stage-dot" style="top: 88px;"></div>
+          <div class="ladder-stage-dot" style="top: 107px;"></div>
+          <div class="ladder-stage-dot" style="top: 125px;"></div>
+          <div class="ladder-stage-dot" style="top: 144px;"></div>
+          <div class="ladder-stage-dot" style="top: 163px;"></div>
+          <div class="ladder-stage-dot" style="top: 181px;"></div>
+          <div class="ladder-stage-dot" style="top: 200px;"></div>
+          <div class="ladder-stage-dot" style="top: 219px;"></div>
+          <div class="ladder-stage-dot" style="top: 237px;"></div>
+          <div class="ladder-stage-dot" style="top: 256px;"></div>
+          <div class="ladder-stage-dot" style="top: 275px;"></div>
+          <div class="px-wire-box ladder-row is-ready-dot" style="top: 232px;">
+            <span class="ladder-diamond"></span>
+            <span class="ladder-name">DashPro</span>
+          </div>
+          <div class="px-wire-box ladder-row is-ready-dot" style="top: 258px;">
+            <span class="ladder-diamond"></span>
+            <span class="ladder-name">SpeedKing</span>
+          </div>
+          <div class="px-wire-box ladder-row is-me" style="top: 284px;">
+            <span class="ladder-diamond"></span>
+            <span class="ladder-name">You</span>
+          </div>
+        </div>
+
+        <!-- Center Countdown Text (Unframed Floating Text — No Panel) -->
+        <div class="countdown-overlay">
+          <div class="px-wire-box countdown-card">
+            <div class="px-text-pixel countdown-num">3</div>
+            <div class="px-text-pixel countdown-sub">GET READY</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================================================================
+           VIEW 2: IN-RACE HUD (Active Run, Center Runway Clear)
+           ================================================================ -->
+      <div class="px-hud-layer race-view-layer" data-ui-view="racing">
+        <div class="px-hud-top race-top-bar">
+          <!-- Top-Left: Unframed Mario Kart Rank Sprite (2nd Silver, click to cycle 1st-10th) -->
+          <div class="rank-cluster">
+            <button type="button" class="px-btn px-wire-box rank-emblem-btn" data-rank-cycle="true" data-rank-index="2" aria-label="Rank Emblem (Click to cycle 1st to 10th)">
+              <img class="px-icon rank-icon-img" data-slice-id="sr_rank_2" style="--w:92;--h:92;--pixel-scale:1;" alt="2nd Place">
+            </button>
+          </div>
+
+          <!-- Top-Center: Live Timer + Racer Ahead Distance -->
+          <div class="timer-cluster">
+            <div class="px-9slice timer-capsule" data-slice-id="sr_bg_menu_dark" data-slice-9="8,8,8,8" style="--pixel-scale: 1;">
+              <img class="px-icon timer-icon-sm" data-slice-id="sr_timer_icon" style="--w:26;--h:26;--pixel-scale:1;" alt="Timer">
+              <span class="px-text-pixel timer-value">01:18.45</span>
+            </div>
+            <div class="px-9slice px-text-pixel ahead-pill" data-slice-id="sr_bg_menu_dark" data-slice-9="6,8,6,8" style="--pixel-scale: 1;">▲ SpeedKing (5m)</div>
+          </div>
+
+          <!-- Top-Right: Exit Icon Panel Button + Plain EXIT Text Below -->
+          <button type="button" class="px-btn exit-cluster-btn" data-ui-state-trigger="exit_confirm" aria-label="Exit Race">
+            <div class="px-9slice exit-icon-frame" data-slice-id="sr_bg_menu_dark" data-slice-9="8,8,8,8" style="--pixel-scale: 1;">
+              <img class="px-icon exit-icon-img" data-slice-id="sr_quit_icon" style="--w:34;--h:34;--pixel-scale:1;" alt="Leave">
+            </div>
+            <span class="px-text-pixel exit-plain-label">EXIT</span>
+          </button>
+        </div>
+
+        <!-- Left Upper-Half: Live 10-Row Simplistic Vertical Progress Ladder -->
+        <div class="px-wire-box progress-panel" aria-label="Live Race Progress Ladder">
+          <div class="ladder-track-line"></div>
+          <div class="ladder-cap-dash is-end"></div>
+          <div class="ladder-cap-dash is-start"></div>
+          <div class="ladder-stage-dot" style="top: 32px;"></div>
+          <div class="ladder-stage-dot" style="top: 51px;"></div>
+          <div class="ladder-stage-dot" style="top: 69px;"></div>
+          <div class="ladder-stage-dot" style="top: 88px;"></div>
+          <div class="ladder-stage-dot" style="top: 107px;"></div>
+          <div class="ladder-stage-dot" style="top: 125px;"></div>
+          <div class="ladder-stage-dot" style="top: 144px;"></div>
+          <div class="ladder-stage-dot" style="top: 163px;"></div>
+          <div class="ladder-stage-dot" style="top: 181px;"></div>
+          <div class="ladder-stage-dot" style="top: 200px;"></div>
+          <div class="ladder-stage-dot" style="top: 219px;"></div>
+          <div class="ladder-stage-dot" style="top: 237px;"></div>
+          <div class="ladder-stage-dot" style="top: 256px;"></div>
+          <div class="ladder-stage-dot" style="top: 275px;"></div>
+          <div class="px-wire-box ladder-row" style="top: 8px;">
+            <span class="ladder-diamond"></span>
+            <span class="ladder-name">SpeedKing</span>
+          </div>
+          <div class="px-wire-box ladder-row is-me" style="top: 35px;">
+            <span class="ladder-diamond"></span>
+            <span class="ladder-name">You</span>
+          </div>
+          <div class="px-wire-box ladder-row" style="top: 62px;">
+            <span class="ladder-diamond"></span>
+            <span class="ladder-name">DashPro</span>
+          </div>
+          <div class="px-wire-box ladder-row" style="top: 89px;">
+            <span class="ladder-diamond"></span>
+            <span class="ladder-name">KellyBlitz</span>
+          </div>
+          <div class="px-wire-box ladder-row" style="top: 116px;">
+            <span class="ladder-diamond"></span>
+            <span class="ladder-name">NovaRun</span>
+          </div>
+          <div class="px-wire-box ladder-row" style="top: 143px;">
+            <span class="ladder-diamond"></span>
+            <span class="ladder-name">BlazeX</span>
+          </div>
+          <div class="px-wire-box ladder-row" style="top: 170px;">
+            <span class="ladder-diamond"></span>
+            <span class="ladder-name">TurboFox</span>
+          </div>
+          <div class="px-wire-box ladder-row" style="top: 197px;">
+            <span class="ladder-diamond"></span>
+            <span class="ladder-name">VoltRunner</span>
+          </div>
+          <div class="px-wire-box ladder-row" style="top: 224px;">
+            <span class="ladder-diamond"></span>
+            <span class="ladder-name">JetKid</span>
+          </div>
+          <div class="px-wire-box ladder-row" style="top: 251px;">
+            <span class="ladder-diamond"></span>
+            <span class="ladder-name">AeroCat</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================================================================
+           VIEW 3: EXIT CONFIRM MODAL (Leave the Race?)
+           ================================================================ -->
+      <div class="px-hud-layer race-view-layer" data-ui-view="exit_confirm">
+        <div class="px-hud-top race-top-bar">
+          <div class="rank-cluster">
+            <button type="button" class="px-btn px-wire-box rank-emblem-btn" data-rank-cycle="true" data-rank-index="2" aria-label="Rank Emblem">
+              <img class="px-icon rank-icon-img" data-slice-id="sr_rank_2" style="--w:92;--h:92;--pixel-scale:1;" alt="2nd Place">
+            </button>
+          </div>
+          <div class="timer-cluster">
+            <div class="px-9slice timer-capsule" data-slice-id="sr_bg_menu_dark" data-slice-9="8,8,8,8" style="--pixel-scale: 1;">
+              <img class="px-icon timer-icon-sm" data-slice-id="sr_timer_icon" style="--w:26;--h:26;--pixel-scale:1;" alt="Timer">
+              <span class="px-text-pixel timer-value">01:18.45</span>
+            </div>
+            <div class="px-9slice px-text-pixel ahead-pill" data-slice-id="sr_bg_menu_dark" data-slice-9="6,8,6,8" style="--pixel-scale: 1;">▲ SpeedKing (5m)</div>
+          </div>
+          <button type="button" class="px-btn exit-cluster-btn" aria-label="Exit Race">
+            <div class="px-9slice exit-icon-frame" data-slice-id="sr_bg_menu_dark" data-slice-9="8,8,8,8" style="--pixel-scale: 1;">
+              <img class="px-icon exit-icon-img" data-slice-id="sr_quit_icon" style="--w:34;--h:34;--pixel-scale:1;" alt="Leave">
+            </div>
+            <span class="px-text-pixel exit-plain-label">EXIT</span>
+          </button>
+        </div>
+
+        <div class="px-wire-box progress-panel" aria-label="Race Progress Ladder">
+          <div class="ladder-track-line"></div>
+          <div class="ladder-cap-dash is-end"></div>
+          <div class="ladder-cap-dash is-start"></div>
+          <div class="ladder-stage-dot" style="top: 32px;"></div>
+          <div class="ladder-stage-dot" style="top: 51px;"></div>
+          <div class="ladder-stage-dot" style="top: 69px;"></div>
+          <div class="ladder-stage-dot" style="top: 88px;"></div>
+          <div class="ladder-stage-dot" style="top: 107px;"></div>
+          <div class="ladder-stage-dot" style="top: 125px;"></div>
+          <div class="ladder-stage-dot" style="top: 144px;"></div>
+          <div class="ladder-stage-dot" style="top: 163px;"></div>
+          <div class="ladder-stage-dot" style="top: 181px;"></div>
+          <div class="ladder-stage-dot" style="top: 200px;"></div>
+          <div class="ladder-stage-dot" style="top: 219px;"></div>
+          <div class="ladder-stage-dot" style="top: 237px;"></div>
+          <div class="ladder-stage-dot" style="top: 256px;"></div>
+          <div class="ladder-stage-dot" style="top: 275px;"></div>
+          <div class="px-wire-box ladder-row" style="top: 8px;">
+            <span class="ladder-diamond"></span>
+            <span class="ladder-name">SpeedKing</span>
+          </div>
+          <div class="px-wire-box ladder-row is-me" style="top: 35px;">
+            <span class="ladder-diamond"></span>
+            <span class="ladder-name">You</span>
+          </div>
+        </div>
+
+        <div class="px-modal-backdrop race-modal-backdrop">
+          <div class="px-9slice exit-confirm-modal" data-slice-id="sr_bg_team_dark" data-slice-9="16,16,16,16" style="--pixel-scale: 1;">
+            <div class="modal-header-row">
+              <div class="px-text-pixel modal-title-lg">LEAVE THE RACE?</div>
+            </div>
+            <div class="modal-divider"></div>
+            <div class="px-9slice confirm-desc-box" data-slice-id="sr_bg_menu_dark" data-slice-9="8,8,8,8" style="--pixel-scale: 1;">
+              Your run will be lost and no reward is given.
+            </div>
+            <div class="px-row center modal-footer-row">
+              <button type="button" class="px-btn px-9slice modal-action-btn" data-slice-id="sr_gray_button" data-slice-9="14,24,14,24" style="--pixel-scale: 1;" data-ui-state-trigger="countdown">
+                <span>LEAVE</span>
+              </button>
+              <button type="button" class="px-btn px-9slice modal-action-btn" data-slice-id="sr_yellow_button" data-slice-9="14,24,14,24" style="--pixel-scale: 1;" data-ui-state-trigger="racing">
+                <span>STAY</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================================================================
+           VIEW 4: RACE FINISHED RESULT MODAL (Finished 1st!)
+           ================================================================ -->
+      <div class="px-hud-layer race-view-layer" data-ui-view="finished">
+        <div class="px-hud-top race-top-bar">
+          <div class="rank-cluster">
+            <button type="button" class="px-btn px-wire-box rank-emblem-btn" data-rank-cycle="true" data-rank-index="1" aria-label="Rank Emblem">
+              <img class="px-icon rank-icon-img" data-slice-id="sr_rank_1" style="--w:92;--h:92;--pixel-scale:1;" alt="1st Place">
+            </button>
+          </div>
+          <div class="timer-cluster">
+            <div class="px-9slice timer-capsule" data-slice-id="sr_bg_menu_dark" data-slice-9="8,8,8,8" style="--pixel-scale: 1;">
+              <img class="px-icon timer-icon-sm" data-slice-id="sr_timer_icon" style="--w:26;--h:26;--pixel-scale:1;" alt="Timer">
+              <span class="px-text-pixel timer-value">00:42.18</span>
+            </div>
+            <div class="px-9slice px-text-pixel ahead-pill is-status-closing" data-slice-id="sr_bg_menu_dark" data-slice-9="6,8,6,8" style="--pixel-scale: 1;">Returning in 10s</div>
+          </div>
+          <button type="button" class="px-btn exit-cluster-btn" data-ui-state-trigger="countdown" aria-label="Exit Race">
+            <div class="px-9slice exit-icon-frame" data-slice-id="sr_bg_menu_dark" data-slice-9="8,8,8,8" style="--pixel-scale: 1;">
+              <img class="px-icon exit-icon-img" data-slice-id="sr_quit_icon" style="--w:34;--h:34;--pixel-scale:1;" alt="Leave">
+            </div>
+            <span class="px-text-pixel exit-plain-label">EXIT</span>
+          </button>
+        </div>
+
+        <div class="px-wire-box progress-panel" aria-label="Race Progress Ladder">
+          <div class="ladder-track-line"></div>
+          <div class="ladder-cap-dash is-end"></div>
+          <div class="ladder-cap-dash is-start"></div>
+          <div class="ladder-stage-dot" style="top: 32px;"></div>
+          <div class="ladder-stage-dot" style="top: 51px;"></div>
+          <div class="ladder-stage-dot" style="top: 69px;"></div>
+          <div class="ladder-stage-dot" style="top: 88px;"></div>
+          <div class="ladder-stage-dot" style="top: 107px;"></div>
+          <div class="ladder-stage-dot" style="top: 125px;"></div>
+          <div class="ladder-stage-dot" style="top: 144px;"></div>
+          <div class="ladder-stage-dot" style="top: 163px;"></div>
+          <div class="ladder-stage-dot" style="top: 181px;"></div>
+          <div class="ladder-stage-dot" style="top: 200px;"></div>
+          <div class="ladder-stage-dot" style="top: 219px;"></div>
+          <div class="ladder-stage-dot" style="top: 237px;"></div>
+          <div class="ladder-stage-dot" style="top: 256px;"></div>
+          <div class="ladder-stage-dot" style="top: 275px;"></div>
+          <div class="px-wire-box ladder-row is-me" style="top: 6px;">
+            <span class="ladder-diamond"></span>
+            <span class="ladder-name">You</span>
+          </div>
+          <div class="px-wire-box ladder-row" style="top: 44px;">
+            <span class="ladder-diamond"></span>
+            <span class="ladder-name">SpeedKing</span>
+          </div>
+        </div>
+
+        <div class="px-modal-backdrop race-modal-backdrop">
+          <div class="px-9slice result-modal" data-slice-id="sr_bg_team_dark" data-slice-9="16,16,16,16" style="--pixel-scale: 1;">
+            <div class="modal-header-row">
+              <img class="px-icon result-confetti-icon" data-slice-id="sr_confetti_icon" style="--w:32;--h:32;--pixel-scale:1;" alt="Confetti">
+              <div class="px-text-pixel modal-title-lg result-title-gold">FINISHED!</div>
+            </div>
+            <div class="modal-divider"></div>
+
+            <!-- Hero Placement & Time Stat Card -->
+            <div class="px-9slice result-hero-card" data-slice-id="sr_linear_gradient_bg" data-slice-9="8,8,8,8" style="--pixel-scale: 1;">
+              <div class="result-rank-col">
+                <img class="px-icon result-rank-img" data-slice-id="sr_rank_1" style="--w:96;--h:96;--pixel-scale:1;" alt="1st Place">
+                <div class="px-9slice px-text-pixel result-place-badge" data-slice-id="sr_bg_menu_dark" data-slice-9="6,8,6,8" style="--pixel-scale: 1;">PLACE: #1 / 12</div>
+              </div>
+              <div class="result-stats-col">
+                <div class="px-9slice result-stat-box" data-slice-id="sr_bg_menu_dark" data-slice-9="6,8,6,8" style="--pixel-scale: 1;">
+                  <span class="result-stat-label">RACE TIME</span>
+                  <span class="px-text-pixel result-stat-val-lg">00:42.18</span>
+                </div>
+                <div class="px-9slice result-stat-box" data-slice-id="sr_bg_menu_dark" data-slice-9="6,8,6,8" style="--pixel-scale: 1;">
+                  <span class="result-stat-label">BEST TIME</span>
+                  <span class="px-text-pixel result-stat-val-md">00:39.50</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Reward Pill Box -->
+            <div class="px-9slice result-reward-box" data-slice-id="sr_bg_menu_dark" data-slice-9="8,8,8,8" style="--pixel-scale: 1;">
+              <div class="reward-left">
+                <img class="px-icon reward-gem-icon" data-slice-id="sr_gem" style="--w:34;--h:34;--pixel-scale:1;" alt="Gems">
+                <span class="px-text-pixel reward-amount-txt">+5,000 GEMS</span>
+              </div>
+              <div class="px-9slice reward-mail-pill" data-slice-id="sr_bg_menu_dark" data-slice-9="6,8,6,8" style="--pixel-scale: 1;">
+                <img class="px-icon reward-mail-icon" data-slice-id="sr_mail_icon" style="--w:22;--h:22;--pixel-scale:1;" alt="Mail">
+                <span>Rewards sent to Mail</span>
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="px-row center modal-footer-row">
+              <button type="button" class="px-btn px-9slice modal-action-btn" data-slice-id="sr_gray_button" data-slice-9="14,24,14,24" style="--pixel-scale: 1;" data-ui-state-trigger="countdown">
+                <span>GO BACK</span>
+              </button>
+              <button type="button" class="px-btn px-9slice modal-action-btn" data-slice-id="sr_yellow_button" data-slice-9="14,24,14,24" style="--pixel-scale: 1;" data-ui-state-trigger="racing">
+                <span>STAY</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ================================================================
+         GROUPED ELEMENT BEHAVIOR SPECIFICATION
+         ================================================================ -->
+    <section id="wb-behavior-drawer" class="workbench-drawer" aria-label="Element Behavior Specification">
+      <h3>Element Behavior Specification (Grouped by Interaction Role)</h3>
+      <table class="behavior-table">
+        <thead>
+          <tr>
+            <th>Element / Group</th>
+            <th>View</th>
+            <th>Count</th>
+            <th>Behavior Description</th>
+          </tr>
+        </thead>
+        <tbody id="wb-behavior-body">
+          <tr>
+            <td><strong>Unframed Mario Kart Rank Sprite (`sr_rank_1..10`)</strong> <span class="behavior-group-tag">Group</span></td>
+            <td><span class="behavior-view-badge">all views</span></td>
+            <td>1 slot (10 states)</td>
+            <td>Top-left unframed `92×92` placement icon (`1st`–`10th`, no backing panel and no `/ 12` pill below) driven by live server `_Rank`. Click in Interactive mode to cycle through all 10 custom rank sprites (`sr_rank_1`..`sr_rank_10`).</td>
+          </tr>
+          <tr>
+            <td><strong>Top-Center Timer Capsule &amp; Status Sub-Pill (`TimerTxt` + `AheadTxt`)</strong> <span class="behavior-group-tag">HUD</span></td>
+            <td><span class="behavior-view-badge">all views</span></td>
+            <td>1</td>
+            <td>Text-backed dark capsules (`sr_bg_menu_dark`) so time and chaser info pop clearly: `TimerTxt` (`MM:SS.cc`) counts down from event duration; `AheadTxt` below shows `"Waiting for GO..."`, `"▲ Name (5m)"`, or `"Returning in Ns"`.</td>
+          </tr>
+          <tr>
+            <td><strong>Top-Right Exit Button (`ExitBtn`: Icon Panel + Plain EXIT Text)</strong> <span class="behavior-group-tag">Action</span></td>
+            <td><span class="behavior-view-badge">all views</span></td>
+            <td>1</td>
+            <td>Top `60×60` icon panel (`sr_bg_menu_dark` + built-in `FF_WS_Quit` door icon) acts as the button; plain outlined `"EXIT"` text sits beneath with no background panel. Opens `ExitConfirmPanel` while racing; leaves at once when finished.</td>
+          </tr>
+          <tr>
+            <td><strong>Center Ready Countdown (`CountdownPanel`)</strong> <span class="behavior-group-tag">Overlay</span></td>
+            <td><span class="behavior-view-badge">countdown</span></td>
+            <td>1</td>
+            <td>Unframed floating `3..2..1..GO!` + `GET READY` text directly over the center of the screen (no backing panel) with bold dark outlines; hides `700 ms` after `GO!` so the center runway stays clear.</td>
+          </tr>
+          <tr>
+            <td><strong>Simplistic Vertical Progress Track (`ProgressPanel`: Start &amp; End Dashes + TrackLine)</strong> <span class="behavior-group-tag">HUD</span></td>
+            <td><span class="behavior-view-badge">all views</span></td>
+            <td>1</td>
+            <td>Slim, unframed `148×312` vertical track on the upper-left with no backing panel. Features solid white horizontal dashes **only** at Start (`stage 0`) and End (`stage 15`).</td>
+          </tr>
+          <tr>
+            <td><strong>Intermediate Stage Dots (Stages 1–14)</strong> <span class="behavior-group-tag">Group</span></td>
+            <td><span class="behavior-view-badge">all views</span></td>
+            <td>14</td>
+            <td>Evenly spaced `5×5 px` semi-transparent circular markers (`rgba(255,255,255,0.4)`) along the `280 px` track representing each stage between Start and End — smaller than the `14×14 px` racer diamond icons.</td>
+          </tr>
+          <tr>
+            <td><strong>Progress Ladder Racer Diamonds (`Row1..Row10`)</strong> <span class="behavior-group-tag">Group</span></td>
+            <td><span class="behavior-view-badge">all views</span></td>
+            <td>10 pooled</td>
+            <td>Up to 10 live racers ease smoothly (`ROW_EASE 0.35`) along the track every `50 ms` tick; co-located names stack upward cleanly. Each marker uses a `14×14 px` diamond icon (`#3DA5FF` local player, `#90EE90` rivals) + crisp outlined label.</td>
+          </tr>
+          <tr>
+            <td><strong>Leave Race Confirm Modal (`ExitConfirmPanel`)</strong> <span class="behavior-group-tag">Modal</span></td>
+            <td><span class="behavior-view-badge">exit_confirm</span></td>
+            <td>1</td>
+            <td>Centered `520×290` `bg_team_dark` shell over dark dim scrim. `LEAVE` (`sr_gray_button`) forfeits the run and returns to origin spawn; `STAY` (`sr_yellow_button`) dismisses the modal back to `racing`.</td>
+          </tr>
+          <tr>
+            <td><strong>Race Result Modal (`ResultPanel`)</strong> <span class="behavior-group-tag">Modal</span></td>
+            <td><span class="behavior-view-badge">finished</span></td>
+            <td>1</td>
+            <td>Centered `560×458` `bg_team_dark` shell with confetti header, Hero Placement Card (large `sr_rank_1..10` emblem + `PLACE: #1 / 12` + `RACE TIME` / `BEST TIME`), Reward Pill (`+5,000 GEMS` + Mail notice), and dual `60 px` footers: `GO BACK` (`sr_gray_button`) and `STAY` (`sr_yellow_button`).</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="wb-manifest-drawer" class="workbench-drawer" aria-label="Sprite Asset Manifest">
+      <h3>Sprite Asset Manifest (Auto-scanned from #game-canvas)</h3>
+      <table class="manifest-table">
+        <thead>
+          <tr>
+            <th>Preview</th>
+            <th>Slice ID</th>
+            <th>Role</th>
+            <th>Source PNG</th>
+            <th>Native Size</th>
+            <th>9-Slice</th>
+          </tr>
+        </thead>
+        <tbody id="wb-manifest-body"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="../_catalog/catalog-data.js"></script>
+  <script src="../_catalog/previews-data.js"></script>
+  <script src="./ui-edits.js"></script>
+  <script src="./pixel-ui-kit.js"></script>
+  <script>
+    (function () {
+      const ORDINALS = ['st', 'nd', 'rd', 'th', 'th', 'th', 'th', 'th', 'th', 'th'];
+
+      function applyRankSprite(btn, rank) {
+        const clamped = ((rank - 1) % 10) + 1;
+        const sliceId = 'sr_rank_' + clamped;
+        btn.setAttribute('data-rank-index', String(clamped));
+        const img = btn.querySelector('.rank-icon-img');
+        if (!img) return;
+        img.setAttribute('data-slice-id', sliceId);
+        img.alt = clamped + ORDINALS[clamped - 1] + ' Place';
+        if (window.PixelUI && typeof window.PixelUI.applySliceToElement === 'function') {
+          window.PixelUI.applySliceToElement(img, sliceId);
+        }
+      }
+
+      document.addEventListener('click', function (evt) {
+        if (window.PixelUI && (window.PixelUI.isWireframeMode() || window.PixelUI.isEditMode())) return;
+
+        const rankBtn = evt.target.closest('[data-rank-cycle="true"]');
+        if (rankBtn) {
+          const cur = parseInt(rankBtn.getAttribute('data-rank-index') || '1', 10) || 1;
+          applyRankSprite(rankBtn, (cur % 10) + 1);
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

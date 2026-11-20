@@ -340,7 +340,10 @@ def render_contact_sheets(
                 preview_h = card_h - 54
                 _draw_checkerboard(sheet, preview_x, preview_y, preview_w, preview_h, tile=8)
 
-                sprite_im = Image.open(slices_root / rec.file).convert("RGBA")
+                sprite_path = Path(rec.file)
+                if not sprite_path.is_file():
+                    sprite_path = slices_root / rec.file
+                sprite_im = Image.open(sprite_path).convert("RGBA")
                 sw, sh = sprite_im.size
                 # Integer scale up small pixel art for legibility; downscale oversized panels cleanly
                 max_int_scale = min(preview_w // max(1, sw), preview_h // max(1, sh))
@@ -715,18 +718,147 @@ def run_studio_server(
     return 0
 
 
+def resolve_real_source_paths(workspace_root: Path, catalog_dir: Path) -> int:
+    """Resolve every manifest source_file to a real file path on disk relative to workspace_root.
+
+    Falls back to the real sliced PNG in previews/_catalog/slices/<id>.png when the original
+    source sheet no longer exists on disk. Rewrites manifest.json and catalog-data.js if changed.
+    """
+    manifest_path = catalog_dir / "manifest.json"
+    if not manifest_path.exists():
+        return 0
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return 0
+    if not isinstance(manifest, dict):
+        return 0
+
+    root = workspace_root.resolve()
+    cat_dir = catalog_dir.resolve()
+    raw_input = manifest.get("input_dir")
+    input_dir = Path(raw_input).resolve() if isinstance(raw_input, str) and raw_input else (root / "Sprite sheets")
+
+    def to_rel_posix(p: Path) -> str:
+        resolved = p.resolve()
+        try:
+            return resolved.relative_to(root).as_posix()
+        except ValueError:
+            return resolved.as_posix()
+
+    # Index real PNGs in trusted asset source directories (Sprite sheets/ and assets/)
+    indexed_pngs: dict[str, list[Path]] = {}
+    for search_root in (input_dir, root / "Sprite sheets", root / "assets"):
+        if not search_root.exists():
+            continue
+        for png in search_root.rglob("*.png"):
+            if not png.is_file():
+                continue
+            key = png.name.lower()
+            bucket = indexed_pngs.setdefault(key, [])
+            rp = png.resolve()
+            if rp not in bucket:
+                bucket.append(rp)
+
+    def resolve_one(raw_sf: str, slice_file: str | None) -> str:
+        norm = str(raw_sf or "").replace("\\", "/").strip()
+        if norm:
+            # 1. Already a real path relative to workspace root
+            cand_root = root / norm
+            if cand_root.is_file():
+                return to_rel_posix(cand_root)
+            # 2. Real path relative to input_dir (e.g. Sprite sheets/)
+            cand_input = input_dir / norm
+            if cand_input.is_file():
+                return to_rel_posix(cand_input)
+            # 3. Embedded absolute Windows path (e.g. "speedyrace/c:/Users/.../file.png")
+            drive_match = re.search(r"([a-zA-Z]:/.+)$", norm)
+            if drive_match:
+                cand_abs = Path(drive_match.group(1))
+                if cand_abs.is_file():
+                    return to_rel_posix(cand_abs)
+            # 4. Filename match in Sprite sheets/ or assets/
+            fname = Path(norm).name.lower()
+            matches = indexed_pngs.get(fname, [])
+            if len(matches) == 1:
+                return to_rel_posix(matches[0])
+            if len(matches) > 1:
+                if "generated" in norm.lower():
+                    for m in matches:
+                        if "generated" in m.as_posix().lower():
+                            return to_rel_posix(m)
+                return to_rel_posix(matches[0])
+
+        # 5. Fallback: original source doesn't exist on disk -> use the real slice PNG on disk
+        if slice_file:
+            sf_norm = str(slice_file).replace("\\", "/")
+            cand_root_slice = root / sf_norm
+            if cand_root_slice.is_file():
+                return to_rel_posix(cand_root_slice)
+            cand_slice = cat_dir / sf_norm
+            if cand_slice.is_file():
+                return to_rel_posix(cand_slice)
+        return norm
+
+    changed = 0
+    slices_dict = manifest.get("slices")
+    if isinstance(slices_dict, dict):
+        for sid, rec in slices_dict.items():
+            if not isinstance(rec, dict):
+                continue
+            old_sf = rec.get("source_file", "")
+            new_sf = resolve_one(old_sf, rec.get("file"))
+            if new_sf and new_sf != old_sf:
+                rec["source_file"] = new_sf
+                changed += 1
+
+    sources_list = manifest.get("sources")
+    if isinstance(sources_list, list):
+        for src in sources_list:
+            if not isinstance(src, dict):
+                continue
+            old_sf = src.get("source_file", "")
+            slice_ids = src.get("slice_ids") or []
+            fallback_slice_file = None
+            if isinstance(slices_dict, dict) and slice_ids:
+                first_rec = slices_dict.get(slice_ids[0])
+                if isinstance(first_rec, dict):
+                    fallback_slice_file = first_rec.get("file")
+            new_sf = resolve_one(old_sf, fallback_slice_file)
+            if new_sf and new_sf != old_sf:
+                src["source_file"] = new_sf
+                changed += 1
+
+    if changed > 0:
+        manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+        catalog_js_path = cat_dir / "catalog-data.js"
+        catalog_js_path.write_text(
+            "// Auto-generated by slice_sprites.py for file:// preview compatibility\n"
+            f"window.SPRITE_CATALOG = {json.dumps(manifest, separators=(',', ':'))};\n",
+            encoding="utf-8",
+        )
+    return changed
+
+
 def process_directory(
     input_dir: Path,
     output_dir: Path,
     alpha_threshold: int,
     dilate: int,
     min_size: int,
+    project: str = "basic-pack",
 ) -> dict[str, Any]:
-    """Slice all PNGs in input_dir and write manifest, JS catalog, and contact sheets."""
+    """Slice all PNGs in input_dir and write manifest, JS catalog, and contact sheets.
+
+    Cropped slices from packed sheets are saved under assets/<project>/slices/ (never duplicated
+    inside previews/). Standalone 1-sprite PNGs are referenced directly by their real path.
+    """
     if not input_dir.exists():
         raise FileNotFoundError(f"Input directory not found: {input_dir}")
 
-    slices_dir = output_dir / "slices"
+    workspace_root = Path.cwd().resolve()
+    safe_project = re.sub(r"[^a-zA-Z0-9_-]+", "-", project.strip()).strip("-") or "basic-pack"
+    slices_dir = workspace_root / "assets" / safe_project / "slices"
     contact_dir = output_dir / "contact_sheets"
     slices_dir.mkdir(parents=True, exist_ok=True)
     contact_dir.mkdir(parents=True, exist_ok=True)
@@ -748,8 +880,13 @@ def process_directory(
     sources_meta: list[dict[str, Any]] = []
     used_ids: set[str] = set()
 
+    workspace_root = Path.cwd().resolve()
     for png_path in png_files:
         rel_path = png_path.relative_to(input_dir)
+        try:
+            real_source_file = png_path.resolve().relative_to(workspace_root).as_posix()
+        except ValueError:
+            real_source_file = png_path.resolve().as_posix()
         group = rel_path.parts[0] if len(rel_path.parts) > 1 else "root"
         stem = shorten_stem(rel_path)
 
@@ -786,8 +923,16 @@ def process_directory(
                     collision += 1
                 used_ids.add(slice_id)
 
-                slice_rel = f"slices/{slice_id}.png"
-                crop.save(output_dir / slice_rel)
+                if len(boxes) == 1 and x0 == 0 and y0 == 0 and x1 == w and y1 == h:
+                    # Standalone 1-sprite PNG: reference directly without duplicating
+                    slice_rel = real_source_file
+                else:
+                    slice_dest = slices_dir / f"{slice_id}.png"
+                    crop.save(slice_dest)
+                    try:
+                        slice_rel = slice_dest.resolve().relative_to(workspace_root).as_posix()
+                    except ValueError:
+                        slice_rel = slice_dest.resolve().as_posix()
 
                 cat = classify_slice(rel_path, cw, ch)
                 manual_9 = slice9_overrides.get(slice_id)
@@ -801,7 +946,7 @@ def process_directory(
                     SliceRecord(
                         slice_id=slice_id,
                         file=slice_rel,
-                        source_file=rel_path.as_posix(),
+                        source_file=real_source_file,
                         group=group,
                         bbox=[x0, y0, cw, ch],
                         width=cw,
@@ -815,7 +960,7 @@ def process_directory(
 
             sources_meta.append(
                 {
-                    "source_file": rel_path.as_posix(),
+                    "source_file": real_source_file,
                     "width": w,
                     "height": h,
                     "dilate_used": sheet_dilate,
@@ -865,7 +1010,8 @@ def process_directory(
 def main() -> int:
     parser = argparse.ArgumentParser(description="Slice packed PNG sprite sheets into isolated sprites + contact sheets.")
     parser.add_argument("--input", default="Sprite sheets", help="Directory containing source PNG sprite sheets.")
-    parser.add_argument("--output", default="previews/_catalog", help="Output catalog directory.")
+    parser.add_argument("--output", default="previews/_catalog", help="Output catalog metadata directory.")
+    parser.add_argument("--project", default="basic-pack", help="Project folder under assets/<project>/slices/ for packed-sheet slices.")
     parser.add_argument("--alpha-threshold", type=int, default=10, help="Minimum alpha (0-255) considered opaque.")
     parser.add_argument("--dilate", type=int, default=1, help="Pixel dilation radius for grouping multi-part icons.")
     parser.add_argument("--min-size", type=int, default=4, help="Minimum slice width/height in pixels.")
@@ -877,12 +1023,19 @@ def main() -> int:
         help="Save a manual 9-slice override (e.g. --set-slice9 basic_pack_056 4,4,5,4) into overrides.json.",
     )
     parser.add_argument("--reslice", action="store_true", help="Force full sheet re-slice after applying --set-slice9.")
+    parser.add_argument("--sync-sources", action="store_true", help="Resolve all manifest source_file paths to real existing files on disk.")
     parser.add_argument("--serve", action="store_true", help="Run local Studio save server on 127.0.0.1 for live Save 9-Slice.")
     parser.add_argument("--port", type=int, default=17890, help="Port for --serve (default: 17890).")
     parser.add_argument("--open", action="store_true", help="Open the Game UI Preview Hub in your default browser when --serve starts.")
     args = parser.parse_args()
 
     out_dir = Path(args.output)
+    if args.sync_sources:
+        changed = resolve_real_source_paths(Path.cwd(), out_dir)
+        print(f"Resolved real source paths in {out_dir.as_posix()} ({changed} entries updated).")
+        if not args.serve and not args.reslice and not args.set_slice9:
+            return 0
+
     if args.set_slice9:
         updates: dict[str, list[int] | None] = {}
         for slice_id, raw_vals in args.set_slice9:
@@ -903,7 +1056,10 @@ def main() -> int:
                 alpha_threshold=args.alpha_threshold,
                 dilate=args.dilate,
                 min_size=args.min_size,
+                project=args.project,
             )
+        else:
+            resolve_real_source_paths(Path.cwd(), out_dir)
         return run_studio_server(Path.cwd(), out_dir, args.port, open_browser=args.open)
 
     manifest = process_directory(
@@ -912,6 +1068,7 @@ def main() -> int:
         alpha_threshold=args.alpha_threshold,
         dilate=args.dilate,
         min_size=args.min_size,
+        project=args.project,
     )
     print(
         f"Sliced {manifest['total_slices']} sprites from {manifest['total_sources']} PNG sheets "

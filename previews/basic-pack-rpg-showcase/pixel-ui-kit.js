@@ -68,6 +68,16 @@
     return bodyBase || DEFAULT_CATALOG_BASE;
   }
 
+  function resolveAssetUrl(filePath) {
+    const f = String(filePath || '');
+    if (!f) return '';
+    if (/^(https?:|data:|\/|\.\.\/)/.test(f)) return f;
+    if (f.startsWith('assets/') || f.startsWith('Sprite sheets/')) {
+      return getCatalogBase() + '../../' + f;
+    }
+    return getCatalogBase() + f;
+  }
+
   function loadSlice9Overrides() {
     try {
       const raw = global.localStorage && global.localStorage.getItem(OVERRIDES_STORAGE_KEY);
@@ -1408,23 +1418,35 @@
             </div>
 
             <div class="wb-tf-fields-grid">
-              <div class="wb-tf-num-cell" data-tf-scrub="posX" title="Drag left/right to adjust, or click to type">
+              <div class="wb-tf-num-cell" data-tf-scrub="posX">
                 <label for="wb-tf-posx">PosX</label>
-                <input id="wb-tf-posx" type="number" step="1" value="${escapeHtml(formatTfVal(tf.posX, 1))}" data-tf-input="posX">
+                <div class="wb-tf-input-box">
+                  <span class="wb-tf-scrub-edge" data-tf-scrub-handle="posX" title="Drag left/right on left border to adjust"></span>
+                  <input id="wb-tf-posx" type="number" step="1" value="${escapeHtml(formatTfVal(tf.posX, 1))}" data-tf-input="posX">
+                </div>
               </div>
-              <div class="wb-tf-num-cell" data-tf-scrub="posY" title="Drag left/right to adjust, or click to type">
+              <div class="wb-tf-num-cell" data-tf-scrub="posY">
                 <label for="wb-tf-posy">PosY</label>
-                <input id="wb-tf-posy" type="number" step="1" value="${escapeHtml(formatTfVal(tf.posY, 1))}" data-tf-input="posY">
+                <div class="wb-tf-input-box">
+                  <span class="wb-tf-scrub-edge" data-tf-scrub-handle="posY" title="Drag left/right on left border to adjust"></span>
+                  <input id="wb-tf-posy" type="number" step="1" value="${escapeHtml(formatTfVal(tf.posY, 1))}" data-tf-input="posY">
+                </div>
               </div>
               <span></span>
               <span></span>
-              <div class="wb-tf-num-cell" data-tf-scrub="width" title="Drag left/right to adjust, or click to type">
+              <div class="wb-tf-num-cell" data-tf-scrub="width">
                 <label for="wb-tf-width">Width</label>
-                <input id="wb-tf-width" type="number" min="1" step="1" value="${Math.max(1, Math.round(tf.width))}" data-tf-input="width">
+                <div class="wb-tf-input-box">
+                  <span class="wb-tf-scrub-edge" data-tf-scrub-handle="width" title="Drag left/right on left border to adjust"></span>
+                  <input id="wb-tf-width" type="number" min="1" step="1" value="${Math.max(1, Math.round(tf.width))}" data-tf-input="width">
+                </div>
               </div>
-              <div class="wb-tf-num-cell" data-tf-scrub="height" title="Drag left/right to adjust, or click to type">
+              <div class="wb-tf-num-cell" data-tf-scrub="height">
                 <label for="wb-tf-height">Height</label>
-                <input id="wb-tf-height" type="number" min="1" step="1" value="${Math.max(1, Math.round(tf.height))}" data-tf-input="height">
+                <div class="wb-tf-input-box">
+                  <span class="wb-tf-scrub-edge" data-tf-scrub-handle="height" title="Drag left/right on left border to adjust"></span>
+                  <input id="wb-tf-height" type="number" min="1" step="1" value="${Math.max(1, Math.round(tf.height))}" data-tf-input="height">
+                </div>
               </div>
               <button
                 type="button"
@@ -1448,11 +1470,13 @@
             <div class="wb-tf-vec-row">
               <span class="wb-tf-vec-label">AnchorMin</span>
               <div class="wb-tf-vec2">
-                <label class="wb-tf-axis-field is-x" data-tf-scrub="anchorMinX" title="Drag left/right to adjust, or click to type">
+                <label class="wb-tf-axis-field is-x" data-tf-scrub="anchorMinX">
+                  <span class="wb-tf-scrub-edge" data-tf-scrub-handle="anchorMinX" title="Drag left/right on left border to adjust"></span>
                   <span class="wb-tf-axis-tag">X</span>
                   <input type="number" step="0.05" value="${escapeHtml(formatTfVal(tf.anchorMin[0], 3))}" data-tf-input="anchorMinX" aria-label="AnchorMin X">
                 </label>
-                <label class="wb-tf-axis-field is-y" data-tf-scrub="anchorMinY" title="Drag left/right to adjust, or click to type">
+                <label class="wb-tf-axis-field is-y" data-tf-scrub="anchorMinY">
+                  <span class="wb-tf-scrub-edge" data-tf-scrub-handle="anchorMinY" title="Drag left/right on left border to adjust"></span>
                   <span class="wb-tf-axis-tag">Y</span>
                   <input type="number" step="0.05" value="${escapeHtml(formatTfVal(tf.anchorMin[1], 3))}" data-tf-input="anchorMinY" aria-label="AnchorMin Y">
                 </label>
@@ -1462,11 +1486,13 @@
             <div class="wb-tf-vec-row">
               <span class="wb-tf-vec-label">AnchorMax</span>
               <div class="wb-tf-vec2">
-                <label class="wb-tf-axis-field is-x" data-tf-scrub="anchorMaxX" title="Drag left/right to adjust, or click to type">
+                <label class="wb-tf-axis-field is-x" data-tf-scrub="anchorMaxX">
+                  <span class="wb-tf-scrub-edge" data-tf-scrub-handle="anchorMaxX" title="Drag left/right on left border to adjust"></span>
                   <span class="wb-tf-axis-tag">X</span>
                   <input type="number" step="0.05" value="${escapeHtml(formatTfVal(tf.anchorMax[0], 3))}" data-tf-input="anchorMaxX" aria-label="AnchorMax X">
                 </label>
-                <label class="wb-tf-axis-field is-y" data-tf-scrub="anchorMaxY" title="Drag left/right to adjust, or click to type">
+                <label class="wb-tf-axis-field is-y" data-tf-scrub="anchorMaxY">
+                  <span class="wb-tf-scrub-edge" data-tf-scrub-handle="anchorMaxY" title="Drag left/right on left border to adjust"></span>
                   <span class="wb-tf-axis-tag">Y</span>
                   <input type="number" step="0.05" value="${escapeHtml(formatTfVal(tf.anchorMax[1], 3))}" data-tf-input="anchorMaxY" aria-label="AnchorMax Y">
                 </label>
@@ -1476,21 +1502,26 @@
             <div class="wb-tf-vec-row">
               <span class="wb-tf-vec-label">Pivot</span>
               <div class="wb-tf-vec2">
-                <label class="wb-tf-axis-field is-x" data-tf-scrub="pivotX" title="Drag left/right to adjust, or click to type">
+                <label class="wb-tf-axis-field is-x" data-tf-scrub="pivotX">
+                  <span class="wb-tf-scrub-edge" data-tf-scrub-handle="pivotX" title="Drag left/right on left border to adjust"></span>
                   <span class="wb-tf-axis-tag">X</span>
                   <input type="number" step="0.05" value="${escapeHtml(formatTfVal(tf.pivot[0], 3))}" data-tf-input="pivotX" aria-label="Pivot X">
                 </label>
-                <label class="wb-tf-axis-field is-y" data-tf-scrub="pivotY" title="Drag left/right to adjust, or click to type">
+                <label class="wb-tf-axis-field is-y" data-tf-scrub="pivotY">
+                  <span class="wb-tf-scrub-edge" data-tf-scrub-handle="pivotY" title="Drag left/right on left border to adjust"></span>
                   <span class="wb-tf-axis-tag">Y</span>
                   <input type="number" step="0.05" value="${escapeHtml(formatTfVal(tf.pivot[1], 3))}" data-tf-input="pivotY" aria-label="Pivot Y">
                 </label>
               </div>
             </div>
 
-            <div class="wb-tf-vec-row" data-tf-scrub="rotate" title="Drag left/right to adjust, or click to type">
+            <div class="wb-tf-vec-row" data-tf-scrub="rotate">
               <span class="wb-tf-vec-label">Rotate</span>
               <div class="wb-tf-rotate-wrap">
-                <input type="number" step="1" class="wb-tf-rotate-input" value="${escapeHtml(formatTfVal(tf.rotate || 0, 2))}" data-tf-input="rotate" aria-label="Rotate">
+                <div class="wb-tf-input-box">
+                  <span class="wb-tf-scrub-edge" data-tf-scrub-handle="rotate" title="Drag left/right on left border to adjust"></span>
+                  <input type="number" step="1" class="wb-tf-rotate-input" value="${escapeHtml(formatTfVal(tf.rotate || 0, 2))}" data-tf-input="rotate" aria-label="Rotate">
+                </div>
               </div>
             </div>
           </div>
@@ -1604,7 +1635,7 @@
     if (!rec) return null;
     return {
       rec,
-      url: getCatalogBase() + rec.file,
+      url: resolveAssetUrl(rec.file),
     };
   }
 
@@ -1865,7 +1896,7 @@
     const rows = [];
     for (const [id, info] of seen.entries()) {
       const rec = catalog.slices && catalog.slices[id];
-      const thumbUrl = rec ? getCatalogBase() + rec.file : '';
+      const thumbUrl = rec ? resolveAssetUrl(rec.file) : '';
       const dims = rec ? `${rec.width}x${rec.height}` : '?';
       const src = rec ? rec.source_file : 'missing';
       const eff9 = overrides[id] || (rec && rec.slice_9);
@@ -1993,7 +2024,7 @@
 
     grid.innerHTML = filtered
       .map(rec => {
-        const url = getCatalogBase() + rec.file;
+        const url = resolveAssetUrl(rec.file);
         const isSelected = state.inspectorMode === 'resource' && state.selectedResourceSliceId === rec.id;
 
         return `
@@ -2296,7 +2327,7 @@
 
     grid.innerHTML = filtered
       .map(rec => {
-        const url = getCatalogBase() + rec.file;
+        const url = resolveAssetUrl(rec.file);
         const meta = Array.isArray(rec.slice_9) ? `9s:[${rec.slice_9.join(',')}]` : rec.category;
         const isCurrent = rec.id === currentId ? ' is-current' : '';
         return `
@@ -4221,28 +4252,19 @@
       }
       if (evt.button !== 0 || !evt.target || typeof evt.target.closest !== 'function') return;
 
-      const scrubWrap = state.selectedEl ? evt.target.closest('[data-tf-scrub]') : null;
-      if (scrubWrap) {
-        const field = scrubWrap.getAttribute('data-tf-scrub');
+      const scrubHandle = state.selectedEl ? evt.target.closest('[data-tf-scrub-handle]') : null;
+      if (scrubHandle) {
+        const field = scrubHandle.getAttribute('data-tf-scrub-handle');
+        const scrubWrap = scrubHandle.closest('[data-tf-scrub]') || scrubHandle.parentElement;
         const inp =
-          scrubWrap.querySelector(`[data-tf-input="${field}"]`) ||
+          (scrubWrap && scrubWrap.querySelector(`[data-tf-input="${field}"]`)) ||
           document.querySelector(`[data-tf-input="${field}"]`);
-        const isInputTarget = Boolean(inp && evt.target === inp);
-        if (isInputTarget && inp.classList.contains('wb-tf-rotate-input')) {
-          const rect = inp.getBoundingClientRect();
-          if (evt.clientX >= rect.right - 18) {
-            return;
-          }
-        }
         const tf = getWidgetTransformState(state.selectedEl);
         const startVal = getTransformFieldNumericValue(tf, field);
-        const started = !isInputTarget;
-        if (started) {
-          evt.preventDefault();
-          suppressNextScrubClick = true;
-          document.body.classList.add('is-tf-scrubbing');
-          scrubWrap.classList.add('is-scrubbing');
-        }
+        evt.preventDefault();
+        suppressNextScrubClick = true;
+        document.body.classList.add('is-tf-scrubbing');
+        if (scrubWrap) scrubWrap.classList.add('is-scrubbing');
         tfScrub = {
           field,
           inp,
@@ -4251,7 +4273,7 @@
           startClientX: evt.clientX,
           lastClientX: evt.clientX,
           accumVal: startVal,
-          started,
+          started: true,
         };
         return;
       }
