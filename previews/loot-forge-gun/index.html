@@ -720,12 +720,12 @@
 
     .lfg-inspector-modal {
       width: 836px;
-      height: 552px;
+      min-height: 552px;
       padding: 18px 24px;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      gap: 6px;
+      gap: var(--px-sp-2, 8px);
     }
 
     .lfg-insp-header {
@@ -1206,12 +1206,12 @@
 
     .lfg-sell-modal {
       width: 584px;
-      height: 626px;
+      min-height: 626px;
       padding: 22px 26px;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      gap: 10px;
+      gap: var(--px-sp-3, 12px);
       margin: auto;
     }
 
@@ -1321,12 +1321,131 @@
     }
 
     .lfg-sell-all-btn {
-      width: 210px;
+      min-width: 228px;
       height: 46px;
-      padding: 4px 8px;
-      font-size: 16px;
+      padding: 4px 14px;
+      font-size: 15px;
       font-weight: 900;
       cursor: pointer;
+    }
+
+    /* ======================================================================
+       Game UI Designer Upgrades: Edge States, Affordability, Rarity & Badges
+       ====================================================================== */
+    body:not(.mode-wireframe) .lfg-stroke-red {
+      color: #fca5a5;
+      text-shadow:
+        -1.5px -1.5px 0 #450a0a,
+         1.5px -1.5px 0 #450a0a,
+        -1.5px  1.5px 0 #450a0a,
+         1.5px  1.5px 0 #450a0a,
+         0      2px   0 #450a0a;
+    }
+
+    body:not(.mode-wireframe) .lfg-stroke-cyan {
+      color: #38bdf8;
+      text-shadow:
+        -1.5px -1.5px 0 #082f49,
+         1.5px -1.5px 0 #082f49,
+        -1.5px  1.5px 0 #082f49,
+         1.5px  1.5px 0 #082f49,
+         0      2px   0 #082f49;
+    }
+
+    body:not(.mode-wireframe) .lfg-stroke-silver {
+      color: #e2e8f0;
+      text-shadow:
+        -1.5px -1.5px 0 #0f172a,
+         1.5px -1.5px 0 #0f172a,
+        -1.5px  1.5px 0 #0f172a,
+         1.5px  1.5px 0 #0f172a,
+         0      2px   0 #0f172a;
+    }
+
+    .lfg-btn-disabled {
+      filter: grayscale(0.82) brightness(0.68) !important;
+      cursor: not-allowed !important;
+      opacity: 0.88;
+    }
+
+    .lfg-btn-disabled [data-stat-cost] {
+      color: #fca5a5 !important;
+    }
+
+    .lfg-boss-critical {
+      box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.85), 0 0 14px rgba(239, 68, 68, 0.55);
+      border-radius: 8px;
+    }
+
+    body:not(.mode-wireframe) #game-canvas .px-9slice.px-tint-multiply > .px-tint-overlay {
+      inset: 0;
+      border-radius: 999px;
+    }
+
+    .lfg-forge-ingot-pill {
+      height: 38px;
+      padding: 2px 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 900;
+      margin-right: 4px;
+    }
+
+    .lfg-empty-state {
+      flex: 1 1 auto;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: var(--px-sp-3, 12px);
+      padding: var(--px-sp-5, 24px);
+      text-align: center;
+      border-radius: 10px;
+      background: rgba(15, 23, 42, 0.55);
+      border: 1px dashed rgba(148, 163, 184, 0.45);
+    }
+
+    .lfg-empty-state.is-visible {
+      display: flex;
+    }
+
+    .lfg-empty-title {
+      font-size: var(--px-fs-title, 18px);
+      font-weight: 900;
+    }
+
+    .lfg-empty-sub {
+      font-size: var(--px-fs-body, 13px);
+      color: #cbd5e1;
+      max-width: 360px;
+      line-height: 1.4;
+    }
+
+    .lfg-claim-tag {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      padding: 2px 5px;
+      border-radius: 4px;
+      font-size: 9px;
+      font-weight: 900;
+      letter-spacing: 0.04em;
+      background: #eab308;
+      color: #1f1203;
+      box-shadow: 0 1px 0 rgba(0, 0, 0, 0.55);
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    .lfg-index-card.is-claimed .lfg-claim-tag {
+      background: #22c55e;
+      color: #052e16;
+    }
+
+    body.mode-wireframe .lfg-claim-tag {
+      display: none !important;
     }
   </style>
 </head>
@@ -1351,6 +1470,13 @@
         <button class="wb-btn" data-ui-state-trigger="sell">Sell Loot</button>
       </div>
       <div class="wb-group">
+        <span class="wb-label">State</span>
+        <button class="wb-btn is-active" data-lfg-edge-state="normal">Normal</button>
+        <button class="wb-btn" data-lfg-edge-state="critical">Low / Critical</button>
+        <button class="wb-btn" data-lfg-edge-state="empty">Empty / Locked</button>
+        <button class="wb-btn" data-lfg-edge-state="max">Max Values</button>
+      </div>
+      <div class="wb-group">
         <span class="wb-label">Scale</span>
         <button class="wb-btn" data-wb-scale="2">2x</button>
         <button class="wb-btn is-active" data-wb-scale="3">3x</button>
@@ -1370,20 +1496,20 @@
         <div class="px-hud-top lfg-hud-top-row">
           <div class="lfg-top-left-cluster">
             <div class="px-row lfg-top-resource-strip" style="gap: 6px;">
-              <div class="px-9slice lfg-top-res-pill" data-slice-id="lfg_16_pill_dark" data-slice-9="16,26,16,26" style="--skin-url: url('../../assets/loot-forge-gun/16_pill_dark.png'); --pixel-scale: 0.35;">
+              <div class="px-9slice lfg-top-res-pill" data-hud-bag-pill data-slice-id="lfg_16_pill_dark" data-slice-9="16,26,16,26" style="--skin-url: url('../../assets/loot-forge-gun/16_pill_dark.png'); --pixel-scale: 0.35;">
                 <img class="px-icon lfg-res-icon-img" src="../../assets/loot-forge-gun/22_icon_backpack.png" data-slice-id="lfg_22_icon_backpack" style="--w:20;--h:20;--pixel-scale:1;" data-render-mode="final" alt="Bag">
                 <div class="px-wire-box lfg-slot-ph" style="width: 34px; height: 22px;" data-render-mode="wireframe">[BAG]</div>
-                <span class="px-text-pixel lfg-stroke" data-hud-bag>4 / 9</span>
+                <span class="px-text-pixel px-num lfg-stroke" data-hud-bag>4 / 9</span>
               </div>
               <div class="px-9slice lfg-top-res-pill" data-slice-id="lfg_16_pill_dark" data-slice-9="16,26,16,26" style="--skin-url: url('../../assets/loot-forge-gun/16_pill_dark.png'); --pixel-scale: 0.35;">
                 <img class="px-icon lfg-res-icon-img" src="../../assets/loot-forge-gun/28_icon_ingot.png" data-slice-id="lfg_28_icon_ingot" style="--w:20;--h:20;--pixel-scale:1;" data-render-mode="final" alt="Ingots">
                 <div class="px-wire-box lfg-slot-ph" style="width: 38px; height: 22px;" data-render-mode="wireframe">[CORE]</div>
-                <span class="px-text-pixel lfg-stroke-gold" data-hud-cores>1,450</span>
+                <span class="px-text-pixel px-num lfg-stroke-gold" data-hud-cores>1,450</span>
               </div>
               <div class="px-9slice lfg-top-res-pill" data-slice-id="lfg_16_pill_dark" data-slice-9="16,26,16,26" style="--skin-url: url('../../assets/loot-forge-gun/16_pill_dark.png'); --pixel-scale: 0.35;">
                 <img class="px-icon lfg-res-icon-img" src="../../assets/loot-forge-gun/27_icon_coin.png" data-slice-id="lfg_27_icon_coin" style="--w:20;--h:20;--pixel-scale:1;" data-render-mode="final" alt="Coins">
                 <div class="px-wire-box lfg-slot-ph" style="width: 38px; height: 22px;" data-render-mode="wireframe">[COIN]</div>
-                <span class="px-text-pixel lfg-stroke-gold" data-hud-coins>1.9M</span>
+                <span class="px-text-pixel px-num lfg-stroke-gold" data-hud-coins>1.9M</span>
               </div>
             </div>
             <div class="px-9slice lfg-season-pill" data-slice-id="lfg_16_pill_dark" data-slice-9="16,26,16,26" style="--skin-url: url('../../assets/loot-forge-gun/16_pill_dark.png'); --pixel-scale: 0.32;">
@@ -1395,13 +1521,13 @@
 
           <div class="lfg-boss-cluster">
             <button type="button" class="px-9slice px-btn px-text-pixel lfg-return-btn lfg-stroke" data-slice-id="lfg_16_pill_dark" data-slice-9="16,26,16,26" style="--skin-url: url('../../assets/loot-forge-gun/16_pill_dark.png'); --pixel-scale: 0.38;" data-action="return-hub">Return</button>
-            <div class="px-9slice lfg-boss-bar-box" data-slice-id="lfg_02_panel_row" data-slice-9="14,14,14,14" style="--skin-url: url('../../assets/loot-forge-gun/02_panel_row.png'); --pixel-scale: 0.4;">
-              <div class="lfg-boss-meta lfg-stroke">
-                <span>Dreadhelm Gun-Titan</span>
-                <span class="px-text-pixel">69.2M / 100M</span>
+            <div class="px-9slice lfg-boss-bar-box" data-hud-boss-box data-slice-id="lfg_02_panel_row" data-slice-9="14,14,14,14" style="--skin-url: url('../../assets/loot-forge-gun/02_panel_row.png'); --pixel-scale: 0.4;">
+              <div class="lfg-boss-meta px-text-outline">
+                <span data-hud-boss-name>Dreadhelm Gun-Titan</span>
+                <span class="px-text-pixel px-num" data-hud-boss-hp>69.2M / 100M</span>
               </div>
               <div class="px-9slice lfg-bar-track" data-slice-id="lfg_04_bar_track" data-slice-9="12,18,12,18" style="--skin-url: url('../../assets/loot-forge-gun/04_bar_track.png'); --pixel-scale: 0.35;">
-                <div class="px-9slice lfg-bar-fill lfg-bar-fill--red" data-slice-id="lfg_05_bar_fill" data-slice-9="12,18,12,18" style="--skin-url: url('../../assets/loot-forge-gun/05_bar_fill.png'); width: 69%; --pixel-scale: 0.25;" data-border-overlap-ok="true"></div>
+                <div class="px-9slice lfg-bar-fill lfg-bar-fill--red" data-hud-boss-bar data-slice-id="lfg_05_bar_fill" data-slice-9="12,18,12,18" style="--skin-url: url('../../assets/loot-forge-gun/05_bar_fill.png'); width: 69%; --pixel-scale: 0.25;" data-border-overlap-ok="true"></div>
               </div>
             </div>
           </div>
@@ -1454,8 +1580,8 @@
             </div>
           </aside>
 
-          <!-- Center Arena Viewport -->
-          <div class="lfg-arena-center">
+          <!-- Center Arena Viewport (Decorative 3D Scene Preview — Center 40% Focus Zone kept 100% clear of HUD) -->
+          <div class="lfg-arena-center world-backdrop-props">
             <div class="px-wire-box lfg-arena-callout" data-render-mode="wireframe">
               <span class="px-text-pixel">[3D COMBAT &amp; LOOT ARENA VIEWPORT]</span>
               <span style="font-size: 12px;">Hero firing forged weapons at Boss + floating loot drops</span>
@@ -1512,37 +1638,37 @@
                 <div class="px-9slice lfg-power-readout" data-slice-id="lfg_16_pill_dark" data-slice-9="16,26,16,26" style="--skin-url: url('../../assets/loot-forge-gun/16_pill_dark.png'); --pixel-scale: 0.35;">
                   <img class="px-icon" src="../../assets/loot-forge-gun/41_icon_power_emblem.png" data-slice-id="lfg_41_icon_power_emblem" style="--w:22;--h:22;--pixel-scale:1;" data-render-mode="final" alt="Power">
                   <div class="px-wire-box lfg-slot-ph" style="width: 38px; height: 22px;" data-render-mode="wireframe">[PWR]</div>
-                  <span class="px-text-pixel lfg-stroke-gold">Power: 288.5K</span>
+                  <span class="px-text-pixel px-num px-text-outline-lg lfg-stroke-gold" data-hud-power>Power: 288.5K</span>
                 </div>
               </div>
 
               <div class="px-row lfg-hotbar-row">
                 <button type="button" class="px-9slice px-btn lfg-hotbar-slot is-equipped" data-slice-id="lfg_08_slot_rare" data-slice-9="18,18,18,18" style="--skin-url: url('../../assets/loot-forge-gun/08_slot_rare.png'); --pixel-scale: 0.36;" data-item-slot="1">
-                  <div class="lfg-hotbar-key-row lfg-stroke"><span>EQUIP</span><span>[F]</span></div>
+                  <div class="lfg-hotbar-key-row lfg-stroke"><span>ACTIVE</span><span class="lfg-stroke-gold">★</span></div>
                   <img class="px-icon" src="../../assets/loot-forge-gun/36_gun_plasma_hellfire.png" data-slice-id="lfg_36_gun_plasma_hellfire" style="--w:34;--h:28;--pixel-scale:1;" data-render-mode="final" alt="Plasma Rifle">
                   <div class="px-wire-box lfg-slot-ph" style="width: 36px; height: 24px;" data-render-mode="wireframe">[GUN]</div>
                   <span class="lfg-hotbar-name lfg-stroke">Plasma Gun</span>
                 </button>
                 <button type="button" class="px-9slice px-btn lfg-hotbar-slot" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../../assets/loot-forge-gun/03_panel_sidebar.png'); --pixel-scale: 0.34;" data-item-slot="2">
-                  <div class="lfg-hotbar-key-row lfg-stroke"><span>SLOT 2</span><span>[R]</span></div>
+                  <div class="lfg-hotbar-key-row lfg-stroke"><span>SLOT 2</span><span>TAP</span></div>
                   <span class="lfg-hotbar-name lfg-stroke">EMPTY</span>
                 </button>
                 <button type="button" class="px-9slice px-btn lfg-hotbar-slot" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../../assets/loot-forge-gun/03_panel_sidebar.png'); --pixel-scale: 0.34;" data-item-slot="3">
-                  <div class="lfg-hotbar-key-row lfg-stroke-gold"><span>+</span><span>[T]</span></div>
+                  <div class="lfg-hotbar-key-row lfg-stroke-gold"><span>+</span><span>LOCKED</span></div>
                   <span class="lfg-hotbar-name lfg-stroke">EXTRA SLOT</span>
                 </button>
               </div>
             </div>
 
             <div class="px-9slice lfg-xp-row" data-slice-id="lfg_02_panel_row" data-slice-9="14,14,14,14" style="--skin-url: url('../../assets/loot-forge-gun/02_panel_row.png'); --pixel-scale: 0.42;">
-              <span class="px-text-pixel lfg-xp-label lfg-stroke-purple">Level 71</span>
+              <span class="px-text-pixel lfg-xp-label px-text-outline lfg-stroke-purple" data-hud-level>Level 71</span>
               <div class="lfg-xp-track-wrap">
                 <div class="px-9slice lfg-bar-track" data-slice-id="lfg_04_bar_track" data-slice-9="12,18,12,18" style="--skin-url: url('../../assets/loot-forge-gun/04_bar_track.png'); --pixel-scale: 0.35;">
-                  <div class="px-9slice lfg-bar-fill lfg-bar-fill--purple" data-slice-id="lfg_05_bar_fill" data-slice-9="12,18,12,18" style="--skin-url: url('../../assets/loot-forge-gun/05_bar_fill.png'); width: 90%; --pixel-scale: 0.25;" data-border-overlap-ok="true"></div>
+                  <div class="px-9slice lfg-bar-fill lfg-bar-fill--purple" data-hud-xp-bar data-slice-id="lfg_05_bar_fill" data-slice-9="12,18,12,18" style="--skin-url: url('../../assets/loot-forge-gun/05_bar_fill.png'); width: 90%; --pixel-scale: 0.25;" data-border-overlap-ok="true"></div>
                 </div>
-                <span class="px-text-pixel lfg-xp-val lfg-stroke">23K / 25.3K</span>
+                <span class="px-text-pixel px-num lfg-xp-val lfg-stroke" data-hud-xp>23K / 25.3K</span>
               </div>
-              <button type="button" class="px-9slice px-btn lfg-auto-badge lfg-stroke-green" data-slice-id="lfg_16_pill_dark" data-slice-9="16,26,16,26" style="--skin-url: url('../../assets/loot-forge-gun/16_pill_dark.png'); --pixel-scale: 0.28;" data-action="toggle-auto">[G] AUTO ON</button>
+              <button type="button" class="px-9slice px-btn lfg-auto-badge lfg-stroke-green" data-slice-id="lfg_16_pill_dark" data-slice-9="16,26,16,26" style="--skin-url: url('../../assets/loot-forge-gun/16_pill_dark.png'); --pixel-scale: 0.28;" data-action="toggle-auto">AUTO: ON</button>
             </div>
           </div>
 
@@ -1653,6 +1779,10 @@
                   </div>
                 </div>
                 <div class="lfg-insp-controls">
+                  <div class="px-9slice lfg-forge-ingot-pill" data-forge-ingot-pill data-slice-id="lfg_16_pill_dark" data-slice-9="16,26,16,26" style="--skin-url: url('../../assets/loot-forge-gun/16_pill_dark.png'); --pixel-scale: 0.35;" title="Available Forge Ingots">
+                    <img class="px-icon" src="../../assets/loot-forge-gun/28_icon_ingot.png" data-slice-id="lfg_28_icon_ingot" style="--w:22;--h:20;--pixel-scale:1;" data-render-mode="final" alt="Ingots">
+                    <span class="px-text-pixel px-num lfg-stroke-gold" data-hud-cores>1,450</span>
+                  </div>
                   <button type="button" class="px-btn lfg-cycle-btn" data-action="prev-bay" aria-label="Previous Bay">
                     <img class="px-icon lfg-cycle-img" src="../../assets/loot-forge-gun/18_btn_nav_left.png" data-slice-id="lfg_18_btn_nav_left" style="--w:38;--h:38;--pixel-scale:1;" data-render-mode="final" alt="Prev">
                     <span class="px-wire-box" style="width: 38px; height: 38px; display:flex; align-items:center; justify-content:center;" data-render-mode="wireframe">&lt;</span>
@@ -1669,8 +1799,13 @@
               </div>
 
               <!-- 3 Upgrade Stat Rows -->
-              <div class="px-stack lfg-upgrade-list">
-                <div class="px-9slice lfg-upgrade-row" data-slice-id="lfg_02_panel_row" data-slice-9="14,14,14,14" style="--skin-url: url('../../assets/loot-forge-gun/02_panel_row.png'); --pixel-scale: 0.55;">
+              <div class="px-stack lfg-upgrade-list" data-forge-upgrade-list>
+                <div class="lfg-empty-state" data-forge-locked-state>
+                  <img class="px-icon" src="../../assets/loot-forge-gun/32_icon_padlock.png" data-slice-id="lfg_32_icon_padlock" style="--w:42;--h:48;--pixel-scale:1;" data-render-mode="final" alt="Locked Bay">
+                  <div class="px-text-pixel lfg-empty-title lfg-stroke-gold">BAY 6 LOCKED — UNLOCK AT ZONE 2</div>
+                  <div class="lfg-empty-sub">Defeat Dreadhelm Gun-Titan in the Combat Arena to unlock this Forge Bay and equip a 6th firearm.</div>
+                </div>
+                <div class="px-9slice lfg-upgrade-row" data-forge-stat-row data-slice-id="lfg_02_panel_row" data-slice-9="14,14,14,14" style="--skin-url: url('../../assets/loot-forge-gun/02_panel_row.png'); --pixel-scale: 0.55;">
                   <img class="px-icon lfg-upg-icon" src="../../assets/loot-forge-gun/29_icon_firepower.png" data-slice-id="lfg_29_icon_firepower" style="--w:48;--h:48;--pixel-scale:1;" data-render-mode="final" alt="Firepower">
                   <div class="px-wire-box lfg-slot-ph lfg-upg-icon" data-render-mode="wireframe">[HAMMER]</div>
                   <div class="lfg-upg-info">
@@ -1680,15 +1815,15 @@
                       <div class="px-9slice lfg-bar-fill" data-stat-bar="firepower" data-slice-id="lfg_05_bar_fill" data-slice-9="12,18,12,18" style="--skin-url: url('../../assets/loot-forge-gun/05_bar_fill.png'); width: 45%; --pixel-scale: 0.25;" data-border-overlap-ok="true"></div>
                     </div>
                   </div>
-                  <div class="px-text-pixel lfg-upg-delta lfg-stroke-green" data-stat-delta="firepower">62 &gt; 67</div>
+                  <div class="px-text-pixel px-num lfg-upg-delta lfg-stroke-green" data-stat-delta="firepower">62 → 67</div>
                   <button type="button" class="px-9slice px-btn lfg-ingot-btn lfg-stroke" data-slice-id="lfg_12_btn_green" data-slice-9="20,24,20,24" style="--skin-url: url('../../assets/loot-forge-gun/12_btn_green.png'); --pixel-scale: 0.42;" data-upgrade-stat="firepower">
                     <img class="px-icon" src="../../assets/loot-forge-gun/28_icon_ingot.png" data-slice-id="lfg_28_icon_ingot" style="--w:26;--h:22;--pixel-scale:1;" data-render-mode="final" alt="Ingot">
                     <div class="px-wire-box lfg-slot-ph" style="width: 38px; height: 22px;" data-render-mode="wireframe">[ING]</div>
-                    <span data-stat-cost="firepower">135</span>
+                    <span class="px-num" data-stat-cost="firepower">135</span>
                   </button>
                 </div>
 
-                <div class="px-9slice lfg-upgrade-row" data-slice-id="lfg_02_panel_row" data-slice-9="14,14,14,14" style="--skin-url: url('../../assets/loot-forge-gun/02_panel_row.png'); --pixel-scale: 0.55;">
+                <div class="px-9slice lfg-upgrade-row" data-forge-stat-row data-slice-id="lfg_02_panel_row" data-slice-9="14,14,14,14" style="--skin-url: url('../../assets/loot-forge-gun/02_panel_row.png'); --pixel-scale: 0.55;">
                   <img class="px-icon lfg-upg-icon" src="../../assets/loot-forge-gun/30_icon_firerate.png" data-slice-id="lfg_30_icon_firerate" style="--w:48;--h:44;--pixel-scale:1;" data-render-mode="final" alt="Fire Rate">
                   <div class="px-wire-box lfg-slot-ph lfg-upg-icon" data-render-mode="wireframe">[BOOT]</div>
                   <div class="lfg-upg-info">
@@ -1698,15 +1833,15 @@
                       <div class="px-9slice lfg-bar-fill lfg-bar-fill--blue" data-stat-bar="firerate" data-slice-id="lfg_05_bar_fill" data-slice-9="12,18,12,18" style="--skin-url: url('../../assets/loot-forge-gun/05_bar_fill.png'); width: 65%; --pixel-scale: 0.25;" data-border-overlap-ok="true"></div>
                     </div>
                   </div>
-                  <div class="px-text-pixel lfg-upg-delta lfg-stroke-green" data-stat-delta="firerate">x1.30 &gt; x1.35</div>
+                  <div class="px-text-pixel px-num lfg-upg-delta lfg-stroke-green" data-stat-delta="firerate">x1.30 → x1.35</div>
                   <button type="button" class="px-9slice px-btn lfg-ingot-btn lfg-stroke" data-slice-id="lfg_12_btn_green" data-slice-9="20,24,20,24" style="--skin-url: url('../../assets/loot-forge-gun/12_btn_green.png'); --pixel-scale: 0.42;" data-upgrade-stat="firerate">
                     <img class="px-icon" src="../../assets/loot-forge-gun/28_icon_ingot.png" data-slice-id="lfg_28_icon_ingot" style="--w:26;--h:22;--pixel-scale:1;" data-render-mode="final" alt="Ingot">
                     <div class="px-wire-box lfg-slot-ph" style="width: 38px; height: 22px;" data-render-mode="wireframe">[ING]</div>
-                    <span data-stat-cost="firerate">193</span>
+                    <span class="px-num" data-stat-cost="firerate">193</span>
                   </button>
                 </div>
 
-                <div class="px-9slice lfg-upgrade-row" data-slice-id="lfg_02_panel_row" data-slice-9="14,14,14,14" style="--skin-url: url('../../assets/loot-forge-gun/02_panel_row.png'); --pixel-scale: 0.55;">
+                <div class="px-9slice lfg-upgrade-row" data-forge-stat-row data-slice-id="lfg_02_panel_row" data-slice-9="14,14,14,14" style="--skin-url: url('../../assets/loot-forge-gun/02_panel_row.png'); --pixel-scale: 0.55;">
                   <img class="px-icon lfg-upg-icon" src="../../assets/loot-forge-gun/31_icon_forgespeed.png" data-slice-id="lfg_31_icon_forgespeed" style="--w:48;--h:48;--pixel-scale:1;" data-render-mode="final" alt="Forge Speed">
                   <div class="px-wire-box lfg-slot-ph lfg-upg-icon" data-render-mode="wireframe">[FRGE]</div>
                   <div class="lfg-upg-info">
@@ -1716,11 +1851,11 @@
                       <div class="px-9slice lfg-bar-fill" data-stat-bar="forgespeed" data-slice-id="lfg_05_bar_fill" data-slice-9="12,18,12,18" style="--skin-url: url('../../assets/loot-forge-gun/05_bar_fill.png'); width: 25%; --pixel-scale: 0.25;" data-border-overlap-ok="true"></div>
                     </div>
                   </div>
-                  <div class="px-text-pixel lfg-upg-delta lfg-stroke-green" data-stat-delta="forgespeed">x1.08 &gt; x1.12</div>
+                  <div class="px-text-pixel px-num lfg-upg-delta lfg-stroke-green" data-stat-delta="forgespeed">x1.08 → x1.12</div>
                   <button type="button" class="px-9slice px-btn lfg-ingot-btn lfg-stroke" data-slice-id="lfg_12_btn_green" data-slice-9="20,24,20,24" style="--skin-url: url('../../assets/loot-forge-gun/12_btn_green.png'); --pixel-scale: 0.42;" data-upgrade-stat="forgespeed">
                     <img class="px-icon" src="../../assets/loot-forge-gun/28_icon_ingot.png" data-slice-id="lfg_28_icon_ingot" style="--w:26;--h:22;--pixel-scale:1;" data-render-mode="final" alt="Ingot">
                     <div class="px-wire-box lfg-slot-ph" style="width: 38px; height: 22px;" data-render-mode="wireframe">[ING]</div>
-                    <span data-stat-cost="forgespeed">911</span>
+                    <span class="px-num" data-stat-cost="forgespeed">911</span>
                   </button>
                 </div>
               </div>
@@ -2002,7 +2137,13 @@
               </button>
             </div>
 
-            <div class="px-stack lfg-sell-list">
+            <div class="px-stack lfg-sell-list" data-sell-list>
+              <div class="lfg-empty-state" data-sell-empty-state>
+                <img class="px-icon" src="../../assets/loot-forge-gun/22_icon_backpack.png" data-slice-id="lfg_22_icon_backpack" style="--w:54;--h:54;--pixel-scale:1;" data-render-mode="final" alt="Empty Bag">
+                <div class="px-text-pixel lfg-empty-title lfg-stroke-gold">YOUR BAG IS EMPTY</div>
+                <div class="lfg-empty-sub">Defeat monsters and bosses in the Combat Arena to collect loot drops to sell for Coins.</div>
+                <button type="button" class="px-9slice px-btn lfg-sell-all-btn lfg-stroke" data-slice-id="lfg_12_btn_green" data-slice-9="20,24,20,24" style="--skin-url: url('../../assets/loot-forge-gun/12_btn_green.png'); --pixel-scale: 0.42;" data-ui-state-trigger="hud">RETURN TO ARENA</button>
+              </div>
               <div class="px-9slice lfg-sell-row" data-slice-id="lfg_02_panel_row" data-slice-9="14,14,14,14" style="--skin-url: url('../../assets/loot-forge-gun/02_panel_row.png'); --pixel-scale: 0.52;" data-sell-item="claw" data-sell-value="37">
                 <div class="px-9slice lfg-sell-item-box" data-slice-id="lfg_07_slot_uncommon" data-slice-9="18,18,18,18" style="--skin-url: url('../../assets/loot-forge-gun/07_slot_uncommon.png'); --pixel-scale: 0.38;">
                   <img class="px-icon" src="../../assets/loot-forge-gun/42_loot_claw.png" data-slice-id="lfg_42_loot_claw" style="--w:44;--h:44;--pixel-scale:1;" data-render-mode="final" alt="Monster Claw">
@@ -2013,10 +2154,10 @@
                   <div class="lfg-sell-price-row">
                     <img class="px-icon lfg-coin-sm" src="../../assets/loot-forge-gun/27_icon_coin.png" data-slice-id="lfg_27_icon_coin" style="--w:22;--h:22;--pixel-scale:1;" data-render-mode="final" alt="Coin">
                     <div class="px-wire-box lfg-slot-ph lfg-coin-sm" data-render-mode="wireframe">[$]</div>
-                    <span class="px-text-pixel lfg-stroke">37</span>
+                    <span class="px-text-pixel px-num lfg-stroke">37</span>
                   </div>
                 </div>
-                <button type="button" class="px-9slice px-btn lfg-sell-btn lfg-stroke" data-slice-id="lfg_11_btn_yellow" data-slice-9="20,24,20,24" style="--skin-url: url('../../assets/loot-forge-gun/11_btn_yellow.png'); --pixel-scale: 0.42;" data-sell-row="claw">SELL</button>
+                <button type="button" class="px-9slice px-btn lfg-sell-btn lfg-stroke" data-slice-id="lfg_13_btn_blue" data-slice-9="20,24,20,24" style="--skin-url: url('../../assets/loot-forge-gun/13_btn_blue.png'); --pixel-scale: 0.42;" data-sell-row="claw">SELL</button>
               </div>
 
               <div class="px-9slice lfg-sell-row" data-slice-id="lfg_02_panel_row" data-slice-9="14,14,14,14" style="--skin-url: url('../../assets/loot-forge-gun/02_panel_row.png'); --pixel-scale: 0.52;" data-sell-item="eye" data-sell-value="72">
@@ -2029,10 +2170,10 @@
                   <div class="lfg-sell-price-row">
                     <img class="px-icon lfg-coin-sm" src="../../assets/loot-forge-gun/27_icon_coin.png" data-slice-id="lfg_27_icon_coin" style="--w:22;--h:22;--pixel-scale:1;" data-render-mode="final" alt="Coin">
                     <div class="px-wire-box lfg-slot-ph lfg-coin-sm" data-render-mode="wireframe">[$]</div>
-                    <span class="px-text-pixel lfg-stroke">72</span>
+                    <span class="px-text-pixel px-num lfg-stroke">72</span>
                   </div>
                 </div>
-                <button type="button" class="px-9slice px-btn lfg-sell-btn lfg-stroke" data-slice-id="lfg_11_btn_yellow" data-slice-9="20,24,20,24" style="--skin-url: url('../../assets/loot-forge-gun/11_btn_yellow.png'); --pixel-scale: 0.42;" data-sell-row="eye">SELL</button>
+                <button type="button" class="px-9slice px-btn lfg-sell-btn lfg-stroke" data-slice-id="lfg_13_btn_blue" data-slice-9="20,24,20,24" style="--skin-url: url('../../assets/loot-forge-gun/13_btn_blue.png'); --pixel-scale: 0.42;" data-sell-row="eye">SELL</button>
               </div>
 
               <div class="px-9slice lfg-sell-row" data-slice-id="lfg_02_panel_row" data-slice-9="14,14,14,14" style="--skin-url: url('../../assets/loot-forge-gun/02_panel_row.png'); --pixel-scale: 0.52;" data-sell-item="rib" data-sell-value="93">
@@ -2045,10 +2186,10 @@
                   <div class="lfg-sell-price-row">
                     <img class="px-icon lfg-coin-sm" src="../../assets/loot-forge-gun/27_icon_coin.png" data-slice-id="lfg_27_icon_coin" style="--w:22;--h:22;--pixel-scale:1;" data-render-mode="final" alt="Coin">
                     <div class="px-wire-box lfg-slot-ph lfg-coin-sm" data-render-mode="wireframe">[$]</div>
-                    <span class="px-text-pixel lfg-stroke">93</span>
+                    <span class="px-text-pixel px-num lfg-stroke">93</span>
                   </div>
                 </div>
-                <button type="button" class="px-9slice px-btn lfg-sell-btn lfg-stroke" data-slice-id="lfg_11_btn_yellow" data-slice-9="20,24,20,24" style="--skin-url: url('../../assets/loot-forge-gun/11_btn_yellow.png'); --pixel-scale: 0.42;" data-sell-row="rib">SELL</button>
+                <button type="button" class="px-9slice px-btn lfg-sell-btn lfg-stroke" data-slice-id="lfg_13_btn_blue" data-slice-9="20,24,20,24" style="--skin-url: url('../../assets/loot-forge-gun/13_btn_blue.png'); --pixel-scale: 0.42;" data-sell-row="rib">SELL</button>
               </div>
 
               <div class="px-9slice lfg-sell-row" data-slice-id="lfg_02_panel_row" data-slice-9="14,14,14,14" style="--skin-url: url('../../assets/loot-forge-gun/02_panel_row.png'); --pixel-scale: 0.52;" data-sell-item="rune" data-sell-value="145">
@@ -2057,14 +2198,14 @@
                   <div class="px-wire-box lfg-slot-ph" style="width: 52px; height: 48px;" data-render-mode="wireframe">[RUNE]</div>
                 </div>
                 <div class="lfg-sell-item-info">
-                  <span class="lfg-sell-item-name lfg-stroke">Old Rune x1</span>
+                  <span class="lfg-sell-item-name lfg-stroke-cyan">Old Rune x1</span>
                   <div class="lfg-sell-price-row">
                     <img class="px-icon lfg-coin-sm" src="../../assets/loot-forge-gun/27_icon_coin.png" data-slice-id="lfg_27_icon_coin" style="--w:22;--h:22;--pixel-scale:1;" data-render-mode="final" alt="Coin">
                     <div class="px-wire-box lfg-slot-ph lfg-coin-sm" data-render-mode="wireframe">[$]</div>
-                    <span class="px-text-pixel lfg-stroke">145</span>
+                    <span class="px-text-pixel px-num lfg-stroke">145</span>
                   </div>
                 </div>
-                <button type="button" class="px-9slice px-btn lfg-sell-btn lfg-stroke" data-slice-id="lfg_11_btn_yellow" data-slice-9="20,24,20,24" style="--skin-url: url('../../assets/loot-forge-gun/11_btn_yellow.png'); --pixel-scale: 0.42;" data-sell-row="rune">SELL</button>
+                <button type="button" class="px-9slice px-btn lfg-sell-btn lfg-stroke" data-slice-id="lfg_13_btn_blue" data-slice-9="20,24,20,24" style="--skin-url: url('../../assets/loot-forge-gun/13_btn_blue.png'); --pixel-scale: 0.42;" data-sell-row="rune">SELL</button>
               </div>
             </div>
 
@@ -2072,9 +2213,9 @@
               <div class="lfg-wallet-total">
                 <img class="px-icon" src="../../assets/loot-forge-gun/27_icon_coin.png" data-slice-id="lfg_27_icon_coin" style="--w:34;--h:34;--pixel-scale:1;" data-render-mode="final" alt="Wallet Coin">
                 <div class="px-wire-box lfg-slot-ph" style="width: 44px; height: 34px;" data-render-mode="wireframe">[COIN]</div>
-                <span class="px-text-pixel lfg-stroke-gold" data-sell-wallet>1,900,000</span>
+                <span class="px-text-pixel px-num lfg-stroke-gold" data-sell-wallet>1,900,000</span>
               </div>
-              <button type="button" class="px-9slice px-btn lfg-sell-all-btn lfg-stroke" data-slice-id="lfg_11_btn_yellow" data-slice-9="20,24,20,24" style="--skin-url: url('../../assets/loot-forge-gun/11_btn_yellow.png'); --pixel-scale: 0.42;" data-action="sell-all">SELL ALL</button>
+              <button type="button" class="px-9slice px-btn lfg-sell-all-btn lfg-stroke" data-slice-id="lfg_11_btn_yellow" data-slice-9="20,24,20,24" style="--skin-url: url('../../assets/loot-forge-gun/11_btn_yellow.png'); --pixel-scale: 0.42;" data-action="sell-all">SELL ALL (+347)</button>
             </div>
           </div>
 
@@ -2215,7 +2356,10 @@
 
       function sliceUrl(id) {
         const cat = window.SPRITE_CATALOG && window.SPRITE_CATALOG.slices;
-        return cat && cat[id] ? '../_catalog/' + cat[id].file : '';
+        const f = cat && cat[id] ? String(cat[id].file || '') : '';
+        if (!f) return '';
+        if (f.startsWith('assets/') || f.startsWith('Sprite sheets/')) return '../../' + f;
+        return '../_catalog/' + f;
       }
 
       // Interactive State
@@ -2245,23 +2389,94 @@
       };
 
       function fmtCompact(n) {
+        if (n >= 1000000000) return (n / 1000000000).toFixed(1).replace(/\.0$/, '') + 'B';
         if (n >= 1000000) return (n / 1000000).toFixed(2).replace(/\.00$/, '') + 'M';
+        if (n >= 100000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
         return n.toLocaleString('en-US');
+      }
+
+      const RARITY_STROKE_CLASS = {
+        COMMON: 'lfg-stroke-silver',
+        UNCOMMON: 'lfg-stroke-green',
+        RARE: 'lfg-stroke-cyan',
+        EPIC: 'lfg-stroke-purple',
+        LEGENDARY: 'lfg-stroke-gold',
+      };
+
+      function syncForgeAffordability() {
+        Object.entries(sim.stats).forEach(([key, st]) => {
+          const btn = document.querySelector('[data-upgrade-stat="' + key + '"]');
+          if (!btn) return;
+          const canAfford = sim.ingots >= st.cost;
+          btn.classList.toggle('lfg-btn-disabled', !canAfford);
+          btn.disabled = !canAfford;
+          btn.title = canAfford ? 'Upgrade ' + key : 'Need ' + st.cost + ' ingots (have ' + sim.ingots + ')';
+        });
+      }
+
+      function syncSellSummary() {
+        let remainingTotal = 0;
+        let remainingCount = 0;
+        document.querySelectorAll('[data-sell-item]').forEach(row => {
+          if (!row.classList.contains('is-sold') && row.style.display !== 'none') {
+            remainingTotal += Number(row.getAttribute('data-sell-value') || '0');
+            remainingCount += 1;
+          }
+        });
+        const emptyEl = document.querySelector('[data-sell-empty-state]');
+        const sellAllBtn = document.querySelector('[data-action="sell-all"]');
+        if (emptyEl) {
+          emptyEl.classList.toggle('is-visible', remainingCount === 0);
+        }
+        if (remainingCount === 0) {
+          document.querySelectorAll('[data-sell-item]').forEach(r => { r.style.display = 'none'; });
+        }
+        if (sellAllBtn) {
+          sellAllBtn.textContent = remainingCount > 0 ? 'SELL ALL (+' + remainingTotal.toLocaleString('en-US') + ')' : 'BAG EMPTY';
+          sellAllBtn.classList.toggle('lfg-btn-disabled', remainingCount === 0);
+          sellAllBtn.disabled = remainingCount === 0;
+        }
+      }
+
+      function initIndexClaimTags() {
+        document.querySelectorAll('.lfg-index-card').forEach(card => {
+          if (card.querySelector('.lfg-silhouette') || card.querySelector('.lfg-claim-tag')) return;
+          const tag = document.createElement('span');
+          tag.className = 'lfg-claim-tag';
+          tag.setAttribute('data-border-overlap-ok', 'true');
+          tag.textContent = card.classList.contains('is-claimed') ? '✓ CLAIMED' : 'CLAIM';
+          card.appendChild(tag);
+        });
       }
 
       function syncCounters() {
         document.querySelectorAll('[data-hud-bag],[data-sell-bag]').forEach(el => {
-          el.textContent = sim.bagUsed + ' / ' + sim.bagCap;
+          const isFull = sim.bagUsed >= sim.bagCap;
+          el.textContent = isFull ? sim.bagUsed + ' / ' + sim.bagCap + ' FULL' : sim.bagUsed + ' / ' + sim.bagCap;
+          el.classList.toggle('lfg-stroke-red', isFull);
         });
+        const bagPill = document.querySelector('[data-hud-bag-pill]');
+        if (bagPill && window.PixelUI && typeof window.PixelUI.applyTintToElement === 'function') {
+          if (sim.bagUsed >= sim.bagCap) {
+            bagPill.setAttribute('data-tint', '#ef4444');
+          } else {
+            bagPill.removeAttribute('data-tint');
+          }
+          window.PixelUI.applyTintToElement(bagPill, bagPill.getAttribute('data-slice-id'));
+        }
         document.querySelectorAll('[data-hud-cores]').forEach(el => {
-          el.textContent = sim.ingots.toLocaleString('en-US');
+          el.textContent = fmtCompact(sim.ingots);
+          el.classList.toggle('lfg-stroke-red', sim.ingots < 135);
+          el.classList.toggle('lfg-stroke-gold', sim.ingots >= 135);
         });
         document.querySelectorAll('[data-hud-coins],[data-sell-top-coins]').forEach(el => {
           el.textContent = fmtCompact(sim.wallet);
         });
         document.querySelectorAll('[data-sell-wallet]').forEach(el => {
-          el.textContent = sim.wallet.toLocaleString('en-US');
+          el.textContent = sim.wallet >= 1000000000 ? fmtCompact(sim.wallet) : sim.wallet.toLocaleString('en-US');
         });
+        syncForgeAffordability();
+        syncSellSummary();
       }
 
       function syncBayView() {
@@ -2272,10 +2487,17 @@
         const dpsEl = document.querySelector('[data-forge-dps]');
         const imgEl = document.querySelector('[data-forge-gun-img]');
         const frameEl = document.querySelector('[data-forge-slot-frame]');
-        if (nameEl) nameEl.textContent = b.name;
+        const strokeCls = RARITY_STROKE_CLASS[b.rarity] || 'lfg-stroke-purple';
+        if (nameEl) {
+          nameEl.textContent = b.name;
+          nameEl.className = 'px-text-pixel lfg-insp-title ' + strokeCls;
+        }
         if (bayEl) bayEl.textContent = b.bay;
-        if (rarEl) rarEl.textContent = b.rarity;
-        if (dpsEl) dpsEl.textContent = 'DPS ' + (b.dps + (sim.stats.firepower.lv - 7) * 28);
+        if (rarEl) {
+          rarEl.textContent = b.rarity;
+          rarEl.className = 'lfg-insp-rarity ' + strokeCls;
+        }
+        if (dpsEl) dpsEl.textContent = 'DPS ' + (b.dps + (sim.stats.firepower.lv - 7) * 28).toLocaleString('en-US');
         if (imgEl) {
           imgEl.setAttribute('data-slice-id', b.gun);
           const u = sliceUrl(b.gun);
@@ -2288,8 +2510,101 @@
         }
       }
 
+      function applyEdgeState(edgeMode) {
+        document.querySelectorAll('[data-lfg-edge-state]').forEach(btn => {
+          btn.classList.toggle('is-active', btn.getAttribute('data-lfg-edge-state') === edgeMode);
+        });
+
+        const bossName = document.querySelector('[data-hud-boss-name]');
+        const bossHp = document.querySelector('[data-hud-boss-hp]');
+        const bossBar = document.querySelector('[data-hud-boss-bar]');
+        const bossBox = document.querySelector('[data-hud-boss-box]');
+        const pwrEl = document.querySelector('[data-hud-power]');
+        const lvlEl = document.querySelector('[data-hud-level]');
+        const xpEl = document.querySelector('[data-hud-xp]');
+        const xpBar = document.querySelector('[data-hud-xp-bar]');
+        const forgeLocked = document.querySelector('[data-forge-locked-state]');
+        const forgeRows = document.querySelectorAll('[data-forge-stat-row]');
+
+        // Reset sell rows visibility
+        document.querySelectorAll('[data-sell-item]').forEach(row => {
+          row.classList.remove('is-sold');
+          row.style.display = '';
+          const btn = row.querySelector('[data-sell-row]');
+          if (btn) btn.textContent = 'SELL';
+        });
+        if (bossBox) bossBox.classList.remove('lfg-boss-critical');
+        if (forgeLocked) forgeLocked.classList.remove('is-visible');
+        forgeRows.forEach(r => { r.style.display = ''; });
+
+        if (edgeMode === 'critical') {
+          sim.wallet = 1900000;
+          sim.ingots = 85; // Cannot afford any Forge upgrade!
+          sim.bagUsed = 9; // Bag FULL!
+          sim.bagCap = 9;
+          if (bossName) bossName.textContent = 'Dreadhelm Gun-Titan — ENRAGED!';
+          if (bossHp) bossHp.textContent = '4.8M / 100M';
+          if (bossBar) bossBar.style.width = '8%';
+          if (bossBox) bossBox.classList.add('lfg-boss-critical');
+          if (pwrEl) pwrEl.textContent = 'Power: 288.5K';
+          if (lvlEl) lvlEl.textContent = 'Level 71';
+          if (xpEl) xpEl.textContent = '25.1K / 25.3K';
+          if (xpBar) xpBar.style.width = '98%';
+        } else if (edgeMode === 'empty') {
+          sim.wallet = 1900000;
+          sim.ingots = 0;
+          sim.bagUsed = 0;
+          sim.bagCap = 9;
+          document.querySelectorAll('[data-sell-item]').forEach(row => {
+            row.classList.add('is-sold');
+            row.style.display = 'none';
+          });
+          if (forgeLocked) forgeLocked.classList.add('is-visible');
+          forgeRows.forEach(r => { r.style.display = 'none'; });
+          if (bossName) bossName.textContent = 'Arena Clear — Next Boss in 00:15';
+          if (bossHp) bossHp.textContent = '0 / 100M';
+          if (bossBar) bossBar.style.width = '0%';
+          if (pwrEl) pwrEl.textContent = 'Power: 0';
+          if (lvlEl) lvlEl.textContent = 'Level 1';
+          if (xpEl) xpEl.textContent = '0 / 100';
+          if (xpBar) xpBar.style.width = '4%';
+        } else if (edgeMode === 'max') {
+          sim.wallet = 999900000000;
+          sim.ingots = 999900;
+          sim.bagUsed = 99;
+          sim.bagCap = 99;
+          if (bossName) bossName.textContent = 'Omega Dreadhelm Gun-Titan MK.IX';
+          if (bossHp) bossHp.textContent = '999.9T / 999.9T';
+          if (bossBar) bossBar.style.width = '100%';
+          if (pwrEl) pwrEl.textContent = 'Power: 999.9T';
+          if (lvlEl) lvlEl.textContent = 'Level 999';
+          if (xpEl) xpEl.textContent = 'MAX LEVEL';
+          if (xpBar) xpBar.style.width = '100%';
+        } else {
+          sim.wallet = 1900000;
+          sim.ingots = 1450;
+          sim.bagUsed = 4;
+          sim.bagCap = 9;
+          if (bossName) bossName.textContent = 'Dreadhelm Gun-Titan';
+          if (bossHp) bossHp.textContent = '69.2M / 100M';
+          if (bossBar) bossBar.style.width = '69%';
+          if (pwrEl) pwrEl.textContent = 'Power: 288.5K';
+          if (lvlEl) lvlEl.textContent = 'Level 71';
+          if (xpEl) xpEl.textContent = '23K / 25.3K';
+          if (xpBar) xpBar.style.width = '90%';
+        }
+        syncCounters();
+        syncBayView();
+      }
+
       // Wire interactive buttons (guarded in wireframe mode)
       document.addEventListener('click', function (ev) {
+        const edgeBtn = ev.target.closest('[data-lfg-edge-state]');
+        if (edgeBtn) {
+          applyEdgeState(edgeBtn.getAttribute('data-lfg-edge-state') || 'normal');
+          return;
+        }
+
         if (isWireframe()) return;
 
         const upgBtn = ev.target.closest('[data-upgrade-stat]');
@@ -2312,8 +2627,8 @@
             if (dEl) {
               dEl.textContent =
                 key === 'firepower'
-                  ? st.val + ' > ' + (st.val + st.step)
-                  : 'x' + st.val.toFixed(2) + ' > x' + (st.val + st.step).toFixed(2);
+                  ? st.val + ' → ' + (st.val + st.step)
+                  : 'x' + st.val.toFixed(2) + ' → x' + (st.val + st.step).toFixed(2);
             }
             syncCounters();
             syncBayView();
@@ -2366,7 +2681,7 @@
             syncCounters();
           } else if (act === 'toggle-auto') {
             const on = actionBtn.textContent.includes('ON');
-            actionBtn.textContent = on ? '[G] AUTO OFF' : '[G] AUTO ON';
+            actionBtn.textContent = on ? 'AUTO: OFF' : 'AUTO: ON';
           }
           return;
         }
@@ -2398,8 +2713,13 @@
         const card = ev.target.closest('.lfg-index-card');
         if (card && !card.querySelector('.lfg-silhouette')) {
           card.classList.toggle('is-claimed');
+          const tag = card.querySelector('.lfg-claim-tag');
+          if (tag) tag.textContent = card.classList.contains('is-claimed') ? '✓ CLAIMED' : 'CLAIM';
         }
       });
+
+      initIndexClaimTags();
+      syncCounters();
     })();
   </script>
 </body>

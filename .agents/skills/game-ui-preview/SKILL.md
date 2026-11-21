@@ -59,6 +59,7 @@ python .agents/skills/game-ui-preview/scripts/scaffold_preview.py --slug "<slug>
 
 2. Build the **structural HTML wireframe** inside `#game-canvas` in `previews/<slug>/index.html` with `data-default-mode="wireframe"`:
    - Lay out all planned views (`[data-ui-view="<stateId>"]`) and regions (`.px-hud-top`, `.px-hud-bottom`, `.px-modal-backdrop`, `.px-wire-box` / container boxes, labels, placeholder icon slots) with **no animations or gameplay logic needed yet**.
+   - **Mobile HUD Ergonomics**: Keep the **Center 40% Focus Zone** clear on active gameplay HUD views (only minimal reticles or brief prompts belong there) and aim for a clean **HUD Visual Budget** (≤ 22% screen coverage). Designers can toggle **`Focus Zone`**, drop in a **`Backdrop`** gameplay screenshot, and check the live **`HUD: X% · Center: Y%`** badge right in the Workbench bar.
    - Keep view switching (`[data-ui-state-trigger]`) wired in the workbench bar so the user can preview the wireframe shape of every screen/modal.
    - Populate `#wb-behavior-drawer` (`.behavior-table`) right below the canvas with the **Grouped Element Behavior Spec**. **Group repeated elements that share the same behavior into a single row** (for example, describe `"Inventory Slots (4×3 grid)"` with count `12` once instead of writing 12 separate rows, or `"Hotbar Slots (1–5)"` as one entry).
 
@@ -78,6 +79,10 @@ node .agents/skills/game-ui-preview/scripts/verify_ui.mjs --page "previews/<slug
    - Place all UI screens/modals inside `#game-canvas` (`1280x720`).
    - Use `[data-ui-view="<stateId>"]` for each screen/modal view and `[data-ui-state-trigger="<stateId>"]` on both workbench toolbar tabs and in-canvas navigation buttons.
    - Bind sprites with `data-slice-id="<id>"` (and optional `data-slice-pressed="<pressed_id>"` for tactile button presses, `data-slice-9="t,r,b,l"` to override 9-slice insets when needed). Always pair clickable `<button class="px-9slice">` controls with `.px-btn` (and never let native button backgrounds/borders bleed through transparent corners).
+   - **Engine-Accurate Dual Sprite Tinting**: Use `data-tint="#RRGGBB"` (and optional `data-tint-mode="auto|mask|multiply"`) to tint sprites cleanly. `auto` uses CSS `mask-image` for pure-white icons/glyphs (`is_white_mask_candidate: true`) and `isolation: isolate` + `mix-blend-mode: multiply` for shaded wood/metal/rarity frames so texture shading is preserved. Designers can also tune tints live in **`Edit UI`** → Right Inspector (**Sprite Tint**), persisted to `ui-edits.json`.
+   - **Scene-Readable HUD Text Outlines**: Apply `.px-text-outline` (or `.px-text-outline-lg`) to text rendered directly over live gameplay scenes so it stays legible against both light and dark backgrounds — avoid adding outlines to text already sitting inside opaque panels/popups.
+   - **Design Tokens & Visual Hierarchy Discipline**: Use the 4px spacing tokens (`--px-sp-1..6`) and named type scale (`--px-fs-caption`, `--px-fs-body`, `--px-fs-label`, `--px-fs-title`, `--px-fs-popup`, `--px-fs-hero`). Keep at most **one hero element** and **one primary CTA button** per modal, use `.px-num` for right-aligned tabular numbers in stat tables, prefer wrapping over silent clipping (use `.px-ellipsis` only for single-line names), and avoid hard-coding fixed `height` on modals so content defines popup height.
+   - **Contextual Non-Happy-Path State Toggles**: Whenever relevant to the screen, wire compact interactive state toggles for realistic edge cases — such as **Empty** (no items/quests), **Locked / Insufficient** (can't afford, disabled state), **Critical / Low-Resource** (low HP/cooldown), or **Max-Value** (`999.9M` large numbers / long names) — so designers can stress-test beyond the default happy path.
    - **9-Slice Border Safe Interior Rule**: For frames, slots, and badges built with `.px-9slice`, calculate outer dimensions from the sprite's insets and `3x` pixel scale (`inner_w = outer_w - (L + R) * 3`, `inner_h = outer_h - (T + B) * 3`) so icons and labels sit strictly inside the inner box without overlapping the frame border. Mark intentional border-straddling elements (like corner hotkeys or badges) with `data-border-overlap-ok="true"`.
    - Use flow layout helpers (`.px-row`, `.px-stack`, `.px-grid`, `.px-hud-top`, `.px-hud-bottom`, `.px-modal-backdrop`) so elements never overflow or collide.
 2. **Preserve the 3-mode switcher (`Wireframe` | `Edit UI` | `Interactive`) on the same page**:
@@ -102,6 +107,7 @@ What `verify_ui.mjs` tests automatically in headless Chromium (`1280x720`, `?cle
 - **Pixel Rendering**: Confirms `image-rendering: pixelated` on sprite elements in `final` mode.
 - **Computed Geometry (`getBoundingClientRect`)**: Detects viewport out-of-bounds, text/child container overflows, child overlap with `.px-9slice` inner border insets (`child-overlaps-9slice-border` in `final` mode), and unintended sibling overlaps inside layout containers in both modes.
 - **Interactive States**: Switches through every `[data-ui-view]` (preferring real in-canvas triggers) and captures `verification/screenshots/<state>-clean.png` and `<state>-wireframe-clean.png` (plus `*-annotated.png` if geometry defects appear).
+- **Non-Blocking Design Warnings**: Logs advisory `warnings` in `report.json` (never failing the run) for silent text clipping (`nowrap + overflow:hidden` without ellipsis), fixed inline modal heights, or high gameplay HUD coverage / Center 40% focus-zone intrusion.
 
 ---
 
@@ -109,11 +115,12 @@ What `verify_ui.mjs` tests automatically in headless Chromium (`1280x720`, `?cle
 
 1. Read `previews/<slug>/verification/report.json`.
    - If `status === "FAILED"`, inspect the failing selectors and any `*-annotated.png` screenshots, fix the HTML/CSS/sprite mapping, and re-run `verify_ui.mjs --mode both`.
-2. Once `status === "PASSED"`, **call `read_file` on EVERY `verification/screenshots/<state>-clean.png` and `<state>-wireframe-clean.png`** and evaluate this 5-point rubric:
+2. Once `status === "PASSED"`, **call `read_file` on EVERY `verification/screenshots/<state>-clean.png` and `<state>-wireframe-clean.png`** and evaluate this 6-point rubric:
    - **9-Slice Crispness**: Are frame/button corners sharp and unstretched, with zero distortion or double-borders?
    - **Semantic Icon Match**: Does every icon visually match its label/tooltip/action?
-   - **Typography & Contrast**: Is text legible, centered in buttons/headers, and properly padded inside panels (in both Final UI and Wireframe modes)?
-   - **Layout Balance & Anchoring**: Are HUD bars, modals, and dialog boxes cleanly anchored with comfortable whitespace?
+   - **Typography & Contrast**: Is text legible, centered in buttons/headers, properly padded inside panels, and outlined (`.px-text-outline`) when sitting over live gameplay?
+   - **Layout Balance & Anchoring**: Are HUD bars, modals, and dialog boxes cleanly anchored with comfortable whitespace and clear visual hierarchy (max 1 hero & 1 primary CTA per modal)?
+   - **HUD Focus & Edge-State Clarity**: Is the Center 40% Focus Zone clear in gameplay HUD views, and do contextual non-happy-path states (Empty, Locked/Insufficient, Critical, Max-Value) look intentional?
    - **Prompt Fidelity**: Does every requested view, modal, interactive control, and mode toggle (`Wireframe` <-> `Final UI`) match the user's prompt?
 3. If any visual issue appears in a screenshot, refine `previews/<slug>/index.html` (or CSS) and re-run `verify_ui.mjs --mode both` until both the automated check and visual inspection pass cleanly.
 

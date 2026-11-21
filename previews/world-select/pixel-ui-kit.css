@@ -27,6 +27,22 @@
 
   --px-font-ui: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
   --px-font-pixel: "Consolas", "Lucida Console", "Courier New", monospace;
+
+  /* Design Tokens — 4px Spacing Grid & Named Type Scale */
+  --px-grid: 4px;
+  --px-sp-1: 4px;
+  --px-sp-2: 8px;
+  --px-sp-3: 12px;
+  --px-sp-4: 16px;
+  --px-sp-5: 24px;
+  --px-sp-6: 32px;
+
+  --px-fs-caption: 11px;
+  --px-fs-body: 13px;
+  --px-fs-label: 14px;
+  --px-fs-title: 18px;
+  --px-fs-popup: 22px;
+  --px-fs-hero: 28px;
 }
 
 *,
@@ -2087,17 +2103,223 @@ body.clean-mode #game-canvas {
 .px-text-outline {
   color: var(--px-ink-light);
   text-shadow:
-    -2px -2px 0 var(--px-ink-dark),
-     2px -2px 0 var(--px-ink-dark),
-    -2px  2px 0 var(--px-ink-dark),
-     2px  2px 0 var(--px-ink-dark),
-     0    2px 0 var(--px-ink-dark);
+    -1px -1px 0 var(--px-outline-color, #000),
+     1px -1px 0 var(--px-outline-color, #000),
+    -1px  1px 0 var(--px-outline-color, #000),
+     1px  1px 0 var(--px-outline-color, #000),
+     0    2px 0 var(--px-outline-color, #000);
+}
+
+.px-text-outline-lg {
+  color: var(--px-ink-light);
+  text-shadow:
+    -2px -2px 0 var(--px-outline-color, #000),
+     2px -2px 0 var(--px-outline-color, #000),
+    -2px  2px 0 var(--px-outline-color, #000),
+     2px  2px 0 var(--px-outline-color, #000),
+     0   -2px 0 var(--px-outline-color, #000),
+     0    2px 0 var(--px-outline-color, #000),
+    -2px  0   0 var(--px-outline-color, #000),
+     2px  0   0 var(--px-outline-color, #000);
+}
+
+.px-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .px-ellipsis {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* ==========================================================================
+   Engine-Accurate Dual Sprite Tinting (Mask for White Glyphs, Multiply for Shaded)
+   ========================================================================== */
+
+.px-tint-mask {
+  background-color: var(--px-tint-color, transparent) !important;
+  background-image: none !important;
+  border-image-source: none !important;
+  -webkit-mask-image: var(--px-tint-mask-url, var(--skin-url));
+  mask-image: var(--px-tint-mask-url, var(--skin-url));
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+
+img.px-tint-mask {
+  object-position: -9999px -9999px;
+}
+
+.px-tint-multiply {
+  isolation: isolate;
+}
+
+.px-tint-multiply > .px-tint-overlay {
+  position: absolute;
+  inset: 0;
+  background-color: var(--px-tint-color, transparent);
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.px-tint-multiply.px-sprite-box > .px-tint-overlay,
+.px-tint-multiply.px-btn-square > .px-tint-overlay {
+  -webkit-mask-image: var(--skin-url);
+  mask-image: var(--skin-url);
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+
+.px-tint-multiply.px-9slice > .px-tint-overlay {
+  inset:
+    calc(var(--slice-t, 5) * -1px * var(--pixel-scale, 3))
+    calc(var(--slice-r, 5) * -1px * var(--pixel-scale, 3))
+    calc(var(--slice-b, 5) * -1px * var(--pixel-scale, 3))
+    calc(var(--slice-l, 5) * -1px * var(--pixel-scale, 3));
+  border-radius: calc(var(--pixel-scale, 3) * 2px);
+}
+
+.px-tint-multiply > :not(.px-tint-overlay) {
+  position: relative;
+  z-index: 1;
+}
+
+/* ==========================================================================
+   HUD Ergonomics: Focus Zone Overlay, Custom Backdrop & Visual Budget Badge
+   ========================================================================== */
+
+#__px_focus_zone__ {
+  position: absolute;
+  left: 30%;
+  top: 30%;
+  width: 40%;
+  height: 40%;
+  border: 2px dashed rgba(56, 189, 248, 0.85);
+  background: rgba(56, 189, 248, 0.06);
+  pointer-events: none;
+  z-index: 950;
+  display: none;
+}
+
+#__px_focus_zone__.is-visible {
+  display: block;
+}
+
+#__px_focus_zone__::before {
+  content: "CENTER 40% FOCUS ZONE";
+  position: absolute;
+  top: -18px;
+  left: 0;
+  background: rgba(14, 116, 144, 0.92);
+  color: #e0f2fe;
+  font: 700 10px/1 var(--px-font-pixel);
+  letter-spacing: 0.05em;
+  padding: 3px 6px;
+  border-radius: 3px;
+}
+
+body.clean-mode #__px_focus_zone__ {
+  display: none !important;
+}
+
+#game-canvas.has-custom-backdrop {
+  background-image: var(--px-custom-backdrop) !important;
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+}
+
+#game-canvas.has-custom-backdrop::before {
+  display: none !important;
+}
+
+#game-canvas.has-custom-backdrop .world-backdrop-props {
+  display: none !important;
+}
+
+#game-canvas.is-backdrop-dragover {
+  outline: 3px dashed #38bdf8;
+  outline-offset: -3px;
+}
+
+.wb-budget-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--px-font-pixel);
+  border: 1px solid #3c455c;
+  background: #1a2030;
+  color: #9aa4b8;
+  white-space: nowrap;
+}
+
+.wb-budget-badge.is-ok {
+  border-color: rgba(122, 184, 85, 0.45);
+  background: rgba(122, 184, 85, 0.14);
+  color: #b7e49c;
+}
+
+.wb-budget-badge.is-warn {
+  border-color: rgba(234, 179, 8, 0.55);
+  background: rgba(234, 179, 8, 0.16);
+  color: #fde047;
+}
+
+.wb-budget-badge.is-modal {
+  border-color: #3c455c;
+  background: #1a2030;
+  color: #9aa4b8;
+}
+
+/* Edit UI Inspector — Sprite Tint Controls */
+.wb-tint-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.wb-tint-color-input {
+  width: 32px;
+  height: 26px;
+  padding: 1px;
+  border: 1px solid #46506b;
+  border-radius: 5px;
+  background: #141821;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.wb-tint-hex-input {
+  flex: 1;
+  min-width: 0;
+  background: #141821;
+  color: var(--px-workbench-text);
+  border: 1px solid #3c455c;
+  border-radius: 5px;
+  padding: 4px 7px;
+  font-size: 12px;
+  font-family: var(--px-font-pixel);
+}
+
+.wb-tint-modes {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
 }
 
 /* Optional debug outlines for alignment inspection */
@@ -2190,4 +2412,14 @@ body:not(.mode-wireframe) [data-render-mode="wireframe"] {
 
 #game-canvas.is-wireframe .px-btn:hover {
   filter: none !important;
+}
+
+#game-canvas.is-wireframe .px-tint-overlay {
+  display: none !important;
+}
+
+#game-canvas.is-wireframe .px-tint-mask {
+  -webkit-mask-image: none !important;
+  mask-image: none !important;
+  background-color: rgba(51, 65, 85, 0.92) !important;
 }

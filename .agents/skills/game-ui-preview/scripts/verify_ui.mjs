@@ -163,13 +163,24 @@ async function auditCurrentState(page, stateName) {
     const overflowDefects = [];
     const overlapDefects = [];
     const textLegibilityDefects = [];
+    const warnings = [];
 
     const allElements = [canvas, ...Array.from(canvas.querySelectorAll('*'))];
     const cssUrlsToVerify = new Map();
     let assetsChecked = 0;
 
+    function isInternalOverlay(el) {
+      return Boolean(
+        el &&
+          (el.id === '__verify_annotations__' ||
+            el.id === '__px_transform_gizmo__' ||
+            el.id === '__px_focus_zone__' ||
+            el.classList.contains('px-tint-overlay'))
+      );
+    }
+
     for (const el of allElements) {
-      if (!isVisible(el)) continue;
+      if (!isVisible(el) || isInternalOverlay(el)) continue;
       const style = getComputedStyle(el);
       const rect = el.getBoundingClientRect();
       const sel = describeEl(el);
@@ -262,6 +273,34 @@ async function auditCurrentState(page, stateName) {
         }
       }
 
+      // 5b. Non-blocking design-rhythm soft warnings
+      if (
+        hasDirectText &&
+        style.whiteSpace === 'nowrap' &&
+        style.overflow === 'hidden' &&
+        style.textOverflow !== 'ellipsis' &&
+        !el.classList.contains('px-ellipsis')
+      ) {
+        warnings.push({
+          type: 'silent-text-clip',
+          selector: sel,
+          message: 'nowrap + overflow:hidden without text-overflow:ellipsis may silently cut text; use .px-ellipsis or allow wrapping.',
+        });
+      }
+
+      if (
+        el.matches('.px-modal, .px-dialog, .px-modal-backdrop > .px-9slice') &&
+        el.style &&
+        el.style.height &&
+        el.getAttribute('data-fixed-height-ok') !== 'true'
+      ) {
+        warnings.push({
+          type: 'fixed-modal-height',
+          selector: sel,
+          message: `Modal/popup has inline fixed height (${el.style.height}); prefer letting content define height.`,
+        });
+      }
+
       // 6. Parent container child-containment check (including 9-slice border safe interior)
       if (el.matches('.px-9slice, .px-wire-box, .px-btn, .px-slot, .px-card, .px-dialog-content')) {
         const checkInnerBorder =
@@ -278,7 +317,7 @@ async function auditCurrentState(page, stateName) {
         const innerBottom = rect.bottom - bB;
 
         for (const child of Array.from(el.children)) {
-          if (!isVisible(child) || child.getAttribute('data-overflow-ok') === 'true') continue;
+          if (!isVisible(child) || isInternalOverlay(child) || child.getAttribute('data-overflow-ok') === 'true') continue;
           const cRect = child.getBoundingClientRect();
           if (
             cRect.left < rect.left - 2 ||
@@ -320,7 +359,7 @@ async function auditCurrentState(page, stateName) {
       // 7. Sibling overlap check inside layout containers
       if (el.matches('.px-row, .px-stack, .px-grid, .px-hud-top, .px-hud-bottom')) {
         const flowChildren = Array.from(el.children).filter(c => {
-          if (!isVisible(c)) return false;
+          if (!isVisible(c) || isInternalOverlay(c)) return false;
           if (c.getAttribute('data-overlap-ok') === 'true') return false;
           const cs = getComputedStyle(c);
           return cs.position !== 'absolute' || c.getAttribute('data-check-overlap') === 'true';
@@ -353,6 +392,83 @@ async function auditCurrentState(page, stateName) {
       }
     }
 
+    // Advisory HUD Visual Budget check on non-modal gameplay views in final mode
+    if (!isWireframe) {
+      const activeView = canvas.querySelector('[data-ui-view].is-active') || canvas;
+      const hasModal = Boolean(
+        activeView.classList.contains('px-modal-backdrop') ||
+          Array.from(activeView.querySelectorAll('.px-modal-backdrop')).some(m => isVisible(m))
+      );
+      if (!hasModal && canvasRect.width > 0 && canvasRect.height > 0) {
+        const focusRect = {
+          left: canvasRect.left + canvasRect.width * 0.3,
+          top: canvasRect.top + canvasRect.height * 0.3,
+          right: canvasRect.left + canvasRect.width * 0.7,
+          bottom: canvasRect.top + canvasRect.height * 0.7,
+        };
+        const focusArea = (focusRect.right - focusRect.left) * (focusRect.bottom - focusRect.top);
+        const canvasArea = canvasRect.width * canvasRect.height;
+
+        const hudWidgets = [];
+        const isTransparentWrapper = el => {
+          if (el.matches('.px-9slice, .px-sprite-box, .px-btn, .px-wire-box, img, button')) return false;
+          if (el.children.length === 0) return false;
+          const cs = getComputedStyle(el);
+          const bgCol = cs.backgroundColor || '';
+          const hasBgCol = bgCol !== '' && bgCol !== 'transparent' && bgCol !== 'rgba(0, 0, 0, 0)';
+          const hasBgImg = cs.backgroundImage && cs.backgroundImage !== 'none';
+          const hasBorderImg = cs.borderImageSource && cs.borderImageSource !== 'none';
+          return !hasBgCol && !hasBgImg && !hasBorderImg;
+        };
+        const walkHud = container => {
+          for (const child of Array.from(container.children)) {
+            if (!isVisible(child) || isInternalOverlay(child)) continue;
+            if (child.classList.contains('world-backdrop-props') || child.getAttribute('data-wireframe-hide') === 'true') continue;
+            if (
+              child.matches('.px-hud-layer, .px-hud-top, .px-hud-bottom, .px-hud-left, .px-hud-right') ||
+              isTransparentWrapper(child)
+            ) {
+              walkHud(child);
+            } else {
+              hudWidgets.push(child);
+            }
+          }
+        };
+        walkHud(activeView);
+
+        let hudArea = 0;
+        let centerOverlap = 0;
+        for (const w of hudWidgets) {
+          const r = w.getBoundingClientRect();
+          const cl = Math.max(canvasRect.left, r.left);
+          const ct = Math.max(canvasRect.top, r.top);
+          const cr = Math.min(canvasRect.right, r.right);
+          const cb = Math.min(canvasRect.bottom, r.bottom);
+          if (cr > cl && cb > ct) {
+            hudArea += (cr - cl) * (cb - ct);
+          }
+          const fl = Math.max(focusRect.left, r.left);
+          const ft = Math.max(focusRect.top, r.top);
+          const fr = Math.min(focusRect.right, r.right);
+          const fb = Math.min(focusRect.bottom, r.bottom);
+          if (fr > fl && fb > ft) {
+            centerOverlap += (fr - fl) * (fb - ft);
+          }
+        }
+        const hudPct = Math.min(100, Math.round((hudArea / canvasArea) * 100));
+        const centerPct = Math.min(100, Math.round((centerOverlap / focusArea) * 100));
+        if (hudPct > 25 || centerPct > 5) {
+          warnings.push({
+            type: 'hud-budget-high',
+            selector: describeEl(activeView),
+            hudCoveragePct: hudPct,
+            centerFocusIntrusionPct: centerPct,
+            message: `Gameplay HUD covers ~${hudPct}% of screen (Center 40% intrusion: ${centerPct}%). Consider trimming HUD clutter or clearing the center focus zone.`,
+          });
+        }
+      }
+    }
+
     // Verify all CSS URLs asynchronously
     for (const [url, sel] of cssUrlsToVerify.entries()) {
       assetsChecked++;
@@ -373,6 +489,7 @@ async function auditCurrentState(page, stateName) {
       overflowDefects,
       overlapDefects,
       textLegibilityDefects,
+      warnings,
     };
   }, stateName);
 }
@@ -603,6 +720,7 @@ async function main() {
     overflowDefects: stateReports.reduce((acc, s) => acc + s.overflowDefects.length, 0),
     overlapDefects: stateReports.reduce((acc, s) => acc + s.overlapDefects.length, 0),
     textLegibilityDefects: stateReports.reduce((acc, s) => acc + s.textLegibilityDefects.length, 0),
+    warnings: stateReports.reduce((acc, s) => acc + (s.warnings ? s.warnings.length : 0), 0),
   };
 
   const totalErrors =
@@ -646,7 +764,7 @@ async function main() {
   console.log(`States tested: ${summary.statesTested} | Assets verified: ${summary.totalAssetsVerified}`);
   console.log(
     `Errors -> console:${summary.consoleErrors} broken:${summary.brokenAssets} pixelated:${summary.pixelatedViolations} ` +
-      `viewport:${summary.viewportDefects} overflow:${summary.overflowDefects} overlap:${summary.overlapDefects} text:${summary.textLegibilityDefects}`
+      `viewport:${summary.viewportDefects} overflow:${summary.overflowDefects} overlap:${summary.overlapDefects} text:${summary.textLegibilityDefects} | Warnings: ${summary.warnings}`
   );
   console.log(`Report: ${reportPath}`);
   for (const shot of screenshots) {
