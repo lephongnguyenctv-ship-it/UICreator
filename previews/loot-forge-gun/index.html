@@ -29,8 +29,9 @@
       background-size: 48px 48px;
     }
 
-    /* Unity-style 9-slice: border-image renders on ::before so editing 9-slice insets NEVER shifts children */
-    body:not(.mode-wireframe) #game-canvas .px-9slice {
+    /* Unity-style 9-slice: border-image renders on ::before so editing 9-slice insets NEVER shifts children
+       Applied in BOTH Wireframe and Interactive modes for 1:1 box-model layout parity! */
+    #game-canvas .px-9slice {
       border: none !important;
       isolation: isolate;
     }
@@ -271,10 +272,10 @@
 
     .lfg-boss-bar-box {
       width: 100%;
-      padding: 4px 8px;
+      padding: 10px 16px;
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 6px;
     }
 
     .lfg-boss-meta {
@@ -398,7 +399,7 @@
     }
 
     .lfg-right-rail {
-      width: 164px;
+      width: 96px;
       display: flex;
       flex-direction: column;
       align-items: flex-end;
@@ -406,39 +407,20 @@
       flex-shrink: 0;
     }
 
-    .lfg-gift-card {
-      width: 104px;
-      padding: 6px;
+    .lfg-gift-card,
+    .lfg-promo-btn,
+    .lfg-races-card {
+      width: 88px;
+      height: 78px;
+      padding: 6px 4px;
       display: flex;
       flex-direction: column;
-      align-items: center;
-      gap: 4px;
-      font-size: 12px;
-      font-weight: 800;
-    }
-
-    .lfg-promo-btn {
-      width: 156px;
-      height: 46px;
-      padding: 4px 8px;
-      display: flex;
       align-items: center;
       justify-content: center;
-      gap: 6px;
-      font-size: 13px;
-      font-weight: 900;
-      cursor: pointer;
-    }
-
-    .lfg-races-card {
-      width: 96px;
-      padding: 6px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
       gap: 4px;
       font-size: 11px;
-      font-weight: 800;
+      font-weight: 900;
+      text-align: center;
       cursor: pointer;
     }
 
@@ -481,7 +463,7 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
     }
 
     .lfg-buff-and-hotbar-row {
@@ -489,29 +471,82 @@
       display: flex;
       align-items: flex-end;
       justify-content: space-between;
-      gap: 10px;
+      gap: 14px;
     }
 
     .lfg-buff-column {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 6px;
-    }
-
-    .lfg-buff-pills {
+      position: relative;
       display: flex;
       align-items: center;
+      gap: 8px;
+    }
+
+    .lfg-buff-trigger {
+      height: 42px;
+      padding: 4px 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       gap: 6px;
-      flex-wrap: wrap;
+      font-size: 12px;
+      font-weight: 900;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .lfg-buff-popover {
+      position: absolute;
+      left: 0;
+      bottom: calc(100% + 8px);
+      width: 236px;
+      padding: 12px 14px;
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+      z-index: 40;
+      background: rgba(15, 23, 42, 0.96);
+      border: 2px solid #eab308;
+      border-radius: 10px;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.55);
+      pointer-events: auto;
+    }
+
+    .lfg-buff-popover.is-open {
+      display: flex;
+    }
+
+    .lfg-buff-pop-title {
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0.05em;
+      color: #fde047;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.28);
+      padding-bottom: 4px;
+    }
+
+    .lfg-buff-pop-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 800;
+      color: #f1f5f9;
+    }
+
+    .lfg-buff-pop-val {
+      color: #4ade80;
+    }
+
+    .lfg-buff-pop-val.is-muted {
+      color: #94a3b8;
     }
 
     .lfg-power-readout {
-      height: 36px;
-      padding: 2px 10px;
+      height: 42px;
+      padding: 4px 14px;
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 7px;
       font-size: 14px;
       font-weight: 900;
     }
@@ -519,17 +554,19 @@
     .lfg-hotbar-row {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
     }
 
     .lfg-hotbar-slot {
+      position: relative;
       width: 96px;
-      height: 84px;
-      padding: 4px 6px;
+      height: 86px;
+      padding: 8px 6px 6px;
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: space-between;
+      justify-content: center;
+      gap: 2px;
       text-align: center;
       cursor: pointer;
     }
@@ -538,13 +575,20 @@
       filter: brightness(1.08);
     }
 
-    .lfg-hotbar-key-row {
-      width: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-size: 10px;
-      font-weight: 800;
+    .lfg-hotbar-corner-badge {
+      position: absolute;
+      top: 5px;
+      right: 7px;
+      font-size: 12px;
+      line-height: 1;
+      pointer-events: none;
+    }
+
+    .lfg-hotbar-empty-glyph {
+      font-size: 22px;
+      font-weight: 900;
+      opacity: 0.35;
+      line-height: 1;
     }
 
     .lfg-hotbar-name {
@@ -556,11 +600,11 @@
 
     .lfg-xp-row {
       width: 100%;
-      padding: 4px 10px;
+      padding: 10px 16px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 10px;
+      gap: 12px;
     }
 
     .lfg-xp-label {
@@ -711,21 +755,20 @@
       position: absolute;
       inset: 0;
       display: flex;
-      align-items: flex-start;
+      align-items: center;
       justify-content: center;
       background: rgba(10, 14, 23, 0.72);
-      padding: 50px 16px 12px;
+      padding: 20px 16px;
       z-index: 30;
     }
 
     .lfg-inspector-modal {
       width: 836px;
-      min-height: 552px;
-      padding: 18px 24px;
+      padding: 28px 30px;
       display: flex;
       flex-direction: column;
-      justify-content: space-between;
-      gap: var(--px-sp-2, 8px);
+      justify-content: flex-start;
+      gap: 14px;
     }
 
     .lfg-insp-header {
@@ -824,7 +867,7 @@
     }
 
     .lfg-upgrade-row {
-      padding: 8px 16px;
+      padding: 12px 18px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -884,7 +927,7 @@
 
     .lfg-module-box {
       flex: 1 1 auto;
-      padding: 8px 12px;
+      padding: 12px 16px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -1206,12 +1249,11 @@
 
     .lfg-sell-modal {
       width: 584px;
-      min-height: 626px;
-      padding: 22px 26px;
+      padding: 28px 30px;
       display: flex;
       flex-direction: column;
-      justify-content: space-between;
-      gap: var(--px-sp-3, 12px);
+      justify-content: flex-start;
+      gap: 14px;
       margin: auto;
     }
 
@@ -1600,18 +1642,18 @@
 
           <aside class="lfg-right-rail">
             <div class="px-9slice lfg-gift-card" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../../assets/loot-forge-gun/03_panel_sidebar.png'); --pixel-scale: 0.35;">
-              <img class="px-icon" src="../../assets/loot-forge-gun/26_icon_gift.png" data-slice-id="lfg_26_icon_gift" style="--w:40;--h:40;--pixel-scale:1;" data-render-mode="final" alt="Gift Timer">
-              <div class="px-wire-box lfg-slot-ph" style="width: 44px; height: 40px;" data-render-mode="wireframe">[GIFT]</div>
+              <img class="px-icon" src="../../assets/loot-forge-gun/26_icon_gift.png" data-slice-id="lfg_26_icon_gift" style="--w:38;--h:38;--pixel-scale:1;" data-render-mode="final" alt="Gift Timer">
+              <div class="px-wire-box lfg-slot-ph" style="width: 44px; height: 36px;" data-render-mode="wireframe">[GIFT]</div>
               <span class="px-text-pixel lfg-stroke">02:57</span>
             </div>
-            <button type="button" class="px-9slice px-btn lfg-promo-btn lfg-stroke" data-slice-id="lfg_20_banner_rainbow" data-slice-9="18,22,18,22" style="--skin-url: url('../../assets/loot-forge-gun/20_banner_rainbow.png'); --pixel-scale: 0.4;" data-action="promo-2x">
-              <img class="px-icon" src="../../assets/loot-forge-gun/41_icon_power_emblem.png" data-slice-id="lfg_41_icon_power_emblem" style="--w:26;--h:26;--pixel-scale:1;" data-render-mode="final" alt="2x Power">
-              <div class="px-wire-box lfg-slot-ph" style="width: 32px; height: 24px;" data-render-mode="wireframe">[2X]</div>
+            <button type="button" class="px-9slice px-btn lfg-promo-btn lfg-stroke" data-slice-id="lfg_20_banner_rainbow" data-slice-9="18,22,18,22" style="--skin-url: url('../../assets/loot-forge-gun/20_banner_rainbow.png'); --pixel-scale: 0.36;" data-action="promo-2x">
+              <img class="px-icon" src="../../assets/loot-forge-gun/41_icon_power_emblem.png" data-slice-id="lfg_41_icon_power_emblem" style="--w:34;--h:34;--pixel-scale:1;" data-render-mode="final" alt="2x Power">
+              <div class="px-wire-box lfg-slot-ph" style="width: 44px; height: 34px;" data-render-mode="wireframe">[2X]</div>
               <span>2x Power</span>
             </button>
             <button type="button" class="px-9slice px-btn lfg-races-card" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../../assets/loot-forge-gun/03_panel_sidebar.png'); --pixel-scale: 0.35;" data-action="races-modal">
-              <img class="px-icon" src="../../assets/loot-forge-gun/37_gun_minigun.png" data-slice-id="lfg_37_gun_minigun" style="--w:34;--h:30;--pixel-scale:1;" data-render-mode="final" alt="Arsenal">
-              <div class="px-wire-box lfg-slot-ph" style="width: 48px; height: 30px;" data-render-mode="wireframe">[CREST]</div>
+              <img class="px-icon" src="../../assets/loot-forge-gun/37_gun_minigun.png" data-slice-id="lfg_37_gun_minigun" style="--w:40;--h:34;--pixel-scale:1;" data-render-mode="final" alt="Arsenal">
+              <div class="px-wire-box lfg-slot-ph" style="width: 44px; height: 34px;" data-render-mode="wireframe">[CREST]</div>
               <span class="lfg-stroke">RACES</span>
             </button>
           </aside>
@@ -1630,32 +1672,39 @@
           <div class="lfg-center-hud-deck">
             <div class="lfg-buff-and-hotbar-row">
               <div class="lfg-buff-column">
-                <div class="lfg-buff-pills">
-                  <div class="px-9slice lfg-pill lfg-stroke" data-slice-id="lfg_16_pill_dark" data-slice-9="16,26,16,26" style="--skin-url: url('../../assets/loot-forge-gun/16_pill_dark.png'); --pixel-scale: 0.32;">TIME +26%</div>
-                  <div class="px-9slice lfg-pill lfg-stroke" data-slice-id="lfg_16_pill_dark" data-slice-9="16,26,16,26" style="--skin-url: url('../../assets/loot-forge-gun/16_pill_dark.png'); --pixel-scale: 0.32;">FRIENDS +0%</div>
-                  <div class="px-9slice lfg-pill lfg-stroke-gold" data-slice-id="lfg_16_pill_dark" data-slice-9="16,26,16,26" style="--skin-url: url('../../assets/loot-forge-gun/16_pill_dark.png'); --pixel-scale: 0.32;">x1.5 | +7.5%</div>
-                </div>
                 <div class="px-9slice lfg-power-readout" data-slice-id="lfg_16_pill_dark" data-slice-9="16,26,16,26" style="--skin-url: url('../../assets/loot-forge-gun/16_pill_dark.png'); --pixel-scale: 0.35;">
                   <img class="px-icon" src="../../assets/loot-forge-gun/41_icon_power_emblem.png" data-slice-id="lfg_41_icon_power_emblem" style="--w:22;--h:22;--pixel-scale:1;" data-render-mode="final" alt="Power">
                   <div class="px-wire-box lfg-slot-ph" style="width: 38px; height: 22px;" data-render-mode="wireframe">[PWR]</div>
                   <span class="px-text-pixel px-num px-text-outline-lg lfg-stroke-gold" data-hud-power>Power: 288.5K</span>
                 </div>
+                <button type="button" class="px-9slice px-btn lfg-buff-trigger lfg-stroke-gold" data-slice-id="lfg_16_pill_dark" data-slice-9="16,26,16,26" style="--skin-url: url('../../assets/loot-forge-gun/16_pill_dark.png'); --pixel-scale: 0.35;" data-action="toggle-buffs" aria-expanded="false" title="Tap to inspect active Time, Friends &amp; Rebirth boosts">
+                  <img class="px-icon" src="../../assets/loot-forge-gun/24_icon_rebirth.png" data-slice-id="lfg_24_icon_rebirth" style="--w:20;--h:20;--pixel-scale:1;" data-render-mode="final" alt="Buffs">
+                  <div class="px-wire-box lfg-slot-ph" style="width: 36px; height: 20px;" data-render-mode="wireframe">[BUFF]</div>
+                  <span class="px-text-pixel px-num">+33.5%</span>
+                </button>
+                <div class="lfg-buff-popover" data-buff-popover role="dialog" aria-label="Active Buff Breakdown">
+                  <div class="lfg-buff-pop-title">ACTIVE BOOSTS (TAP TO CLOSE)</div>
+                  <div class="lfg-buff-pop-row"><span>Playtime Bonus</span><span class="px-num lfg-buff-pop-val">+26%</span></div>
+                  <div class="lfg-buff-pop-row"><span>Friends in Server</span><span class="px-num lfg-buff-pop-val is-muted">+0%</span></div>
+                  <div class="lfg-buff-pop-row"><span>Rebirth Multi</span><span class="px-num lfg-buff-pop-val">x1.5 (+7.5%)</span></div>
+                </div>
               </div>
 
               <div class="px-row lfg-hotbar-row">
-                <button type="button" class="px-9slice px-btn lfg-hotbar-slot is-equipped" data-slice-id="lfg_08_slot_rare" data-slice-9="18,18,18,18" style="--skin-url: url('../../assets/loot-forge-gun/08_slot_rare.png'); --pixel-scale: 0.36;" data-item-slot="1">
-                  <div class="lfg-hotbar-key-row lfg-stroke"><span>ACTIVE</span><span class="lfg-stroke-gold">★</span></div>
-                  <img class="px-icon" src="../../assets/loot-forge-gun/36_gun_plasma_hellfire.png" data-slice-id="lfg_36_gun_plasma_hellfire" style="--w:34;--h:28;--pixel-scale:1;" data-render-mode="final" alt="Plasma Rifle">
-                  <div class="px-wire-box lfg-slot-ph" style="width: 36px; height: 24px;" data-render-mode="wireframe">[GUN]</div>
+                <button type="button" class="px-9slice px-btn lfg-hotbar-slot is-equipped" data-slice-id="lfg_08_slot_rare" data-slice-9="18,18,18,18" style="--skin-url: url('../../assets/loot-forge-gun/08_slot_rare.png'); --pixel-scale: 0.36;" data-item-slot="1" title="Equipped: Plasma Gun">
+                  <span class="lfg-hotbar-corner-badge lfg-stroke-gold" data-border-overlap-ok="true">★</span>
+                  <img class="px-icon" src="../../assets/loot-forge-gun/36_gun_plasma_hellfire.png" data-slice-id="lfg_36_gun_plasma_hellfire" style="--w:64;--h:52;--pixel-scale:1;" data-render-mode="final" alt="Plasma Rifle">
+                  <div class="px-wire-box lfg-slot-ph" style="width: 60px; height: 48px;" data-render-mode="wireframe">[GUN]</div>
                   <span class="lfg-hotbar-name lfg-stroke">Plasma Gun</span>
                 </button>
-                <button type="button" class="px-9slice px-btn lfg-hotbar-slot" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../../assets/loot-forge-gun/03_panel_sidebar.png'); --pixel-scale: 0.34;" data-item-slot="2">
-                  <div class="lfg-hotbar-key-row lfg-stroke"><span>SLOT 2</span><span>TAP</span></div>
+                <button type="button" class="px-9slice px-btn lfg-hotbar-slot" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../../assets/loot-forge-gun/03_panel_sidebar.png'); --pixel-scale: 0.34;" data-item-slot="2" title="Empty Weapon Slot">
+                  <span class="lfg-hotbar-empty-glyph lfg-stroke">+</span>
                   <span class="lfg-hotbar-name lfg-stroke">EMPTY</span>
                 </button>
-                <button type="button" class="px-9slice px-btn lfg-hotbar-slot" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../../assets/loot-forge-gun/03_panel_sidebar.png'); --pixel-scale: 0.34;" data-item-slot="3">
-                  <div class="lfg-hotbar-key-row lfg-stroke-gold"><span>+</span><span>LOCKED</span></div>
-                  <span class="lfg-hotbar-name lfg-stroke">EXTRA SLOT</span>
+                <button type="button" class="px-9slice px-btn lfg-hotbar-slot" data-slice-id="lfg_03_panel_sidebar" data-slice-9="22,22,22,22" style="--skin-url: url('../../assets/loot-forge-gun/03_panel_sidebar.png'); --pixel-scale: 0.34;" data-item-slot="3" title="Locked Extra Slot">
+                  <img class="px-icon" src="../../assets/loot-forge-gun/32_icon_padlock.png" data-slice-id="lfg_32_icon_padlock" style="--w:28;--h:32;--pixel-scale:1;" data-render-mode="final" alt="Locked">
+                  <div class="px-wire-box lfg-slot-ph" style="width: 34px; height: 32px;" data-render-mode="wireframe">[LOCK]</div>
+                  <span class="lfg-hotbar-name lfg-stroke-gold">LOCKED</span>
                 </button>
               </div>
             </div>
@@ -2682,8 +2731,22 @@
           } else if (act === 'toggle-auto') {
             const on = actionBtn.textContent.includes('ON');
             actionBtn.textContent = on ? 'AUTO: OFF' : 'AUTO: ON';
+          } else if (act === 'toggle-buffs') {
+            const pop = document.querySelector('[data-buff-popover]');
+            if (pop) {
+              const open = pop.classList.toggle('is-open');
+              actionBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            }
           }
           return;
+        }
+
+        // Dismiss Buffs popover when tapping anywhere outside it
+        const openPop = document.querySelector('[data-buff-popover].is-open');
+        if (openPop && !ev.target.closest('[data-buff-popover]')) {
+          openPop.classList.remove('is-open');
+          const trig = document.querySelector('[data-action="toggle-buffs"]');
+          if (trig) trig.setAttribute('aria-expanded', 'false');
         }
 
         const sellRowBtn = ev.target.closest('[data-sell-row]');

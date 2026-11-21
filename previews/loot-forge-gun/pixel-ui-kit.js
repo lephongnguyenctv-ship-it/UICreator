@@ -2167,8 +2167,8 @@
     badge.classList.add(crowded ? 'is-warn' : 'is-ok');
     badge.textContent = `HUD: ${res.hudPct}% · Center: ${res.centerPct}%`;
     badge.title = crowded
-      ? `Advisory: Gameplay HUD covers ${res.hudPct}% of screen (target ≤ 22%) and ${res.centerPct}% of the Center 40% Focus Zone (target ≤ 5%).`
-      : `Clean HUD budget: ${res.hudPct}% screen coverage, ${res.centerPct}% Center 40% Focus Zone intrusion.`;
+      ? `${res.hudPct}% of canvas covered by HUD · ${res.centerPct}% of Center 40% Focus Zone covered (advisory target: ≤22% / ≤5%).`
+      : `${res.hudPct}% of canvas covered by HUD · ${res.centerPct}% of Center 40% Focus Zone covered (clean target: ≤22% / ≤5%).`;
   }
 
   function setScene(sceneName) {
