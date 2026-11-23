@@ -10,9 +10,41 @@ echo.
 echo Syncing UI Gallery and starting local backend server on port 17890...
 echo (Keep this window open while editing 9-slice borders. Press Ctrl+C to stop.)
 echo.
-python ".agents\skills\game-ui-preview\scripts\slice_sprites.py" --output "previews\_catalog" --serve --port 17890 --open
+set "SCRIPT=.agents\skills\game-ui-preview\scripts\slice_sprites.py"
+set "ARGS=--output previews\_catalog --serve --port 17890 --open"
+
+where uv >nul 2>&1
+if not errorlevel 1 (
+  uv run --with pillow "%SCRIPT%" %ARGS%
+  goto :check_exit
+)
+
+if exist "%USERPROFILE%\.local\bin\uv.exe" (
+  "%USERPROFILE%\.local\bin\uv.exe" run --with pillow "%SCRIPT%" %ARGS%
+  goto :check_exit
+)
+
+python -c "import PIL" >nul 2>&1
+if not errorlevel 1 (
+  python "%SCRIPT%" %ARGS%
+  goto :check_exit
+)
+
+py -3 -c "import PIL" >nul 2>&1
+if not errorlevel 1 (
+  py -3 "%SCRIPT%" %ARGS%
+  goto :check_exit
+)
+
+echo [ERROR] No working Python 3 + Pillow installation or uv runner was found.
+echo Install uv or Python 3 with Pillow: pip install pillow
+pause
+exit /b 1
+
+:check_exit
 if errorlevel 1 (
   echo.
-  echo [ERROR] Server exited with an error. Make sure Python 3 and Pillow are installed.
+  echo [ERROR] Server exited with an error. Make sure Python 3 and Pillow or uv are installed.
   pause
+  exit /b 1
 )

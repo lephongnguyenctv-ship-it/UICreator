@@ -6,6 +6,7 @@
   const DEFAULT_CATALOG_BASE = '../_catalog/';
   const OVERRIDES_STORAGE_KEY = 'pixelui_slice9_overrides_v1';
   const UI_EDITS_STORAGE_PREFIX = 'pixelui_ui_edits_v1:';
+  const BACKDROP_STORAGE_PREFIX = 'pixelui_backdrop_v1:';
 
   const STUDIO_SERVER_PORT = 17890;
   const FS_DB_NAME = 'pixelui_fs_handles_v1';
@@ -19,6 +20,7 @@
     activeEditorSliceAttr: 'data-slice-id',
     currentMode: 'final',
     studioVisible: false,
+    focusZoneVisible: false,
     applyAllInstances: true,
     swapAllSprites: false,
     collapsedViews: new WeakMap(),
@@ -216,7 +218,13 @@
   }
 
   function isInternalOverlayElement(el) {
-    return Boolean(el && (el.id === '__verify_annotations__' || el.id === '__px_transform_gizmo__'));
+    return Boolean(
+      el &&
+        (el.id === '__verify_annotations__' ||
+          el.id === '__px_transform_gizmo__' ||
+          el.id === '__px_focus_zone__' ||
+          (el.classList && el.classList.contains('px-tint-overlay')))
+    );
   }
 
   function getElementCanvasPath(el) {
@@ -264,6 +272,7 @@
       textEdits: Object.assign({}, diskEdits.textEdits || {}, localEdits.textEdits || {}),
       spriteEdits: Object.assign({}, diskEdits.spriteEdits || {}, localEdits.spriteEdits || {}),
       transformEdits: Object.assign({}, diskEdits.transformEdits || {}, localEdits.transformEdits || {}),
+      tintEdits: Object.assign({}, diskEdits.tintEdits || {}, localEdits.tintEdits || {}),
     };
   }
 
@@ -273,6 +282,7 @@
       textEdits: edits && edits.textEdits ? edits.textEdits : {},
       spriteEdits: edits && edits.spriteEdits ? edits.spriteEdits : {},
       transformEdits: edits && edits.transformEdits ? edits.transformEdits : {},
+      tintEdits: edits && edits.tintEdits ? edits.tintEdits : {},
     };
     global.PIXELUI_EDITS = global.PIXELUI_EDITS || {};
     global.PIXELUI_EDITS[slug] = normalized;
@@ -281,7 +291,8 @@
       if (
         Object.keys(normalized.textEdits).length === 0 &&
         Object.keys(normalized.spriteEdits).length === 0 &&
-        Object.keys(normalized.transformEdits).length === 0
+        Object.keys(normalized.transformEdits).length === 0 &&
+        Object.keys(normalized.tintEdits).length === 0
       ) {
         global.localStorage.removeItem(UI_EDITS_STORAGE_PREFIX + slug);
       } else {
@@ -305,6 +316,8 @@
     'data-slice-on',
     'data-slice-off',
     'data-slice-9',
+    'data-tint',
+    'data-tint-mode',
   ];
 
   const BUTTON_STATE_DEFS = [
@@ -1541,6 +1554,16 @@
     if (spriteTarget && spriteTarget !== el) {
       resetSingleElementSpriteAttrs(spriteTarget, edits);
     }
+    const elPath = getElementCanvasPath(el);
+    if (elPath && edits.tintEdits[elPath]) delete edits.tintEdits[elPath];
+    if (spriteTarget && spriteTarget !== el) {
+      const spPath = getElementCanvasPath(spriteTarget);
+      if (spPath && edits.tintEdits[spPath]) delete edits.tintEdits[spPath];
+    }
+    applyTintToElement(el, el.getAttribute('data-slice-id'));
+    if (spriteTarget && spriteTarget !== el) {
+      applyTintToElement(spriteTarget, spriteTarget.getAttribute('data-slice-id'));
+    }
     resetSingleElementTransform(el, edits);
 
     // Reset text edits on el or its targetEl
@@ -1568,6 +1591,7 @@
     const spriteEntries = Object.entries(edits.spriteEdits || {});
     const textEntries = Object.entries(edits.textEdits || {});
     const transformEntries = Object.entries(edits.transformEdits || {});
+    const tintEntries = Object.entries(edits.tintEdits || {});
 
     spriteEntries.forEach(([pathKey, attrMap]) => {
       const el = resolveElementByCanvasPath(pathKey);
@@ -1617,7 +1641,25 @@
       applyWidgetTransformToDom(el, tf, { applyCss: true });
     });
 
-    return spriteEntries.length + textEntries.length + transformEntries.length;
+    tintEntries.forEach(([pathKey, tintCfg]) => {
+      const el = resolveElementByCanvasPath(pathKey);
+      if (!el || !tintCfg || typeof tintCfg !== 'object') return;
+      snapshotWidgetOriginals(el);
+      if (tintCfg.color) {
+        el.setAttribute('data-tint', String(tintCfg.color));
+        if (tintCfg.mode && tintCfg.mode !== 'auto') {
+          el.setAttribute('data-tint-mode', String(tintCfg.mode));
+        } else {
+          el.removeAttribute('data-tint-mode');
+        }
+      } else {
+        el.removeAttribute('data-tint');
+        el.removeAttribute('data-tint-mode');
+      }
+      applyTintToElement(el, el.getAttribute('data-slice-id'));
+    });
+
+    return spriteEntries.length + textEntries.length + transformEntries.length + tintEntries.length;
   }
 
   function parseSlice9Attr(raw) {
@@ -1662,6 +1704,95 @@
     return rec && Array.isArray(rec.slice_9) && rec.slice_9.length === 4 ? rec.slice_9 : null;
   }
 
+  function resolveEffectiveTintMode(el, sliceId, rec) {
+    const rawMode = String((el && el.getAttribute('data-tint-mode')) || 'auto').trim().toLowerCase();
+    if (rawMode === 'mask' || rawMode === 'multiply') return rawMode;
+    const isWhite = Boolean(rec && rec.is_white_mask_candidate);
+    if (isWhite) return 'mask';
+    if (el && el.tagName === 'IMG') return 'mask';
+    return 'multiply';
+  }
+
+  function applyTintToElement(el, sliceId) {
+    if (!el || el.nodeType !== 1) return;
+    const tintHex = (el.getAttribute('data-tint') || '').trim();
+    const existingOverlay = Array.from(el.children).find(c => c.classList && c.classList.contains('px-tint-overlay'));
+
+    if (!tintHex) {
+      el.classList.remove('px-tint-mask', 'px-tint-multiply');
+      el.style.removeProperty('--px-tint-color');
+      el.style.removeProperty('--px-tint-mask-url');
+      if (existingOverlay) existingOverlay.remove();
+      return;
+    }
+
+    const resolved = sliceId ? resolveSliceUrl(sliceId) : null;
+    const rec = resolved ? resolved.rec : null;
+    const url = resolved ? resolved.url : el.tagName === 'IMG' ? el.getAttribute('src') : '';
+    const mode = resolveEffectiveTintMode(el, sliceId, rec);
+
+    el.style.setProperty('--px-tint-color', tintHex);
+
+    if (mode === 'mask') {
+      if (existingOverlay) existingOverlay.remove();
+      el.classList.remove('px-tint-multiply');
+      if (url) {
+        el.style.setProperty('--px-tint-mask-url', `url("${url}")`);
+      }
+      el.classList.add('px-tint-mask');
+    } else {
+      el.classList.remove('px-tint-mask');
+      el.style.removeProperty('--px-tint-mask-url');
+      el.classList.add('px-tint-multiply');
+      let overlay = existingOverlay;
+      if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.className = 'px-tint-overlay';
+        overlay.setAttribute('aria-hidden', 'true');
+        el.insertBefore(overlay, el.firstChild);
+      }
+    }
+  }
+
+  function setWidgetTint(el, colorHex, mode = 'auto', persist = true) {
+    if (!el) return Promise.resolve({ ok: false });
+    const target = isButtonComponent(el) ? getButtonSpriteTargetEl(el) || el : el;
+    snapshotWidgetOriginals(target);
+    const cleanHex = String(colorHex || '').trim();
+    const cleanMode = ['mask', 'multiply', 'auto'].includes(String(mode || '').toLowerCase())
+      ? String(mode).toLowerCase()
+      : 'auto';
+
+    if (cleanHex) {
+      target.setAttribute('data-tint', cleanHex);
+      if (cleanMode === 'auto') target.removeAttribute('data-tint-mode');
+      else target.setAttribute('data-tint-mode', cleanMode);
+    } else {
+      target.removeAttribute('data-tint');
+      target.removeAttribute('data-tint-mode');
+    }
+
+    applyTintToElement(target, target.getAttribute('data-slice-id'));
+
+    const pathKey = getElementCanvasPath(target);
+    if (pathKey) {
+      const edits = loadUiEdits();
+      if (cleanHex) {
+        edits.tintEdits[pathKey] = { color: cleanHex, mode: cleanMode };
+      } else {
+        delete edits.tintEdits[pathKey];
+      }
+      saveUiEdits(edits);
+    }
+
+    if (persist) return persistUiEditsToDisk();
+    return Promise.resolve({ ok: true, method: 'browser-storage' });
+  }
+
+  function clearWidgetTint(el, persist = true) {
+    return setWidgetTint(el, '', 'auto', persist);
+  }
+
   function applySliceToElement(el, sliceId) {
     const resolved = resolveSliceUrl(sliceId);
     if (!resolved) {
@@ -1674,6 +1805,7 @@
       el.src = url;
       if (!el.style.getPropertyValue('--w')) el.style.setProperty('--w', String(rec.width));
       if (!el.style.getPropertyValue('--h')) el.style.setProperty('--h', String(rec.height));
+      applyTintToElement(el, sliceId);
       return;
     }
 
@@ -1689,6 +1821,7 @@
       el.style.setProperty('--slice-b', String(b));
       el.style.setProperty('--slice-l', String(l));
     }
+    applyTintToElement(el, sliceId);
   }
 
   function hydrateSprites(root = document) {
@@ -1786,6 +1919,7 @@
     }
 
     document.dispatchEvent(new CustomEvent('pixelui:modechange', { detail: { mode: normalized } }));
+    updateHudBudgetBadge();
   }
 
   function setState(stateId) {
@@ -1822,6 +1956,7 @@
     flushPendingTransforms();
     renderHierarchyTree();
     renderTransformGizmo();
+    updateHudBudgetBadge();
     document.dispatchEvent(new CustomEvent('pixelui:statechange', { detail: { state: stateId } }));
   }
 
@@ -1835,6 +1970,205 @@
       renderInspector();
     }
     renderTransformGizmo();
+    updateHudBudgetBadge();
+  }
+
+  /* ========================================================================
+     HUD Ergonomics: Focus Zone Overlay, Custom Preview Backdrop & HUD Budget
+     ======================================================================== */
+
+  function ensureFocusZoneOverlay() {
+    const canvas = document.getElementById('game-canvas');
+    if (!canvas) return null;
+    let overlay = document.getElementById('__px_focus_zone__');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = '__px_focus_zone__';
+      overlay.setAttribute('aria-hidden', 'true');
+      canvas.appendChild(overlay);
+    }
+    return overlay;
+  }
+
+  function toggleFocusZone(forceState) {
+    const next = typeof forceState === 'boolean' ? forceState : !state.focusZoneVisible;
+    state.focusZoneVisible = next;
+    const overlay = ensureFocusZoneOverlay();
+    if (overlay) {
+      overlay.classList.toggle('is-visible', next);
+    }
+    document.querySelectorAll('[data-wb-focus-zone]').forEach(btn => {
+      btn.classList.toggle('is-active', next);
+      btn.setAttribute('aria-pressed', next ? 'true' : 'false');
+    });
+    return next;
+  }
+
+  function setCustomBackdrop(dataUrl, persist = true) {
+    const canvas = document.getElementById('game-canvas');
+    if (!canvas || !dataUrl) return false;
+    canvas.style.setProperty('--px-custom-backdrop', `url("${dataUrl}")`);
+    canvas.classList.add('has-custom-backdrop');
+    const clearBtn = document.querySelector('[data-wb-backdrop-clear]');
+    if (clearBtn) clearBtn.style.display = 'inline-flex';
+    const pickBtn = document.querySelector('[data-wb-backdrop-pick]');
+    if (pickBtn) pickBtn.classList.add('is-active');
+    if (persist) {
+      try {
+        if (global.localStorage) {
+          global.localStorage.setItem(BACKDROP_STORAGE_PREFIX + getPreviewSlugForEdits(), dataUrl);
+        }
+      } catch {
+        // Ignore quota errors for very large screenshots
+      }
+    }
+    return true;
+  }
+
+  function clearCustomBackdrop() {
+    const canvas = document.getElementById('game-canvas');
+    if (canvas) {
+      canvas.classList.remove('has-custom-backdrop');
+      canvas.style.removeProperty('--px-custom-backdrop');
+    }
+    const clearBtn = document.querySelector('[data-wb-backdrop-clear]');
+    if (clearBtn) clearBtn.style.display = 'none';
+    const pickBtn = document.querySelector('[data-wb-backdrop-pick]');
+    if (pickBtn) pickBtn.classList.remove('is-active');
+    try {
+      if (global.localStorage) {
+        global.localStorage.removeItem(BACKDROP_STORAGE_PREFIX + getPreviewSlugForEdits());
+      }
+    } catch {
+      // Ignore storage errors
+    }
+  }
+
+  function loadSavedBackdrop() {
+    if (isCleanMode()) return;
+    try {
+      const saved = global.localStorage && global.localStorage.getItem(BACKDROP_STORAGE_PREFIX + getPreviewSlugForEdits());
+      if (saved) setCustomBackdrop(saved, false);
+    } catch {
+      // Ignore storage errors
+    }
+  }
+
+  function loadBackdropFile(file) {
+    if (!file || !file.type || !file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setCustomBackdrop(reader.result, true);
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function computeHudBudget() {
+    const canvas = document.getElementById('game-canvas');
+    if (!canvas) return null;
+    const cRect = canvas.getBoundingClientRect();
+    if (cRect.width <= 0 || cRect.height <= 0) return null;
+
+    const isVis = el => {
+      if (!el || el.nodeType !== 1 || isInternalOverlayElement(el)) return false;
+      const cs = getComputedStyle(el);
+      if (cs.display === 'none' || cs.visibility === 'hidden' || parseFloat(cs.opacity || '1') <= 0) return false;
+      const r = el.getBoundingClientRect();
+      return r.width > 1 && r.height > 1;
+    };
+
+    const activeView = canvas.querySelector('[data-ui-view].is-active') || canvas;
+    const hasModal = Boolean(
+      activeView.classList.contains('px-modal-backdrop') ||
+        Array.from(activeView.querySelectorAll('.px-modal-backdrop')).some(isVis)
+    );
+    if (hasModal) {
+      return { isModal: true, hudPct: 0, centerPct: 0 };
+    }
+
+    const focusRect = {
+      left: cRect.left + cRect.width * 0.3,
+      top: cRect.top + cRect.height * 0.3,
+      right: cRect.left + cRect.width * 0.7,
+      bottom: cRect.top + cRect.height * 0.7,
+    };
+    const focusArea = (focusRect.right - focusRect.left) * (focusRect.bottom - focusRect.top);
+    const canvasArea = cRect.width * cRect.height;
+
+    const widgets = [];
+    const isTransparentWrapper = el => {
+      if (el.matches('.px-9slice, .px-sprite-box, .px-btn, .px-wire-box, img, button')) return false;
+      if (el.children.length === 0) return false;
+      const cs = getComputedStyle(el);
+      const bgCol = cs.backgroundColor || '';
+      const hasBgCol = bgCol !== '' && bgCol !== 'transparent' && bgCol !== 'rgba(0, 0, 0, 0)';
+      const hasBgImg = cs.backgroundImage && cs.backgroundImage !== 'none';
+      const hasBorderImg = cs.borderImageSource && cs.borderImageSource !== 'none';
+      return !hasBgCol && !hasBgImg && !hasBorderImg;
+    };
+    const walk = container => {
+      for (const child of Array.from(container.children)) {
+        if (!isVis(child)) continue;
+        if (child.classList.contains('world-backdrop-props') || child.getAttribute('data-wireframe-hide') === 'true') {
+          continue;
+        }
+        if (
+          child.matches('.px-hud-layer, .px-hud-top, .px-hud-bottom, .px-hud-left, .px-hud-right') ||
+          isTransparentWrapper(child)
+        ) {
+          walk(child);
+        } else {
+          widgets.push(child);
+        }
+      }
+    };
+    walk(activeView);
+
+    let hudArea = 0;
+    let centerOverlap = 0;
+    for (const w of widgets) {
+      const r = w.getBoundingClientRect();
+      const cl = Math.max(cRect.left, r.left);
+      const ct = Math.max(cRect.top, r.top);
+      const cr = Math.min(cRect.right, r.right);
+      const cb = Math.min(cRect.bottom, r.bottom);
+      if (cr > cl && cb > ct) hudArea += (cr - cl) * (cb - ct);
+
+      const fl = Math.max(focusRect.left, r.left);
+      const ft = Math.max(focusRect.top, r.top);
+      const fr = Math.min(focusRect.right, r.right);
+      const fb = Math.min(focusRect.bottom, r.bottom);
+      if (fr > fl && fb > ft) centerOverlap += (fr - fl) * (fb - ft);
+    }
+
+    return {
+      isModal: false,
+      hudPct: Math.min(100, Math.round((hudArea / canvasArea) * 100)),
+      centerPct: Math.min(100, Math.round((centerOverlap / focusArea) * 100)),
+    };
+  }
+
+  function updateHudBudgetBadge() {
+    if (isCleanMode()) return;
+    const badge = document.getElementById('wb-hud-budget');
+    if (!badge) return;
+    const res = computeHudBudget();
+    if (!res) return;
+    badge.classList.remove('is-ok', 'is-warn', 'is-modal');
+    if (res.isModal) {
+      badge.classList.add('is-modal');
+      badge.textContent = 'HUD: Modal';
+      badge.title = 'Full modal/popup view — HUD visual budget applies to gameplay HUD views.';
+      return;
+    }
+    const crowded = res.hudPct > 22 || res.centerPct > 5;
+    badge.classList.add(crowded ? 'is-warn' : 'is-ok');
+    badge.textContent = `HUD: ${res.hudPct}% · Center: ${res.centerPct}%`;
+    badge.title = crowded
+      ? `${res.hudPct}% of canvas covered by HUD · ${res.centerPct}% of Center 40% Focus Zone covered (advisory target: ≤22% / ≤5%).`
+      : `${res.hudPct}% of canvas covered by HUD · ${res.centerPct}% of Center 40% Focus Zone covered (clean target: ≤22% / ≤5%).`;
   }
 
   function setScene(sceneName) {
@@ -2415,6 +2749,60 @@
         editBtn.textContent = 'Edit UI';
         modeGroup.insertBefore(editBtn, finalBtn);
       }
+    }
+
+    // Inject mobile HUD Designer Tools (Focus Zone toggle, Custom Backdrop uploader, Advisory HUD Budget)
+    const controlsBar = document.querySelector('.workbench-controls');
+    if (controlsBar && !controlsBar.querySelector('[data-wb-focus-zone]')) {
+      const hudGroup = document.createElement('div');
+      hudGroup.className = 'wb-group';
+      hudGroup.innerHTML = `
+        <span class="wb-label">HUD</span>
+        <button type="button" class="wb-btn" data-wb-focus-zone aria-pressed="false" title="Toggle Center 40% Gameplay Focus Zone guide">Focus Zone</button>
+        <button type="button" class="wb-btn" data-wb-backdrop-pick title="Upload or drop a gameplay screenshot as a preview-only backdrop">Backdrop…</button>
+        <button type="button" class="wb-btn" data-wb-backdrop-clear style="display:none;" title="Clear custom preview backdrop">×</button>
+        <input type="file" id="wb-backdrop-file-input" accept="image/*" style="display:none;">
+        <span id="wb-hud-budget" class="wb-budget-badge is-ok" title="Live advisory gameplay HUD coverage">HUD: --</span>
+      `;
+      controlsBar.appendChild(hudGroup);
+
+      const focusBtn = hudGroup.querySelector('[data-wb-focus-zone]');
+      const pickBtn = hudGroup.querySelector('[data-wb-backdrop-pick]');
+      const clearBtn = hudGroup.querySelector('[data-wb-backdrop-clear]');
+      const fileInput = hudGroup.querySelector('#wb-backdrop-file-input');
+
+      if (focusBtn) {
+        focusBtn.addEventListener('click', () => toggleFocusZone());
+      }
+      if (pickBtn && fileInput) {
+        pickBtn.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', () => {
+          const file = fileInput.files && fileInput.files[0];
+          if (file) loadBackdropFile(file);
+          fileInput.value = '';
+        });
+      }
+      if (clearBtn) {
+        clearBtn.addEventListener('click', () => clearCustomBackdrop());
+      }
+
+      canvas.addEventListener('dragover', evt => {
+        if (evt.dataTransfer && Array.from(evt.dataTransfer.types || []).includes('Files')) {
+          evt.preventDefault();
+          canvas.classList.add('is-backdrop-dragover');
+        }
+      });
+      canvas.addEventListener('dragleave', () => {
+        canvas.classList.remove('is-backdrop-dragover');
+      });
+      canvas.addEventListener('drop', evt => {
+        canvas.classList.remove('is-backdrop-dragover');
+        const file = evt.dataTransfer && evt.dataTransfer.files && evt.dataTransfer.files[0];
+        if (file && file.type && file.type.startsWith('image/')) {
+          evt.preventDefault();
+          loadBackdropFile(file);
+        }
+      });
     }
 
     if (!document.getElementById('wb-hierarchy-panel')) {
@@ -3120,6 +3508,34 @@
       `;
     }
 
+    const tintTargetEl = isBtnComp ? buttonSpriteTargetEl : sliceAttrs.length > 0 ? el : null;
+    if (tintTargetEl) {
+      const tintSliceId = tintTargetEl.getAttribute('data-slice-id');
+      const tintResolved = tintSliceId ? resolveSliceUrl(tintSliceId) : null;
+      const autoModeLabel = resolveEffectiveTintMode(tintTargetEl, tintSliceId, tintResolved ? tintResolved.rec : null);
+      const currentTint = (tintTargetEl.getAttribute('data-tint') || '').trim();
+      const currentTintMode = (tintTargetEl.getAttribute('data-tint-mode') || 'auto').trim().toLowerCase();
+      const pickerColor = /^#[0-9a-fA-F]{6}$/.test(currentTint) ? currentTint : '#f3c65f';
+
+      html += `
+        <div class="wb-insp-card">
+          <div class="wb-insp-section-title">Sprite Tint</div>
+          <div class="wb-tint-row">
+            <input type="color" id="wb-insp-tint-color" class="wb-tint-color-input" value="${escapeHtml(pickerColor)}" title="Pick sprite tint color">
+            <input type="text" id="wb-insp-tint-hex" class="wb-tint-hex-input" value="${escapeHtml(currentTint)}" placeholder="#RRGGBB (none)">
+            <button type="button" class="wb-btn wb-btn-sm" data-insp-tint-clear>Clear</button>
+          </div>
+          <div class="wb-tint-modes">
+            <button type="button" class="wb-btn wb-btn-sm ${currentTintMode === 'auto' ? 'is-active' : ''}" data-insp-tint-mode="auto">Auto (${autoModeLabel})</button>
+            <button type="button" class="wb-btn wb-btn-sm ${currentTintMode === 'mask' ? 'is-active' : ''}" data-insp-tint-mode="mask">Mask</button>
+            <button type="button" class="wb-btn wb-btn-sm ${currentTintMode === 'multiply' ? 'is-active' : ''}" data-insp-tint-mode="multiply">Multiply</button>
+          </div>
+          <div class="wb-insp-hint">Mask for pure-white icons; Multiply preserves shading on wood/metal frames.</div>
+          <div id="wb-tint-feedback" class="wb-insp-feedback"></div>
+        </div>
+      `;
+    }
+
     body.innerHTML = html;
   }
 
@@ -3234,7 +3650,7 @@
         typeof target.closest !== 'function' ||
         !canvas ||
         !canvas.contains(target) ||
-        target.closest('#__verify_annotations__, #__px_transform_gizmo__')
+        target.closest('#__verify_annotations__, #__px_transform_gizmo__, #__px_focus_zone__')
       ) {
         return null;
       }
@@ -3774,6 +4190,38 @@
         const inp = document.getElementById('wb-insp-slice-input');
         const attrName = state.activeEditorSliceAttr || 'data-slice-id';
         applyInputSliceValue(state.selectedEl, attrName, inp ? inp.value : '', 'wb-sprite-feedback');
+        return;
+      }
+
+      const tintClearBtn = evt.target.closest('[data-insp-tint-clear]');
+      if (tintClearBtn && state.selectedEl) {
+        clearWidgetTint(state.selectedEl, true).then(result => {
+          renderInspector();
+          const fb = document.getElementById('wb-tint-feedback');
+          if (fb) {
+            fb.textContent =
+              result.method === 'studio-server' ? '✓ Tint cleared & saved to ui-edits.js' : '✓ Tint cleared';
+          }
+        });
+        return;
+      }
+
+      const tintModeBtn = evt.target.closest('[data-insp-tint-mode]');
+      if (tintModeBtn && state.selectedEl) {
+        const nextMode = tintModeBtn.getAttribute('data-insp-tint-mode') || 'auto';
+        const hexEl = document.getElementById('wb-insp-tint-hex');
+        const colEl = document.getElementById('wb-insp-tint-color');
+        const hexVal = (hexEl && hexEl.value.trim()) || (colEl && colEl.value) || '#f3c65f';
+        setWidgetTint(state.selectedEl, hexVal, nextMode, true).then(result => {
+          renderInspector();
+          const fb = document.getElementById('wb-tint-feedback');
+          if (fb) {
+            fb.textContent =
+              result.method === 'studio-server'
+                ? `✓ Tint (${nextMode}) saved to ui-edits.js`
+                : `✓ Tint (${nextMode}) applied`;
+          }
+        });
         return;
       }
 
@@ -4738,8 +5186,46 @@
     }
 
     ensureStudioShell();
+    const inspBody = document.getElementById('wb-inspector-body');
+    if (inspBody && !inspBody.dataset.tintWired) {
+      inspBody.dataset.tintWired = '1';
+      const applyTintFromInputs = persist => {
+        if (!state.selectedEl) return;
+        const hexEl = document.getElementById('wb-insp-tint-hex');
+        const activeModeBtn = inspBody.querySelector('[data-insp-tint-mode].is-active');
+        const modeVal = (activeModeBtn && activeModeBtn.getAttribute('data-insp-tint-mode')) || 'auto';
+        const rawHex = hexEl ? hexEl.value.trim() : '';
+        if (rawHex && !/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(rawHex)) return;
+        setWidgetTint(state.selectedEl, rawHex, modeVal, persist).then(result => {
+          const fb = document.getElementById('wb-tint-feedback');
+          if (fb && persist) {
+            fb.textContent =
+              result.method === 'studio-server' ? '✓ Tint saved to ui-edits.js' : '✓ Tint saved in browser storage';
+          }
+        });
+      };
+      inspBody.addEventListener('input', evt => {
+        if (evt.target && evt.target.id === 'wb-insp-tint-color') {
+          const hexEl = document.getElementById('wb-insp-tint-hex');
+          if (hexEl) hexEl.value = evt.target.value;
+          applyTintFromInputs(false);
+        } else if (evt.target && evt.target.id === 'wb-insp-tint-hex') {
+          const colEl = document.getElementById('wb-insp-tint-color');
+          if (colEl && /^#[0-9a-fA-F]{6}$/.test(evt.target.value.trim())) {
+            colEl.value = evt.target.value.trim();
+          }
+          applyTintFromInputs(false);
+        }
+      });
+      inspBody.addEventListener('change', evt => {
+        if (evt.target && (evt.target.id === 'wb-insp-tint-color' || evt.target.id === 'wb-insp-tint-hex')) {
+          applyTintFromInputs(true);
+        }
+      });
+    }
     applySavedUiEdits();
     hydrateSprites(document);
+    loadSavedBackdrop();
     wireInteractions();
     wireStudioInteractions();
 
@@ -4779,13 +5265,24 @@
         document.querySelector('[data-ui-view]').getAttribute('data-ui-view'));
 
     if (initialState) setState(initialState);
-    else renderHierarchyTree();
+    else {
+      renderHierarchyTree();
+      updateHudBudgetBadge();
+    }
   }
 
   global.PixelUI = {
     init,
     hydrateSprites,
     applySliceToElement,
+    applyTintToElement,
+    setWidgetTint,
+    clearWidgetTint,
+    toggleFocusZone,
+    setCustomBackdrop,
+    clearCustomBackdrop,
+    computeHudBudget,
+    updateHudBudgetBadge,
     setState,
     setRenderMode,
     isWireframeMode,
