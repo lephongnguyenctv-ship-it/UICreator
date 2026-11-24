@@ -467,8 +467,24 @@ def _clean_transform_pair(val: Any, default: list[float]) -> list[int | float]:
     return list(default)
 
 
+def _clean_hex_color(val: Any, default: str = "#FFFFFF") -> str:
+    raw = str(val or "").strip()
+    if re.fullmatch(r"#[0-9a-fA-F]{6}", raw):
+        return raw.upper()
+    if re.fullmatch(r"#[0-9a-fA-F]{3}", raw):
+        return ("#" + "".join(ch * 2 for ch in raw[1:])).upper()
+    return default
+
+
+def _clean_clamped_number(val: Any, lo: float, hi: float, default: float, decimals: int = 3) -> int | float:
+    num = float(_clean_transform_number(val, default))
+    num = max(lo, min(hi, num))
+    rounded = round(num, decimals)
+    return int(rounded) if rounded.is_integer() else rounded
+
+
 def apply_ui_edits_in_place(previews_root: Path, slug: str, edits_payload: dict[str, Any]) -> dict[str, Any]:
-    """Persist per-preview text, sprite, and transform edits to previews/<slug>/ui-edits.json and ui-edits.js."""
+    """Persist per-preview text, sprite, transform, label, and image edits to previews/<slug>/ui-edits.json and ui-edits.js."""
     clean_slug = str(slug or "").strip()
     if not clean_slug or "/" in clean_slug or "\\" in clean_slug or clean_slug.startswith("."):
         raise ValueError(f"Invalid preview slug: {slug!r}")
@@ -481,6 +497,9 @@ def apply_ui_edits_in_place(previews_root: Path, slug: str, edits_payload: dict[
     raw_text = edits_payload.get("textEdits") if isinstance(edits_payload, dict) else {}
     raw_sprites = edits_payload.get("spriteEdits") if isinstance(edits_payload, dict) else {}
     raw_transforms = edits_payload.get("transformEdits") if isinstance(edits_payload, dict) else {}
+    raw_tints = edits_payload.get("tintEdits") if isinstance(edits_payload, dict) else {}
+    raw_labels = edits_payload.get("labelEdits") if isinstance(edits_payload, dict) else {}
+    raw_images = edits_payload.get("imageEdits") if isinstance(edits_payload, dict) else {}
 
     clean_text: dict[str, str] = {}
     if isinstance(raw_text, dict):
@@ -495,8 +514,12 @@ def apply_ui_edits_in_place(previews_root: Path, slug: str, edits_payload: dict[
                 continue
             cleaned_attrs: dict[str, str] = {}
             for attr_name, slice_val in attr_map.items():
-                if isinstance(attr_name, str) and attr_name.strip() and isinstance(slice_val, str) and slice_val.strip():
-                    cleaned_attrs[attr_name.strip()] = slice_val.strip()
+                if not isinstance(attr_name, str) or not attr_name.strip() or not isinstance(slice_val, str):
+                    continue
+                aname = attr_name.strip()
+                sval = slice_val.strip()
+                if sval or aname in ("data-slice-hover", "data-slice-pressed"):
+                    cleaned_attrs[aname] = sval
             if cleaned_attrs:
                 clean_sprites[path_key.strip()] = cleaned_attrs
 
@@ -532,12 +555,122 @@ def apply_ui_edits_in_place(previews_root: Path, slug: str, edits_payload: dict[
             if entry:
                 clean_transforms[path_key.strip()] = entry
 
+    clean_tints: dict[str, dict[str, str]] = {}
+    if isinstance(raw_tints, dict):
+        for path_key, tint_obj in raw_tints.items():
+            if not isinstance(path_key, str) or not path_key.strip() or not isinstance(tint_obj, dict):
+                continue
+            col = str(tint_obj.get("color") or "").strip()
+            if not col:
+                continue
+            mode = str(tint_obj.get("mode") or "auto").strip().lower()
+            if mode not in ("auto", "mask", "multiply"):
+                mode = "auto"
+            clean_tints[path_key.strip()] = {"color": _clean_hex_color(col, col), "mode": mode}
+
+    clean_labels: dict[str, dict[str, Any]] = {}
+    if isinstance(raw_labels, dict):
+        for path_key, lbl_obj in raw_labels.items():
+            if not isinstance(path_key, str) or not path_key.strip() or not isinstance(lbl_obj, dict):
+                continue
+            entry: dict[str, Any] = {}
+            if "color" in lbl_obj:
+                entry["color"] = _clean_hex_color(lbl_obj["color"], "#FFFFFF")
+            if "alpha" in lbl_obj:
+                entry["alpha"] = _clean_clamped_number(lbl_obj["alpha"], 0.0, 100.0, 100.0, 1)
+            if "fontSize" in lbl_obj:
+                entry["fontSize"] = _clean_clamped_number(lbl_obj["fontSize"], 4.0, 256.0, 16.0, 1)
+            if "alignH" in lbl_obj and str(lbl_obj["alignH"]) in ("left", "center", "right", "fillH"):
+                entry["alignH"] = str(lbl_obj["alignH"])
+            if "alignV" in lbl_obj and str(lbl_obj["alignV"]) in ("top", "middle", "bottom", "fillV"):
+                entry["alignV"] = str(lbl_obj["alignV"])
+            for bkey in ("bold", "italic", "underline", "shadow", "outline"):
+                if bkey in lbl_obj:
+                    entry[bkey] = bool(lbl_obj[bkey])
+            if "lineSpacing" in lbl_obj:
+                entry["lineSpacing"] = _clean_clamped_number(lbl_obj["lineSpacing"], -64.0, 128.0, 0.0, 2)
+            if "overflow" in lbl_obj:
+                ov = int(_clean_transform_number(lbl_obj["overflow"], 0))
+                entry["overflow"] = ov if ov in (0, 1, 2) else 0
+            if "shadowColor" in lbl_obj:
+                entry["shadowColor"] = _clean_hex_color(lbl_obj["shadowColor"], "#000000")
+            if "shadowOffset" in lbl_obj:
+                entry["shadowOffset"] = _clean_transform_pair(lbl_obj["shadowOffset"], [1, 1])
+            if "shadowAlpha" in lbl_obj:
+                entry["shadowAlpha"] = _clean_clamped_number(lbl_obj["shadowAlpha"], 0.0, 1.0, 1.0, 3)
+            if "outlineColor" in lbl_obj:
+                entry["outlineColor"] = _clean_hex_color(lbl_obj["outlineColor"], "#000000")
+            if "outlineAlpha" in lbl_obj:
+                entry["outlineAlpha"] = _clean_clamped_number(lbl_obj["outlineAlpha"], 0.0, 1.0, 1.0, 3)
+            if "outlineWidth" in lbl_obj:
+                entry["outlineWidth"] = _clean_clamped_number(lbl_obj["outlineWidth"], 0.0, 24.0, 1.0, 2)
+            if "gradient" in lbl_obj:
+                gr = int(_clean_transform_number(lbl_obj["gradient"], 0))
+                entry["gradient"] = gr if gr in (0, 1, 2) else 0
+            if "gradientTop" in lbl_obj:
+                entry["gradientTop"] = _clean_hex_color(lbl_obj["gradientTop"], "#FFFFFF")
+            if "gradientTopAlpha" in lbl_obj:
+                entry["gradientTopAlpha"] = _clean_clamped_number(lbl_obj["gradientTopAlpha"], 0.0, 100.0, 100.0, 1)
+            if "gradientBottom" in lbl_obj:
+                entry["gradientBottom"] = _clean_hex_color(lbl_obj["gradientBottom"], "#FFFFFF")
+            if "gradientBottomAlpha" in lbl_obj:
+                entry["gradientBottomAlpha"] = _clean_clamped_number(lbl_obj["gradientBottomAlpha"], 0.0, 100.0, 100.0, 1)
+            if entry:
+                clean_labels[path_key.strip()] = entry
+
+    clean_images: dict[str, dict[str, Any]] = {}
+    if isinstance(raw_images, dict):
+        for path_key, img_obj in raw_images.items():
+            if not isinstance(path_key, str) or not path_key.strip() or not isinstance(img_obj, dict):
+                continue
+            entry: dict[str, Any] = {}
+            if "color" in img_obj:
+                entry["color"] = _clean_hex_color(img_obj["color"], "#FFFFFF")
+            if "tintMode" in img_obj and str(img_obj["tintMode"]).lower() in ("auto", "mask", "multiply"):
+                entry["tintMode"] = str(img_obj["tintMode"]).lower()
+            if "alpha" in img_obj:
+                entry["alpha"] = _clean_clamped_number(img_obj["alpha"], 0.0, 100.0, 100.0, 1)
+            for bkey in ("flipX", "flipY", "centerInvisible", "invertFill", "passthrough"):
+                if bkey in img_obj:
+                    entry[bkey] = bool(img_obj[bkey])
+            if "fillType" in img_obj:
+                ft = int(_clean_transform_number(img_obj["fillType"], 0))
+                entry["fillType"] = ft if ft in (0, 1, 2, 3, 5) else 0
+            if "fillDir" in img_obj:
+                fd = int(_clean_transform_number(img_obj["fillDir"], 0))
+                entry["fillDir"] = fd if fd in (0, 1, 2, 3, 4) else 0
+            if "fillAmount" in img_obj:
+                entry["fillAmount"] = _clean_clamped_number(img_obj["fillAmount"], 0.0, 1.0, 1.0, 3)
+            if "gradient" in img_obj:
+                gr = int(_clean_transform_number(img_obj["gradient"], 0))
+                entry["gradient"] = gr if gr in (0, 1, 2) else 0
+            if "gradientTop" in img_obj:
+                entry["gradientTop"] = _clean_hex_color(img_obj["gradientTop"], "#FFFFFF")
+            if "gradientTopAlpha" in img_obj:
+                entry["gradientTopAlpha"] = _clean_clamped_number(img_obj["gradientTopAlpha"], 0.0, 100.0, 100.0, 1)
+            if "gradientBottom" in img_obj:
+                entry["gradientBottom"] = _clean_hex_color(img_obj["gradientBottom"], "#FFFFFF")
+            if "gradientBottomAlpha" in img_obj:
+                entry["gradientBottomAlpha"] = _clean_clamped_number(img_obj["gradientBottomAlpha"], 0.0, 100.0, 100.0, 1)
+            if "pressedColor" in img_obj:
+                entry["pressedColor"] = _clean_hex_color(img_obj["pressedColor"], "#C5C5C5")
+            if "disableColor" in img_obj:
+                entry["disableColor"] = _clean_hex_color(img_obj["disableColor"], "#808080")
+            if entry:
+                clean_images[path_key.strip()] = entry
+
     normalized: dict[str, Any] = {
         "textEdits": clean_text,
         "spriteEdits": clean_sprites,
     }
     if clean_transforms:
         normalized["transformEdits"] = clean_transforms
+    if clean_tints:
+        normalized["tintEdits"] = clean_tints
+    if clean_labels:
+        normalized["labelEdits"] = clean_labels
+    if clean_images:
+        normalized["imageEdits"] = clean_images
 
     edits_json_path = target_dir / "ui-edits.json"
     edits_json_path.write_text(json.dumps(normalized, indent=2) + "\n", encoding="utf-8")

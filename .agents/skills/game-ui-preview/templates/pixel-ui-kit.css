@@ -2447,7 +2447,8 @@ body:not(.mode-wireframe) [data-render-mode="wireframe"] {
   filter: none !important;
 }
 
-#game-canvas.is-wireframe .px-tint-overlay {
+#game-canvas.is-wireframe .px-tint-overlay,
+#game-canvas.is-wireframe .px-grad-overlay {
   display: none !important;
 }
 
@@ -2455,4 +2456,876 @@ body:not(.mode-wireframe) [data-render-mode="wireframe"] {
   -webkit-mask-image: none !important;
   mask-image: none !important;
   background-color: rgba(51, 65, 85, 0.92) !important;
+}
+
+#game-canvas.is-wireframe .px-label-gradient {
+  background-image: none !important;
+  -webkit-background-clip: border-box !important;
+  background-clip: border-box !important;
+  -webkit-text-fill-color: #e2e8f0 !important;
+  color: #e2e8f0 !important;
+}
+
+#game-canvas.is-wireframe .px-img-filled,
+#game-canvas.is-wireframe .px-img-grad,
+#game-canvas.is-wireframe .px-img-tiled {
+  clip-path: none !important;
+  -webkit-mask-image: none !important;
+  mask-image: none !important;
+  object-position: center !important;
+}
+
+#game-canvas.is-wireframe .px-flip-active,
+#game-canvas.is-wireframe .px-flip-active > * {
+  scale: none !important;
+}
+
+/* ==========================================================================
+   Craftland UI Widget Components — Inspector Styles (Label / Image / Button)
+   ========================================================================== */
+
+.wb-cl-card {
+  gap: 8px;
+  position: relative;
+}
+
+.wb-cl-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wb-cl-body.is-collapsed {
+  display: none;
+}
+
+.wb-cl-row {
+  display: grid;
+  grid-template-columns: 98px 1fr;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.wb-cl-row--top {
+  align-items: start;
+}
+
+.wb-cl-row--top > .wb-cl-label {
+  padding-top: 5px;
+}
+
+.wb-cl-label {
+  font-size: 11px;
+  color: var(--px-workbench-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: none;
+}
+
+.wb-cl-ctrl {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.wb-cl-textarea {
+  width: 100%;
+  min-height: 52px;
+  background: #141720;
+  border: 1px solid #353c4f;
+  border-radius: 3px;
+  color: #f1f5f9;
+  font-family: var(--px-font-ui);
+  font-size: 12px;
+  line-height: 1.35;
+  padding: 6px 8px;
+  resize: vertical;
+}
+
+.wb-cl-textarea:focus {
+  outline: none;
+  border-color: #eab308;
+}
+
+/* Color Row (Swatch + #HEX + optional % + Eyedropper) */
+.wb-cl-color-wrap {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.wb-cl-color-box {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  background: #141720;
+  border: 1px solid #353c4f;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 5px;
+}
+
+.wb-cl-color-box:focus-within {
+  border-color: #eab308;
+}
+
+.wb-cl-swatch {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  border-radius: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  flex-shrink: 0;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.wb-cl-swatch input[type="color"] {
+  position: absolute;
+  inset: -4px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.wb-cl-hex {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  color: #f1f5f9;
+  font-family: var(--px-font-pixel);
+  font-size: 11px;
+  text-transform: uppercase;
+  outline: none;
+  padding: 0;
+}
+
+.wb-cl-alpha-inline {
+  width: 48px;
+  height: 26px;
+  flex-shrink: 0;
+  background: #141720;
+  border: 1px solid #353c4f;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  padding: 0 4px;
+}
+
+.wb-cl-alpha-inline:focus-within {
+  border-color: #eab308;
+}
+
+.wb-cl-alpha-inline input {
+  width: 100%;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: #f1f5f9;
+  font-family: var(--px-font-pixel);
+  font-size: 11px;
+  text-align: right;
+  outline: none;
+  padding: 0;
+}
+
+.wb-cl-alpha-inline span {
+  font-size: 10px;
+  color: var(--px-workbench-muted);
+  margin-left: 1px;
+  user-select: none;
+}
+
+.wb-cl-eyedropper {
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: #9aa4b8;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.12s ease, background 0.12s ease, border-color 0.12s ease;
+}
+
+.wb-cl-eyedropper:hover {
+  color: #facc15;
+  background: rgba(250, 204, 21, 0.1);
+  border-color: rgba(250, 204, 21, 0.35);
+}
+
+/* Craftland Amber/Gold Slider + Numeric Box */
+.wb-cl-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.wb-cl-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 1;
+  min-width: 0;
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(
+    to right,
+    #eab308 0%,
+    #eab308 var(--pct, 100%),
+    #353c4f var(--pct, 100%),
+    #353c4f 100%
+  );
+  outline: none;
+  cursor: pointer;
+}
+
+.wb-cl-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 7px;
+  height: 14px;
+  border-radius: 1.5px;
+  background: #facc15;
+  border: 1px solid #a16207;
+  cursor: ew-resize;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+}
+
+.wb-cl-slider::-moz-range-thumb {
+  width: 7px;
+  height: 14px;
+  border-radius: 1.5px;
+  background: #facc15;
+  border: 1px solid #a16207;
+  cursor: ew-resize;
+}
+
+.wb-cl-num-box {
+  width: 58px;
+  height: 26px;
+  flex-shrink: 0;
+  background: #141720;
+  border: 1px solid #353c4f;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+}
+
+.wb-cl-num-box:focus-within {
+  border-color: #eab308;
+}
+
+.wb-cl-num-box input {
+  width: 100%;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: #f1f5f9;
+  font-family: var(--px-font-pixel);
+  font-size: 11px;
+  outline: none;
+  padding: 0;
+}
+
+.wb-cl-num-box--full {
+  width: 100%;
+}
+
+.wb-cl-num-suffix {
+  font-size: 10px;
+  color: var(--px-workbench-muted);
+  margin-left: 2px;
+  user-select: none;
+}
+
+.wb-cl-icon-num {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.wb-cl-prefix-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #cbd5e1;
+  font-family: Georgia, serif;
+  font-size: 14px;
+  font-weight: 700;
+  user-select: none;
+}
+
+.wb-cl-stepper-input {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  background: #141720;
+  border: 1px solid #353c4f;
+  border-radius: 3px;
+  color: #f1f5f9;
+  font-family: var(--px-font-pixel);
+  font-size: 12px;
+  padding: 2px 7px;
+  color-scheme: dark;
+}
+
+.wb-cl-stepper-input:focus {
+  outline: none;
+  border-color: #eab308;
+}
+
+/* Segmented Icon Toggle Groups (Align H/V, B/I/U, Flip) */
+.wb-cl-seg-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.wb-cl-seg-btn {
+  appearance: none;
+  width: 28px;
+  height: 24px;
+  padding: 0;
+  background: #191d28;
+  border: 1px solid #32384a;
+  border-radius: 3px;
+  color: #9aa4b8;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  transition: background 0.1s ease, border-color 0.1s ease, color 0.1s ease;
+}
+
+.wb-cl-seg-btn:hover {
+  background: #252b3b;
+  color: #eef1f7;
+}
+
+.wb-cl-seg-btn.is-active {
+  background: #2d3446;
+  border-color: #eab308;
+  color: #facc15;
+}
+
+/* Craftland Amber/Gold Checkbox */
+.wb-cl-check {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  border-radius: 2.5px;
+  border: 1px solid #46506b;
+  background: #141720;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: background 0.1s ease, border-color 0.1s ease;
+}
+
+.wb-cl-check:hover {
+  border-color: #eab308;
+}
+
+.wb-cl-check:checked {
+  background: #eab308;
+  border-color: #facc15;
+}
+
+.wb-cl-check:checked::after {
+  content: "";
+  width: 4px;
+  height: 8px;
+  border: solid #141720;
+  border-width: 0 2px 2px 0;
+  transform: rotate(42deg) translate(-0.5px, -1px);
+}
+
+/* Dropdown Select */
+.wb-cl-select {
+  width: 100%;
+  height: 26px;
+  background: #141720;
+  border: 1px solid #353c4f;
+  border-radius: 3px;
+  color: #f1f5f9;
+  font-family: var(--px-font-ui);
+  font-size: 12px;
+  padding: 0 7px;
+  cursor: pointer;
+  color-scheme: dark;
+}
+
+.wb-cl-select:focus {
+  outline: none;
+  border-color: #eab308;
+}
+
+/* Collapsible Sub-section (Gradient) */
+.wb-cl-sub {
+  margin-top: 2px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(53, 60, 79, 0.55);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.wb-cl-subhead {
+  appearance: none;
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--px-workbench-text);
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.wb-cl-subhead:hover {
+  color: #facc15;
+}
+
+.wb-cl-subbody {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding-left: 8px;
+}
+
+.wb-cl-subbody.is-collapsed {
+  display: none;
+}
+
+.wb-cl-conditional {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.wb-cl-conditional.is-hidden {
+  display: none;
+}
+
+/* Craftland Sprite Shape / Resource Picker Widget */
+.wb-cl-sprite-widget {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #353c4f;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #141720;
+}
+
+.wb-cl-sprite-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  background: #191d28;
+  border-bottom: 1px solid #2b3142;
+  min-width: 0;
+}
+
+.wb-cl-sprite-bar--compact {
+  border: 1px solid #353c4f;
+  border-radius: 3px;
+}
+
+.wb-cl-sprite-mini {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border-radius: 2px;
+  background: #232732;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-size: 10px;
+  color: var(--px-workbench-muted);
+}
+
+.wb-cl-sprite-mini img {
+  max-width: 100%;
+  max-height: 100%;
+  image-rendering: pixelated;
+  object-fit: contain;
+}
+
+.wb-cl-sprite-name {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  color: #f1f5f9;
+  font-family: var(--px-font-pixel);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  outline: none;
+  padding: 0;
+}
+
+.wb-cl-sprite-pick-btn {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: #cbd5e1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wb-cl-sprite-pick-btn:hover {
+  color: #facc15;
+  background: rgba(250, 204, 21, 0.12);
+  border-color: rgba(250, 204, 21, 0.35);
+}
+
+.wb-cl-sprite-clear-btn {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wb-cl-sprite-clear-btn:hover {
+  color: #f87171;
+}
+
+.wb-cl-sprite-preview {
+  position: relative;
+  height: 88px;
+  background-color: #232732;
+  background-image:
+    linear-gradient(45deg, #2d3240 25%, transparent 25%),
+    linear-gradient(-45deg, #2d3240 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #2d3240 75%),
+    linear-gradient(-45deg, transparent 75%, #2d3240 75%);
+  background-size: 14px 14px;
+  background-position: 0 0, 0 7px, 7px -7px, -7px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  cursor: pointer;
+}
+
+.wb-cl-sprite-preview img {
+  max-width: 100%;
+  max-height: 100%;
+  image-rendering: pixelated;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.wb-cl-sprite-empty {
+  font-size: 11px;
+  color: var(--px-workbench-muted);
+}
+
+.wb-cl-sprite-dim {
+  position: absolute;
+  left: 5px;
+  bottom: 4px;
+  font-family: var(--px-font-pixel);
+  font-size: 9px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(15, 20, 30, 0.82);
+  color: #cbd5e1;
+  pointer-events: none;
+}
+
+.wb-cl-edit-s9-link {
+  position: absolute;
+  right: 5px;
+  bottom: 4px;
+  appearance: none;
+  background: rgba(15, 20, 30, 0.88);
+  border: 1px solid #46506b;
+  border-radius: 3px;
+  color: #facc15;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+
+.wb-cl-edit-s9-link:hover {
+  background: rgba(30, 41, 59, 0.96);
+  border-color: #facc15;
+}
+
+/* Menu Separators & Checked Items in ⋯ Popovers */
+.wb-tf-menu-sep {
+  height: 1px;
+  background: #2b3142;
+  margin: 3px 2px;
+}
+
+.wb-tf-menu-heading {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
+  padding: 4px 8px 2px;
+  user-select: none;
+}
+
+.wb-tf-menu-item.is-checked::before {
+  content: "✓ ";
+  color: #facc15;
+  font-weight: 700;
+}
+
+.wb-tf-menu-item--danger {
+  color: #fca5a5;
+}
+
+.wb-tf-menu-item--danger:hover {
+  background: rgba(239, 68, 68, 0.16);
+  color: #fecaca;
+}
+
+.wb-cl-num-box input::-webkit-inner-spin-button,
+.wb-cl-num-box input::-webkit-outer-spin-button,
+.wb-cl-alpha-inline input::-webkit-inner-spin-button,
+.wb-cl-alpha-inline input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* ==========================================================================
+   Craftland Canvas Rendering Primitives (9-Grid Invisible Center, Fill Types,
+   Flip, Gradients, Passthrough, Label Gradients)
+   ========================================================================== */
+
+/* 9-Grid Pattern: Invisible to Center (omits CSS border-image-slice 'fill') */
+.px-9slice.px-9slice-no-center {
+  border-image-slice: var(--slice-t, 5) var(--slice-r, 5) var(--slice-b, 5) var(--slice-l, 5) !important;
+}
+
+body:not(.mode-wireframe) .px-9slice.px-9slice--hd.px-9slice-no-center::before {
+  border-image-slice: var(--slice-t, 12) var(--slice-r, 12) var(--slice-b, 12) var(--slice-l, 12) !important;
+}
+
+/* Image Fill Types: Simple / Tiled / Fit / Filled */
+.px-img-simple:not(img) {
+  border-width: 0 !important;
+  border-image-source: none !important;
+  background-image: var(--skin-url) !important;
+  background-size: 100% 100% !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+}
+
+.px-img-simple.px-9slice--hd::before {
+  display: none !important;
+}
+
+img.px-img-simple {
+  object-fit: fill !important;
+}
+
+.px-img-tiled:not(img) {
+  border-width: 0 !important;
+  border-image-source: none !important;
+  background-image: var(--skin-url) !important;
+  background-repeat: repeat !important;
+  background-position: 0 0 !important;
+  background-size:
+    calc(var(--w, 32) * 1px * var(--pixel-scale, 1))
+    calc(var(--h, 32) * 1px * var(--pixel-scale, 1)) !important;
+}
+
+.px-img-tiled.px-9slice--hd::before {
+  display: none !important;
+}
+
+img.px-img-tiled {
+  object-position: -9999px -9999px !important;
+  background-image: var(--skin-url) !important;
+  background-repeat: repeat !important;
+  background-position: 0 0 !important;
+  background-size:
+    calc(var(--w, 32) * 1px * var(--pixel-scale, 1))
+    calc(var(--h, 32) * 1px * var(--pixel-scale, 1)) !important;
+}
+
+.px-img-fit:not(img) {
+  border-width: 0 !important;
+  border-image-source: none !important;
+  background-image: var(--skin-url) !important;
+  background-size: contain !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+}
+
+.px-img-fit.px-9slice--hd::before {
+  display: none !important;
+}
+
+img.px-img-fit {
+  object-fit: contain !important;
+}
+
+.px-img-filled:not(img) {
+  border-width: 0 !important;
+  border-image-source: none !important;
+  background-image: var(--skin-url) !important;
+  background-size: 100% 100% !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  clip-path: var(--px-fill-clip, none);
+  -webkit-mask-image: var(--px-fill-mask, none);
+  mask-image: var(--px-fill-mask, none);
+}
+
+.px-img-filled.px-9slice--hd::before {
+  display: none !important;
+}
+
+img.px-img-filled {
+  clip-path: var(--px-fill-clip, none);
+  -webkit-mask-image: var(--px-fill-mask, none);
+  mask-image: var(--px-fill-mask, none);
+}
+
+/* Sprite Flip (H / V) without clobbering Transform CSS 'rotate' or flipping child text */
+.px-9slice--hd.px-flip-active::before {
+  transform: scale(var(--px-flip-x, 1), var(--px-flip-y, 1));
+}
+
+.px-flip-active:not(.px-9slice--hd) {
+  scale: var(--px-flip-x, 1) var(--px-flip-y, 1);
+}
+
+.px-flip-active:not(.px-9slice--hd):not(img) > :not(.px-tint-overlay):not(.px-grad-overlay) {
+  scale: var(--px-flip-x, 1) var(--px-flip-y, 1);
+}
+
+/* Image / Button Gradient Overlay */
+.px-has-grad {
+  isolation: isolate;
+}
+
+.px-has-grad > .px-grad-overlay {
+  position: absolute;
+  inset: 0;
+  background-image: var(--px-grad-bg, none);
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.px-has-grad.px-9slice:not(.px-9slice--hd):not(.px-img-simple):not(.px-img-tiled):not(.px-img-fit):not(.px-img-filled) > .px-grad-overlay {
+  inset:
+    calc(var(--slice-t, 5) * -1px * var(--pixel-scale, 3))
+    calc(var(--slice-r, 5) * -1px * var(--pixel-scale, 3))
+    calc(var(--slice-b, 5) * -1px * var(--pixel-scale, 3))
+    calc(var(--slice-l, 5) * -1px * var(--pixel-scale, 3));
+}
+
+.px-has-grad.px-sprite-box > .px-grad-overlay,
+.px-has-grad.px-btn-square > .px-grad-overlay,
+.px-has-grad.px-img-simple > .px-grad-overlay,
+.px-has-grad.px-img-fit > .px-grad-overlay {
+  -webkit-mask-image: var(--skin-url);
+  mask-image: var(--skin-url);
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+
+.px-has-grad.px-img-fit > .px-grad-overlay {
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+
+.px-has-grad > :not(.px-tint-overlay):not(.px-grad-overlay) {
+  position: relative;
+  z-index: 1;
+}
+
+img.px-img-grad {
+  object-position: -9999px -9999px !important;
+  background-image: var(--px-grad-bg), var(--skin-url) !important;
+  background-blend-mode: multiply;
+  background-size: 100% 100%, contain !important;
+  background-position: center, center !important;
+  background-repeat: no-repeat, no-repeat !important;
+  -webkit-mask-image: var(--skin-url);
+  mask-image: var(--skin-url);
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+
+/* Button Passthrough (DisableCollider) */
+body.mode-interactive .px-btn-passthrough {
+  pointer-events: none !important;
+  cursor: default !important;
+}
+
+/* Label Gradient Text Fill */
+.px-label-gradient {
+  background-image: var(--px-label-grad-bg, none) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  color: transparent !important;
 }

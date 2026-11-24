@@ -30,9 +30,23 @@
     originalWidgetText: new WeakMap(),
     widgetTransforms: new WeakMap(),
     pendingSavedTransforms: new WeakMap(),
+    widgetLabelStates: new WeakMap(),
+    widgetImageStates: new WeakMap(),
+    originalLabelStyles: new WeakMap(),
+    originalImageStyles: new WeakMap(),
     transformCollapsed: false,
     anchorPresetOpen: false,
     transformMenuOpen: false,
+    labelCollapsed: false,
+    labelGradientCollapsed: false,
+    labelMenuOpen: false,
+    imageCollapsed: false,
+    imageGradientCollapsed: false,
+    imageMenuOpen: false,
+    buttonCollapsed: false,
+    buttonGradientCollapsed: false,
+    buttonMenuOpen: false,
+    showHoverSpriteSlot: false,
     inlineEdit: null,
     spritePicker: {
       category: 'all',
@@ -223,7 +237,8 @@
         (el.id === '__verify_annotations__' ||
           el.id === '__px_transform_gizmo__' ||
           el.id === '__px_focus_zone__' ||
-          (el.classList && el.classList.contains('px-tint-overlay')))
+          (el.classList &&
+            (el.classList.contains('px-tint-overlay') || el.classList.contains('px-grad-overlay'))))
     );
   }
 
@@ -273,6 +288,8 @@
       spriteEdits: Object.assign({}, diskEdits.spriteEdits || {}, localEdits.spriteEdits || {}),
       transformEdits: Object.assign({}, diskEdits.transformEdits || {}, localEdits.transformEdits || {}),
       tintEdits: Object.assign({}, diskEdits.tintEdits || {}, localEdits.tintEdits || {}),
+      labelEdits: Object.assign({}, diskEdits.labelEdits || {}, localEdits.labelEdits || {}),
+      imageEdits: Object.assign({}, diskEdits.imageEdits || {}, localEdits.imageEdits || {}),
     };
   }
 
@@ -283,6 +300,8 @@
       spriteEdits: edits && edits.spriteEdits ? edits.spriteEdits : {},
       transformEdits: edits && edits.transformEdits ? edits.transformEdits : {},
       tintEdits: edits && edits.tintEdits ? edits.tintEdits : {},
+      labelEdits: edits && edits.labelEdits ? edits.labelEdits : {},
+      imageEdits: edits && edits.imageEdits ? edits.imageEdits : {},
     };
     global.PIXELUI_EDITS = global.PIXELUI_EDITS || {};
     global.PIXELUI_EDITS[slug] = normalized;
@@ -292,7 +311,9 @@
         Object.keys(normalized.textEdits).length === 0 &&
         Object.keys(normalized.spriteEdits).length === 0 &&
         Object.keys(normalized.transformEdits).length === 0 &&
-        Object.keys(normalized.tintEdits).length === 0
+        Object.keys(normalized.tintEdits).length === 0 &&
+        Object.keys(normalized.labelEdits).length === 0 &&
+        Object.keys(normalized.imageEdits).length === 0
       ) {
         global.localStorage.removeItem(UI_EDITS_STORAGE_PREFIX + slug);
       } else {
@@ -426,7 +447,13 @@
     const btn = target.closest('button, .px-btn');
     if (btn && !btn.hasAttribute('data-ui-toggle')) {
       const spriteEl = getButtonSpriteTargetEl(btn);
-      if (spriteEl && (spriteEl.hasAttribute('data-slice-pressed') || spriteEl.hasAttribute('data-slice-hover'))) {
+      if (
+        spriteEl &&
+        (spriteEl.hasAttribute('data-slice-pressed') ||
+          spriteEl.hasAttribute('data-slice-hover') ||
+          spriteEl.hasAttribute('data-slice-id') ||
+          state.widgetImageStates.has(spriteEl))
+      ) {
         return {
           hostEl: btn,
           spriteEl,
@@ -441,17 +468,32 @@
     const pressedId = spriteEl.getAttribute('data-slice-pressed');
     const hoverId = spriteEl.getAttribute('data-slice-hover');
     const idleId = spriteEl.getAttribute('data-slice-id');
+    const interactive = !isWireframeMode() && !isEditMode();
+    const isPressed = interactive && spriteEl.classList.contains('is-pressed');
+    const isHovered = interactive && spriteEl.classList.contains('is-hovered');
 
     let nextSlice = idleId;
-    if (!isWireframeMode() && !isEditMode()) {
-      if (spriteEl.classList.contains('is-pressed') && pressedId && resolveSliceUrl(pressedId)) {
-        nextSlice = pressedId;
-      } else if (spriteEl.classList.contains('is-hovered') && hoverId && resolveSliceUrl(hoverId)) {
-        nextSlice = hoverId;
-      }
+    if (isPressed && pressedId && resolveSliceUrl(pressedId)) {
+      nextSlice = pressedId;
+    } else if (isHovered && hoverId && resolveSliceUrl(hoverId)) {
+      nextSlice = hoverId;
     }
     if (nextSlice) {
       applySliceToElement(spriteEl, nextSlice);
+    }
+
+    const imgState = state.widgetImageStates.get(spriteEl);
+    if (imgState) {
+      const activeTint = isPressed ? imgState.pressedColor || '#C5C5C5' : imgState.color || '#FFFFFF';
+      applyEffectiveColorTint(spriteEl, nextSlice || idleId, activeTint, imgState.tintMode || 'auto');
+    } else if (isPressed && !pressedId && nextSlice) {
+      // Craftland default pressed color feedback when no dedicated pressed sprite is assigned
+      const origTint = spriteEl.getAttribute('data-tint') || '';
+      if (!origTint) {
+        applyEffectiveColorTint(spriteEl, nextSlice, '#C5C5C5', 'auto');
+      }
+    } else if (!isPressed && !state.widgetImageStates.has(spriteEl)) {
+      applyTintToElement(spriteEl, nextSlice || idleId);
     }
   }
 
@@ -531,6 +573,11 @@
     if (!targetEl) return false;
 
     setTargetElementText(targetEl, nextText);
+
+    const lblState = state.widgetLabelStates.get(targetEl);
+    if (lblState && lblState.overflow === 0) {
+      fitLabelReduceFontSize(targetEl, lblState);
+    }
 
     const pathKey = getElementCanvasPath(targetEl);
     if (pathKey) {
@@ -1355,6 +1402,7 @@
 
     updateInspectorGeometryReadout();
     renderTransformGizmo();
+    refitDescendantLabels(el);
   }
 
   function renderTransformComponentCard(el) {
@@ -1545,37 +1593,1408 @@
     `;
   }
 
+  /* ========================================================================
+     Craftland UI Widget Label, Image & Button Components
+     ======================================================================== */
+
+  const CL_EYEDROPPER_SVG = `
+    <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10.5 2.5l3 3-1.4 1.4-3-3 1.4-1.4z"/>
+      <path d="M9.1 3.9l3 3L6.2 12.8l-3.4.7.7-3.4 5.6-6.2z"/>
+    </svg>
+  `;
+
+  const CL_TARGET_PICK_SVG = `
+    <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4">
+      <circle cx="8" cy="8" r="5.5"/>
+      <circle cx="8" cy="8" r="1.8" fill="currentColor" stroke="none"/>
+    </svg>
+  `;
+
+  const CL_LINE_SPACE_SVG = `
+    <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
+      <path d="M3 3h10M3 13h10M8 5v6M6.2 6.8L8 5l1.8 1.8M6.2 9.2L8 11l1.8-1.8"/>
+    </svg>
+  `;
+
+  const CL_ALIGN_H_SVGS = {
+    left: '<svg viewBox="0 0 16 16" width="13" height="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 4h11M2.5 8h7.5M2.5 12h9.5"/></svg>',
+    center: '<svg viewBox="0 0 16 16" width="13" height="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 4h11M4.2 8h7.6M3.2 12h9.6"/></svg>',
+    right: '<svg viewBox="0 0 16 16" width="13" height="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 4h11M6 8h7.5M4 12h9.5"/></svg>',
+    fillH: '<svg viewBox="0 0 16 16" width="13" height="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></svg>',
+  };
+
+  const CL_ALIGN_V_SVGS = {
+    top: '<svg viewBox="0 0 16 16" width="13" height="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 3h11M6 5.5v7.5M10 5.5v5"/></svg>',
+    middle: '<svg viewBox="0 0 16 16" width="13" height="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 8h11M6 4v8M10 5.5v5"/></svg>',
+    bottom: '<svg viewBox="0 0 16 16" width="13" height="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 13h11M6 3v7.5M10 5.5v5"/></svg>',
+    fillV: '<svg viewBox="0 0 16 16" width="13" height="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4.5 3v10M8 3v10M11.5 3v10"/></svg>',
+  };
+
+  const CL_FLIP_SVGS = {
+    x: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><path d="M8 2v12" stroke-dasharray="2 1.5"/><path d="M6.2 4.5L2.5 11.5h3.7z" fill="currentColor" stroke="none"/><path d="M9.8 4.5L13.5 11.5H9.8z"/></svg>',
+    y: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><path d="M2 8h12" stroke-dasharray="2 1.5"/><path d="M4.5 6.2L11.5 2.5v3.7z" fill="currentColor" stroke="none"/><path d="M4.5 9.8L11.5 13.5V9.8z"/></svg>',
+  };
+
+  function normalizeHexColor(raw, fallback = '#FFFFFF') {
+    const s = String(raw || '').trim();
+    if (/^#[0-9a-fA-F]{6}$/.test(s)) return s.toUpperCase();
+    if (/^#[0-9a-fA-F]{3}$/.test(s)) {
+      return ('#' + s[1] + s[1] + s[2] + s[2] + s[3] + s[3]).toUpperCase();
+    }
+    return fallback;
+  }
+
+  function parseCssColorToHexAlpha(cssStr, fallback = '#FFFFFF') {
+    const s = String(cssStr || '').trim();
+    if (!s) return { hex: fallback, alpha: 1 };
+    if (s.startsWith('#')) {
+      return { hex: normalizeHexColor(s, fallback), alpha: 1 };
+    }
+    const m = s.match(/rgba?\(\s*([\d.]+)\s*[,\s]\s*([\d.]+)\s*[,\s]\s*([\d.]+)(?:\s*[,/]\s*([\d.]+))?\s*\)/i);
+    if (!m) return { hex: fallback, alpha: 1 };
+    const r = Math.max(0, Math.min(255, Math.round(parseFloat(m[1]) || 0)));
+    const g = Math.max(0, Math.min(255, Math.round(parseFloat(m[2]) || 0)));
+    const b = Math.max(0, Math.min(255, Math.round(parseFloat(m[3]) || 0)));
+    const a = m[4] !== undefined ? clamp01(parseFloat(m[4])) : 1;
+    const hex = '#' + [r, g, b].map(n => n.toString(16).padStart(2, '0')).join('').toUpperCase();
+    return { hex, alpha: a };
+  }
+
+  function hexToRgba(hex, alpha01 = 1) {
+    const clean = normalizeHexColor(hex, '#FFFFFF');
+    const r = parseInt(clean.slice(1, 3), 16);
+    const g = parseInt(clean.slice(3, 5), 16);
+    const b = parseInt(clean.slice(5, 7), 16);
+    const a = roundTfNum(clamp01(alpha01), 3);
+    return `rgba(${r}, ${g}, ${b}, ${a})`;
+  }
+
+  function applyEffectiveColorTint(el, sliceId, colorHex, tintMode = 'auto') {
+    if (!el) return;
+    const norm = normalizeHexColor(colorHex, '#FFFFFF');
+    const cleanMode = ['auto', 'mask', 'multiply'].includes(String(tintMode || '').toLowerCase())
+      ? String(tintMode).toLowerCase()
+      : 'auto';
+    if (norm === '#FFFFFF') {
+      el.removeAttribute('data-tint');
+      el.removeAttribute('data-tint-mode');
+    } else {
+      el.setAttribute('data-tint', norm);
+      if (cleanMode === 'auto') el.removeAttribute('data-tint-mode');
+      else el.setAttribute('data-tint-mode', cleanMode);
+    }
+    applyTintToElement(el, sliceId);
+  }
+
+  function snapshotLabelOriginals(targetEl) {
+    if (!targetEl || state.originalLabelStyles.has(targetEl)) return;
+    state.originalLabelStyles.set(targetEl, {
+      color: targetEl.style.color || '',
+      fontSize: targetEl.style.fontSize || '',
+      fontWeight: targetEl.style.fontWeight || '',
+      fontStyle: targetEl.style.fontStyle || '',
+      textDecoration: targetEl.style.textDecoration || '',
+      lineHeight: targetEl.style.lineHeight || '',
+      textAlign: targetEl.style.textAlign || '',
+      textAlignLast: targetEl.style.textAlignLast || '',
+      display: targetEl.style.display || '',
+      flexDirection: targetEl.style.flexDirection || '',
+      justifyContent: targetEl.style.justifyContent || '',
+      alignItems: targetEl.style.alignItems || '',
+      overflow: targetEl.style.overflow || '',
+      whiteSpace: targetEl.style.whiteSpace || '',
+      wordBreak: targetEl.style.wordBreak || '',
+      textShadow: targetEl.style.textShadow || '',
+      filter: targetEl.style.filter || '',
+      gradBg: targetEl.style.getPropertyValue('--px-label-grad-bg') || '',
+      hadGradClass: targetEl.classList.contains('px-label-gradient'),
+    });
+  }
+
+  function readInitialLabelState(targetEl) {
+    const cs = getComputedStyle(targetEl);
+    const parsedCol = parseCssColorToHexAlpha(cs.color, '#FFFFFF');
+    const fs = Math.max(6, Math.round(parseFloat(cs.fontSize || '16') || 16));
+    const fwNum = parseInt(cs.fontWeight || '400', 10);
+    const isBold = cs.fontWeight === 'bold' || (Number.isFinite(fwNum) && fwNum >= 600);
+    const isItalic = cs.fontStyle === 'italic' || cs.fontStyle === 'oblique';
+    const isUnderline = String(cs.textDecorationLine || cs.textDecoration || '').includes('underline');
+
+    let alignH = 'left';
+    if (cs.textAlign === 'center') alignH = 'center';
+    else if (cs.textAlign === 'right' || cs.textAlign === 'end') alignH = 'right';
+    else if (cs.textAlign === 'justify') alignH = 'fillH';
+    else if (cs.display.includes('flex') && cs.justifyContent === 'center') alignH = 'center';
+
+    let alignV = 'middle';
+    if (cs.display.includes('flex')) {
+      const axisProp = cs.flexDirection.startsWith('column') ? cs.justifyContent : cs.alignItems;
+      if (axisProp === 'flex-start' || axisProp === 'start') alignV = 'top';
+      else if (axisProp === 'flex-end' || axisProp === 'end') alignV = 'bottom';
+      else if (axisProp === 'stretch' || axisProp === 'space-between') alignV = 'fillV';
+    }
+
+    const rawShadow = cs.textShadow && cs.textShadow !== 'none' ? cs.textShadow : '';
+    const hasOutlineCls = targetEl.classList.contains('px-text-outline') || targetEl.classList.contains('px-text-outline-lg');
+    const shadowParts = rawShadow ? rawShadow.split(/,(?![^(]*\))/) : [];
+    const hasOutline = hasOutlineCls || shadowParts.length >= 4;
+    const hasShadow = !hasOutline && shadowParts.length >= 1;
+    let shadowColor = '#000000';
+    let shadowAlpha = 1;
+    let outlineColor = '#000000';
+    let outlineAlpha = 1;
+    const outlineWidth = targetEl.classList.contains('px-text-outline-lg') ? 2 : 1;
+    if (rawShadow) {
+      const colMatch = rawShadow.match(/rgba?\([^)]+\)|#[0-9a-fA-F]{3,6}/);
+      if (colMatch) {
+        const parsedSh = parseCssColorToHexAlpha(colMatch[0], '#000000');
+        if (hasOutline) {
+          outlineColor = parsedSh.hex;
+          outlineAlpha = roundTfNum(parsedSh.alpha, 2);
+        } else {
+          shadowColor = parsedSh.hex;
+          shadowAlpha = roundTfNum(parsedSh.alpha, 2);
+        }
+      }
+    }
+
+    return {
+      color: parsedCol.hex,
+      alpha: Math.round(parsedCol.alpha * 100),
+      fontSize: fs,
+      alignH,
+      alignV,
+      _alignVEdited: false,
+      bold: isBold,
+      italic: isItalic,
+      underline: isUnderline,
+      lineSpacing: 0,
+      overflow: 1, // 0: Reduce Font Size, 1: Wrap around, 2: Overflow
+      shadow: hasShadow,
+      shadowColor,
+      shadowOffset: [1, 1],
+      shadowAlpha,
+      outline: hasOutline,
+      outlineColor,
+      outlineAlpha,
+      outlineWidth,
+      gradient: 0, // 0: None, 1: Vertical Gradient, 2: Horizontal Gradient
+      gradientTop: '#FFFFFF',
+      gradientTopAlpha: 100,
+      gradientBottom: '#FFFFFF',
+      gradientBottomAlpha: 100,
+      dirty: false,
+    };
+  }
+
+  function getWidgetLabelState(el) {
+    const info = getEditableTextInfo(el);
+    const targetEl = (info && info.targetEl) || null;
+    if (!targetEl) return null;
+    let lbl = state.widgetLabelStates.get(targetEl);
+    if (!lbl) {
+      lbl = readInitialLabelState(targetEl);
+      state.widgetLabelStates.set(targetEl, lbl);
+    }
+    return { targetEl, lbl, info };
+  }
+
+  function fitLabelReduceFontSize(targetEl, lbl) {
+    if (!targetEl || !lbl || lbl.overflow !== 0) return;
+    const baseSize = Math.max(6, Number(lbl.fontSize) || 16);
+    targetEl.style.fontSize = `${baseSize}px`;
+    if (targetEl.clientWidth <= 2 || targetEl.clientHeight <= 2) return;
+    const isOverflowing = () =>
+      targetEl.scrollWidth > targetEl.clientWidth + 1 || targetEl.scrollHeight > targetEl.clientHeight + 1;
+    if (!isOverflowing()) return;
+
+    let lo = 6;
+    let hi = baseSize;
+    let best = lo;
+    for (let i = 0; i < 8; i++) {
+      const mid = Math.round(((lo + hi) / 2) * 2) / 2;
+      targetEl.style.fontSize = `${mid}px`;
+      if (isOverflowing()) {
+        hi = mid;
+      } else {
+        best = mid;
+        lo = mid;
+      }
+      if (hi - lo <= 0.5) break;
+    }
+    targetEl.style.fontSize = `${Math.max(6, best)}px`;
+  }
+
+  function refitDescendantLabels(rootEl) {
+    if (!rootEl) return;
+    const check = node => {
+      const lbl = state.widgetLabelStates.get(node);
+      if (lbl && lbl.dirty && lbl.overflow === 0) {
+        fitLabelReduceFontSize(node, lbl);
+      }
+    };
+    check(rootEl);
+    rootEl.querySelectorAll('*').forEach(check);
+  }
+
+  function applyWidgetLabelToDom(targetEl, lbl) {
+    if (!targetEl || !lbl) return;
+    snapshotLabelOriginals(targetEl);
+    state.widgetLabelStates.set(targetEl, lbl);
+
+    const aMul = clamp01((Number.isFinite(Number(lbl.alpha)) ? Number(lbl.alpha) : 100) / 100);
+    const fs = Math.max(4, Number(lbl.fontSize) || 16);
+    const orig = state.originalLabelStyles.get(targetEl) || {};
+
+    targetEl.style.fontSize = `${fs}px`;
+    targetEl.style.fontWeight = lbl.bold ? '700' : '400';
+    targetEl.style.fontStyle = lbl.italic ? 'italic' : 'normal';
+    targetEl.style.textDecoration = lbl.underline ? 'underline' : 'none';
+
+    const ls = Number(lbl.lineSpacing) || 0;
+    if (ls !== 0) {
+      targetEl.style.lineHeight = `calc(1.2em + ${ls}px)`;
+    } else {
+      targetEl.style.lineHeight = orig.lineHeight || '';
+    }
+
+    // Horizontal alignment
+    const csBefore = getComputedStyle(targetEl);
+    const isFlex = csBefore.display.includes('flex');
+    const isFlexCol = isFlex && csBefore.flexDirection.startsWith('column');
+    if (lbl.alignH === 'fillH') {
+      targetEl.style.textAlign = 'justify';
+      targetEl.style.textAlignLast = 'justify';
+    } else {
+      targetEl.style.textAlign = lbl.alignH || 'left';
+      targetEl.style.textAlignLast = '';
+      if (isFlex) {
+        const mapFlex = { left: 'flex-start', center: 'center', right: 'flex-end' };
+        const fv = mapFlex[lbl.alignH] || 'center';
+        if (isFlexCol) targetEl.style.alignItems = fv;
+        else targetEl.style.justifyContent = fv;
+      }
+    }
+
+    // Vertical alignment (only mutate layout display when explicitly edited)
+    if (lbl._alignVEdited) {
+      const mapV = { top: 'flex-start', middle: 'center', bottom: 'flex-end', fillV: 'stretch' };
+      if (isFlex && !isFlexCol) {
+        targetEl.style.alignItems = mapV[lbl.alignV] || 'center';
+      } else {
+        if (!isFlex) {
+          targetEl.style.display = 'inline-flex';
+          targetEl.style.flexDirection = 'column';
+        }
+        const mapColV = { top: 'flex-start', middle: 'center', bottom: 'flex-end', fillV: 'space-between' };
+        targetEl.style.justifyContent = mapColV[lbl.alignV] || 'center';
+      }
+    }
+
+    // Overflow mode: 0 = Reduce Font Size, 1 = Wrap around (Clamp), 2 = Overflow
+    if (lbl.overflow === 2) {
+      targetEl.style.overflow = 'visible';
+      targetEl.style.whiteSpace = 'pre-wrap';
+      targetEl.style.wordBreak = 'normal';
+    } else {
+      targetEl.style.overflow = 'hidden';
+      targetEl.style.whiteSpace = 'pre-wrap';
+      targetEl.style.wordBreak = 'break-word';
+      if (lbl.overflow === 0) {
+        fitLabelReduceFontSize(targetEl, lbl);
+      }
+    }
+
+    // Color, Outline, Shadow & Gradient
+    const hasSpriteBg =
+      targetEl.hasAttribute('data-slice-id') ||
+      targetEl.classList.contains('px-9slice') ||
+      targetEl.classList.contains('px-sprite-box') ||
+      targetEl.classList.contains('px-btn-square');
+    const useGrad = Number(lbl.gradient) > 0 && !hasSpriteBg;
+
+    const sx = Array.isArray(lbl.shadowOffset) ? Number(lbl.shadowOffset[0]) || 0 : 1;
+    const sy = Array.isArray(lbl.shadowOffset) ? Number(lbl.shadowOffset[1]) || 0 : 1;
+    const shCol = hexToRgba(lbl.shadowColor || '#000000', clamp01(lbl.shadowAlpha ?? 1) * aMul);
+    const outW = Math.max(0, Number(lbl.outlineWidth) || 0);
+    const outCol = hexToRgba(lbl.outlineColor || '#000000', clamp01(lbl.outlineAlpha ?? 1) * aMul);
+
+    if (useGrad) {
+      const dir = Number(lbl.gradient) === 2 ? '90deg' : '180deg';
+      const topRgba = hexToRgba(lbl.gradientTop || '#FFFFFF', clamp01((lbl.gradientTopAlpha ?? 100) / 100) * aMul);
+      const botRgba = hexToRgba(lbl.gradientBottom || '#FFFFFF', clamp01((lbl.gradientBottomAlpha ?? 100) / 100) * aMul);
+      targetEl.style.setProperty('--px-label-grad-bg', `linear-gradient(${dir}, ${topRgba} 0%, ${botRgba} 100%)`);
+      targetEl.classList.add('px-label-gradient');
+      targetEl.style.textShadow = 'none';
+
+      const filters = [];
+      if (lbl.outline && outW > 0) {
+        const dirs = [
+          [-outW, -outW], [outW, -outW], [-outW, outW], [outW, outW],
+          [0, -outW], [0, outW], [-outW, 0], [outW, 0],
+        ];
+        dirs.forEach(([dx, dy]) => filters.push(`drop-shadow(${dx}px ${dy}px 0 ${outCol})`));
+      }
+      if (lbl.shadow) {
+        filters.push(`drop-shadow(${sx}px ${sy}px 0 ${shCol})`);
+      }
+      targetEl.style.filter = filters.length ? filters.join(' ') : orig.filter || '';
+    } else {
+      targetEl.classList.remove('px-label-gradient');
+      targetEl.style.removeProperty('--px-label-grad-bg');
+      targetEl.style.filter = orig.filter || '';
+      targetEl.style.color = hexToRgba(lbl.color || '#FFFFFF', aMul);
+
+      const shadows = [];
+      if (lbl.outline && outW > 0) {
+        const dirs = [
+          [-outW, -outW], [0, -outW], [outW, -outW],
+          [-outW, 0], [outW, 0],
+          [-outW, outW], [0, outW], [outW, outW],
+        ];
+        if (outW >= 2.5) {
+          const half = roundTfNum(outW / 2, 1);
+          dirs.push([-half, -outW], [half, -outW], [-half, outW], [half, outW], [-outW, -half], [outW, -half], [-outW, half], [outW, half]);
+        }
+        dirs.forEach(([dx, dy]) => shadows.push(`${dx}px ${dy}px 0 ${outCol}`));
+      }
+      if (lbl.shadow) {
+        shadows.push(`${sx}px ${sy}px 0 ${shCol}`);
+      }
+      targetEl.style.textShadow = shadows.length ? shadows.join(', ') : 'none';
+    }
+  }
+
+  function saveWidgetLabelEdit(targetEl, lbl, persistToServer = false) {
+    if (!targetEl || !lbl) return Promise.resolve({ ok: false });
+    const pathKey = getElementCanvasPath(targetEl);
+    if (pathKey) {
+      const edits = loadUiEdits();
+      edits.labelEdits[pathKey] = {
+        color: normalizeHexColor(lbl.color, '#FFFFFF'),
+        alpha: roundTfNum(clamp01((lbl.alpha ?? 100) / 100) * 100, 1),
+        fontSize: roundTfNum(Math.max(4, Number(lbl.fontSize) || 16), 1),
+        alignH: lbl.alignH || 'left',
+        ...(lbl._alignVEdited ? { alignV: lbl.alignV || 'middle' } : {}),
+        bold: Boolean(lbl.bold),
+        italic: Boolean(lbl.italic),
+        underline: Boolean(lbl.underline),
+        lineSpacing: roundTfNum(Number(lbl.lineSpacing) || 0, 2),
+        overflow: Number(lbl.overflow) || 0,
+        shadow: Boolean(lbl.shadow),
+        shadowColor: normalizeHexColor(lbl.shadowColor, '#000000'),
+        shadowOffset: [
+          roundTfNum(Array.isArray(lbl.shadowOffset) ? Number(lbl.shadowOffset[0]) || 0 : 1, 2),
+          roundTfNum(Array.isArray(lbl.shadowOffset) ? Number(lbl.shadowOffset[1]) || 0 : 1, 2),
+        ],
+        shadowAlpha: roundTfNum(clamp01(lbl.shadowAlpha ?? 1), 3),
+        outline: Boolean(lbl.outline),
+        outlineColor: normalizeHexColor(lbl.outlineColor, '#000000'),
+        outlineAlpha: roundTfNum(clamp01(lbl.outlineAlpha ?? 1), 3),
+        outlineWidth: roundTfNum(Math.max(0, Number(lbl.outlineWidth) || 0), 2),
+        gradient: Number(lbl.gradient) || 0,
+        gradientTop: normalizeHexColor(lbl.gradientTop, '#FFFFFF'),
+        gradientTopAlpha: roundTfNum(clamp01((lbl.gradientTopAlpha ?? 100) / 100) * 100, 1),
+        gradientBottom: normalizeHexColor(lbl.gradientBottom, '#FFFFFF'),
+        gradientBottomAlpha: roundTfNum(clamp01((lbl.gradientBottomAlpha ?? 100) / 100) * 100, 1),
+      };
+      saveUiEdits(edits);
+    }
+    if (persistToServer) return persistUiEditsToDisk();
+    return Promise.resolve({ ok: true, method: 'browser-storage' });
+  }
+
+  function resetSingleElementLabel(el, edits) {
+    const info = getEditableTextInfo(el);
+    const targetEl = (info && info.targetEl) || el;
+    if (!targetEl) return;
+    const pathKey = getElementCanvasPath(targetEl);
+    if (pathKey && edits) {
+      if (edits.labelEdits && edits.labelEdits[pathKey]) delete edits.labelEdits[pathKey];
+      if (edits.textEdits && edits.textEdits[pathKey] !== undefined) delete edits.textEdits[pathKey];
+    }
+    if (state.originalWidgetText.has(targetEl)) {
+      setTargetElementText(targetEl, state.originalWidgetText.get(targetEl));
+    }
+    const orig = state.originalLabelStyles.get(targetEl);
+    if (orig) {
+      targetEl.style.color = orig.color;
+      targetEl.style.fontSize = orig.fontSize;
+      targetEl.style.fontWeight = orig.fontWeight;
+      targetEl.style.fontStyle = orig.fontStyle;
+      targetEl.style.textDecoration = orig.textDecoration;
+      targetEl.style.lineHeight = orig.lineHeight;
+      targetEl.style.textAlign = orig.textAlign;
+      targetEl.style.textAlignLast = orig.textAlignLast;
+      targetEl.style.display = orig.display;
+      targetEl.style.flexDirection = orig.flexDirection;
+      targetEl.style.justifyContent = orig.justifyContent;
+      targetEl.style.alignItems = orig.alignItems;
+      targetEl.style.overflow = orig.overflow;
+      targetEl.style.whiteSpace = orig.whiteSpace;
+      targetEl.style.wordBreak = orig.wordBreak;
+      targetEl.style.textShadow = orig.textShadow;
+      targetEl.style.filter = orig.filter;
+      if (orig.gradBg) targetEl.style.setProperty('--px-label-grad-bg', orig.gradBg);
+      else targetEl.style.removeProperty('--px-label-grad-bg');
+      targetEl.classList.toggle('px-label-gradient', Boolean(orig.hadGradClass));
+    }
+    state.widgetLabelStates.delete(targetEl);
+  }
+
+  function exportLabelCraftlandJson(targetEl, lbl) {
+    const info = getEditableTextInfo(targetEl);
+    return {
+      component: 'HudLabelWidget',
+      'text.value': info ? info.currentText : '',
+      'text.color': normalizeHexColor(lbl.color, '#FFFFFF'),
+      alpha: roundTfNum(lbl.alpha ?? 100, 1),
+      'text.fontSize': Math.round(lbl.fontSize || 16),
+      'text.alignment.h': lbl.alignH || 'left',
+      'text.alignment.v': lbl.alignV || 'middle',
+      isBold: Boolean(lbl.bold),
+      isItalic: Boolean(lbl.italic),
+      isUnderline: Boolean(lbl.underline),
+      'text.lineSpacing': roundTfNum(lbl.lineSpacing || 0, 2),
+      'text.overflow': Number(lbl.overflow) || 0,
+      'text.shadow': Boolean(lbl.shadow),
+      'text.shadowColor': normalizeHexColor(lbl.shadowColor, '#000000'),
+      shadowOffset: { x: lbl.shadowOffset ? lbl.shadowOffset[0] : 1, y: lbl.shadowOffset ? lbl.shadowOffset[1] : 1 },
+      shadowAlpha: roundTfNum(lbl.shadowAlpha ?? 1, 3),
+      isApplyOutline: Boolean(lbl.outline),
+      outlineColor: normalizeHexColor(lbl.outlineColor, '#000000'),
+      outlineAlpha: roundTfNum(lbl.outlineAlpha ?? 1, 3),
+      outlineOffset: roundTfNum(lbl.outlineWidth ?? 1, 2),
+      gradient: Number(lbl.gradient) || 0,
+      gradientTop: normalizeHexColor(lbl.gradientTop, '#FFFFFF'),
+      gradientTopAlpha: roundTfNum(lbl.gradientTopAlpha ?? 100, 1),
+      gradientBottom: normalizeHexColor(lbl.gradientBottom, '#FFFFFF'),
+      gradientBottomAlpha: roundTfNum(lbl.gradientBottomAlpha ?? 100, 1),
+    };
+  }
+
+  /* ---- Craftland UI Widget Image & UI Widget Button ---- */
+
+  function snapshotImageOriginals(targetEl) {
+    if (!targetEl || state.originalImageStyles.has(targetEl)) return;
+    state.originalImageStyles.set(targetEl, {
+      opacity: targetEl.style.opacity || '',
+      hadPx9: targetEl.classList.contains('px-9slice'),
+      hadPx9NoCenter: targetEl.classList.contains('px-9slice-no-center'),
+      hadSimple: targetEl.classList.contains('px-img-simple'),
+      hadTiled: targetEl.classList.contains('px-img-tiled'),
+      hadFit: targetEl.classList.contains('px-img-fit'),
+      hadFilled: targetEl.classList.contains('px-img-filled'),
+      hadFlip: targetEl.classList.contains('px-flip-active'),
+      hadPassthrough: targetEl.classList.contains('px-btn-passthrough'),
+      hadGrad: targetEl.classList.contains('px-has-grad'),
+      hadImgGrad: targetEl.classList.contains('px-img-grad'),
+      dataTint: targetEl.hasAttribute('data-tint') ? targetEl.getAttribute('data-tint') : null,
+      dataTintMode: targetEl.hasAttribute('data-tint-mode') ? targetEl.getAttribute('data-tint-mode') : null,
+    });
+  }
+
+  function inferInitialFillType(targetEl) {
+    if (!targetEl) return 0;
+    if (targetEl.classList.contains('px-img-tiled')) return 2;
+    if (targetEl.classList.contains('px-img-filled')) return 3;
+    if (targetEl.classList.contains('px-img-fit')) return 5;
+    if (targetEl.classList.contains('px-img-simple')) return 0;
+    if (targetEl.classList.contains('px-9slice')) return 1;
+    if (targetEl.classList.contains('px-icon') || targetEl.tagName === 'IMG') return 5;
+    return 0;
+  }
+
+  function readInitialImageState(targetEl) {
+    const cs = getComputedStyle(targetEl);
+    const rawTint = (targetEl.getAttribute('data-tint') || '').trim();
+    const rawTintMode = (targetEl.getAttribute('data-tint-mode') || 'auto').trim().toLowerCase();
+    const op = parseFloat(cs.opacity || '1');
+    return {
+      color: rawTint ? normalizeHexColor(rawTint, '#FFFFFF') : '#FFFFFF',
+      tintMode: ['auto', 'mask', 'multiply'].includes(rawTintMode) ? rawTintMode : 'auto',
+      alpha: Math.round(clamp01(Number.isFinite(op) ? op : 1) * 100),
+      flipX: false,
+      flipY: false,
+      fillType: inferInitialFillType(targetEl), // 0 Simple, 1 9-Grid Pattern, 2 Tiled, 3 Filled, 5 Fit
+      centerInvisible: targetEl.classList.contains('px-9slice-no-center'),
+      fillDir: 0, // 0 Horizontal, 1 Vertical, 2 Radial90, 3 Radial180, 4 Radial360
+      fillAmount: 1,
+      invertFill: false,
+      gradient: 0, // 0 None, 1 Vertical Gradient, 2 Horizontal Gradient
+      gradientTop: '#FFFFFF',
+      gradientTopAlpha: 100,
+      gradientBottom: '#FFFFFF',
+      gradientBottomAlpha: 100,
+      pressedColor: '#C5C5C5',
+      disableColor: '#808080',
+      passthrough: targetEl.classList.contains('px-btn-passthrough'),
+      dirty: false,
+    };
+  }
+
+  function getWidgetImageState(targetEl) {
+    if (!targetEl) return null;
+    let img = state.widgetImageStates.get(targetEl);
+    if (!img) {
+      img = readInitialImageState(targetEl);
+      state.widgetImageStates.set(targetEl, img);
+    }
+    return img;
+  }
+
+  function computeFilledMaskStyles(fillDir, fillAmount, invertFill) {
+    const amt = clamp01(Number.isFinite(Number(fillAmount)) ? Number(fillAmount) : 1);
+    const pct = roundTfNum((1 - amt) * 100, 2);
+    if (fillDir === 0) {
+      // Horizontal
+      return {
+        clip: invertFill ? `inset(0 0 0 ${pct}%)` : `inset(0 ${pct}% 0 0)`,
+        mask: 'none',
+      };
+    }
+    if (fillDir === 1) {
+      // Vertical (default bottom-up like Craftland/NGUI)
+      return {
+        clip: invertFill ? `inset(0 0 ${pct}% 0)` : `inset(${pct}% 0 0 0)`,
+        mask: 'none',
+      };
+    }
+    if (fillDir === 2) {
+      // Radial 90°
+      const deg = roundTfNum(amt * 90, 2);
+      const mask = invertFill
+        ? `conic-gradient(from 0deg at 0% 100%, transparent 0deg ${roundTfNum(90 - deg, 2)}deg, #000 ${roundTfNum(90 - deg, 2)}deg 90deg, transparent 90deg)`
+        : `conic-gradient(from 0deg at 0% 100%, #000 0deg ${deg}deg, transparent ${deg}deg)`;
+      return { clip: 'none', mask };
+    }
+    if (fillDir === 3) {
+      // Radial 180°
+      const deg = roundTfNum(amt * 180, 2);
+      const mask = invertFill
+        ? `conic-gradient(from -90deg at 50% 100%, transparent 0deg ${roundTfNum(180 - deg, 2)}deg, #000 ${roundTfNum(180 - deg, 2)}deg 180deg, transparent 180deg)`
+        : `conic-gradient(from -90deg at 50% 100%, #000 0deg ${deg}deg, transparent ${deg}deg)`;
+      return { clip: 'none', mask };
+    }
+    // Radial 360°
+    const deg = roundTfNum(amt * 360, 2);
+    const mask = invertFill
+      ? `conic-gradient(from 0deg at 50% 50%, transparent 0deg ${roundTfNum(360 - deg, 2)}deg, #000 ${roundTfNum(360 - deg, 2)}deg 360deg)`
+      : `conic-gradient(from 0deg at 50% 50%, #000 0deg ${deg}deg, transparent ${deg}deg)`;
+    return { clip: 'none', mask };
+  }
+
+  function applyWidgetImageToDom(targetEl, img, hostEl = null) {
+    if (!targetEl || !img) return;
+    snapshotWidgetOriginals(targetEl);
+    snapshotImageOriginals(targetEl);
+    state.widgetImageStates.set(targetEl, img);
+
+    const orig = state.originalImageStyles.get(targetEl) || {};
+    const sliceId = targetEl.getAttribute('data-slice-id') || '';
+
+    // Alpha
+    const alphaVal = clamp01((Number.isFinite(Number(img.alpha)) ? Number(img.alpha) : 100) / 100);
+    if (alphaVal < 0.999) {
+      targetEl.style.opacity = String(roundTfNum(alphaVal, 3));
+    } else {
+      targetEl.style.opacity = orig.opacity || '';
+    }
+
+    // Flip (H / V)
+    const flipped = Boolean(img.flipX || img.flipY);
+    targetEl.classList.toggle('px-flip-active', flipped);
+    if (flipped) {
+      targetEl.style.setProperty('--px-flip-x', img.flipX ? '-1' : '1');
+      targetEl.style.setProperty('--px-flip-y', img.flipY ? '-1' : '1');
+    } else {
+      targetEl.style.removeProperty('--px-flip-x');
+      targetEl.style.removeProperty('--px-flip-y');
+    }
+
+    // Fill Type: 0 Simple, 1 9-Grid Pattern, 2 Tiled, 3 Filled, 5 Fit
+    targetEl.classList.remove('px-img-simple', 'px-img-tiled', 'px-img-fit', 'px-img-filled', 'px-9slice-no-center');
+    targetEl.style.removeProperty('--px-fill-clip');
+    targetEl.style.removeProperty('--px-fill-mask');
+
+    const ft = Number(img.fillType);
+    if (ft === 1) {
+      if (targetEl.tagName !== 'IMG') {
+        targetEl.classList.add('px-9slice');
+      }
+      targetEl.classList.toggle('px-9slice-no-center', Boolean(img.centerInvisible));
+      if (sliceId) applySliceToElement(targetEl, sliceId);
+    } else if (ft === 0) {
+      targetEl.classList.add('px-img-simple');
+    } else if (ft === 2) {
+      targetEl.classList.add('px-img-tiled');
+    } else if (ft === 3) {
+      targetEl.classList.add('px-img-filled');
+      const fm = computeFilledMaskStyles(Number(img.fillDir) || 0, img.fillAmount ?? 1, Boolean(img.invertFill));
+      targetEl.style.setProperty('--px-fill-clip', fm.clip);
+      targetEl.style.setProperty('--px-fill-mask', fm.mask);
+    } else if (ft === 5) {
+      targetEl.classList.add('px-img-fit');
+    }
+
+    // Color Tint (respects pressed state in Interactive mode)
+    const interactivePressed = !isWireframeMode() && !isEditMode() && targetEl.classList.contains('is-pressed');
+    const activeTint = interactivePressed ? img.pressedColor || '#C5C5C5' : img.color || '#FFFFFF';
+    applyEffectiveColorTint(targetEl, sliceId, activeTint, img.tintMode || 'auto');
+
+    // Gradient overlay
+    const existingGrad = Array.from(targetEl.children).find(c => c.classList && c.classList.contains('px-grad-overlay'));
+    if (Number(img.gradient) > 0) {
+      const dir = Number(img.gradient) === 2 ? '90deg' : '180deg';
+      const topRgba = hexToRgba(img.gradientTop || '#FFFFFF', clamp01((img.gradientTopAlpha ?? 100) / 100));
+      const botRgba = hexToRgba(img.gradientBottom || '#FFFFFF', clamp01((img.gradientBottomAlpha ?? 100) / 100));
+      targetEl.style.setProperty('--px-grad-bg', `linear-gradient(${dir}, ${topRgba} 0%, ${botRgba} 100%)`);
+      if (targetEl.tagName === 'IMG') {
+        targetEl.classList.add('px-img-grad');
+      } else {
+        targetEl.classList.add('px-has-grad');
+        if (!existingGrad) {
+          const ov = document.createElement('div');
+          ov.className = 'px-grad-overlay';
+          ov.setAttribute('aria-hidden', 'true');
+          targetEl.insertBefore(ov, targetEl.firstChild);
+        }
+      }
+    } else {
+      targetEl.classList.remove('px-has-grad', 'px-img-grad');
+      targetEl.style.removeProperty('--px-grad-bg');
+      if (existingGrad) existingGrad.remove();
+    }
+
+    // Passthrough (DisableCollider on Buttons)
+    const passthrough = Boolean(img.passthrough);
+    targetEl.classList.toggle('px-btn-passthrough', passthrough);
+    if (hostEl && hostEl !== targetEl) {
+      hostEl.classList.toggle('px-btn-passthrough', passthrough);
+    }
+  }
+
+  function saveWidgetImageEdit(targetEl, img, persistToServer = false) {
+    if (!targetEl || !img) return Promise.resolve({ ok: false });
+    const pathKey = getElementCanvasPath(targetEl);
+    if (pathKey) {
+      const edits = loadUiEdits();
+      edits.imageEdits[pathKey] = {
+        color: normalizeHexColor(img.color, '#FFFFFF'),
+        tintMode: img.tintMode || 'auto',
+        alpha: roundTfNum(clamp01((img.alpha ?? 100) / 100) * 100, 1),
+        flipX: Boolean(img.flipX),
+        flipY: Boolean(img.flipY),
+        fillType: Number.isFinite(Number(img.fillType)) ? Number(img.fillType) : 0,
+        centerInvisible: Boolean(img.centerInvisible),
+        fillDir: Number(img.fillDir) || 0,
+        fillAmount: roundTfNum(clamp01(img.fillAmount ?? 1), 3),
+        invertFill: Boolean(img.invertFill),
+        gradient: Number(img.gradient) || 0,
+        gradientTop: normalizeHexColor(img.gradientTop, '#FFFFFF'),
+        gradientTopAlpha: roundTfNum(clamp01((img.gradientTopAlpha ?? 100) / 100) * 100, 1),
+        gradientBottom: normalizeHexColor(img.gradientBottom, '#FFFFFF'),
+        gradientBottomAlpha: roundTfNum(clamp01((img.gradientBottomAlpha ?? 100) / 100) * 100, 1),
+        pressedColor: normalizeHexColor(img.pressedColor, '#C5C5C5'),
+        disableColor: normalizeHexColor(img.disableColor, '#808080'),
+        passthrough: Boolean(img.passthrough),
+      };
+      if (edits.tintEdits && edits.tintEdits[pathKey]) {
+        delete edits.tintEdits[pathKey];
+      }
+      saveUiEdits(edits);
+    }
+    if (persistToServer) return persistUiEditsToDisk();
+    return Promise.resolve({ ok: true, method: 'browser-storage' });
+  }
+
+  function resetSingleElementImage(targetEl, edits, hostEl = null) {
+    if (!targetEl) return;
+    const pathKey = getElementCanvasPath(targetEl);
+    if (pathKey && edits) {
+      if (edits.imageEdits && edits.imageEdits[pathKey]) delete edits.imageEdits[pathKey];
+      if (edits.tintEdits && edits.tintEdits[pathKey]) delete edits.tintEdits[pathKey];
+    }
+    resetSingleElementSpriteAttrs(targetEl, edits || { spriteEdits: {} });
+    const orig = state.originalImageStyles.get(targetEl);
+    if (orig) {
+      targetEl.style.opacity = orig.opacity;
+      targetEl.classList.toggle('px-9slice', Boolean(orig.hadPx9));
+      targetEl.classList.toggle('px-9slice-no-center', Boolean(orig.hadPx9NoCenter));
+      targetEl.classList.toggle('px-img-simple', Boolean(orig.hadSimple));
+      targetEl.classList.toggle('px-img-tiled', Boolean(orig.hadTiled));
+      targetEl.classList.toggle('px-img-fit', Boolean(orig.hadFit));
+      targetEl.classList.toggle('px-img-filled', Boolean(orig.hadFilled));
+      targetEl.classList.toggle('px-flip-active', Boolean(orig.hadFlip));
+      targetEl.classList.toggle('px-btn-passthrough', Boolean(orig.hadPassthrough));
+      targetEl.classList.toggle('px-has-grad', Boolean(orig.hadGrad));
+      targetEl.classList.toggle('px-img-grad', Boolean(orig.hadImgGrad));
+      if (orig.dataTint === null) targetEl.removeAttribute('data-tint');
+      else targetEl.setAttribute('data-tint', orig.dataTint);
+      if (orig.dataTintMode === null) targetEl.removeAttribute('data-tint-mode');
+      else targetEl.setAttribute('data-tint-mode', orig.dataTintMode);
+    } else {
+      targetEl.style.opacity = '';
+      targetEl.classList.remove(
+        'px-9slice-no-center',
+        'px-img-simple',
+        'px-img-tiled',
+        'px-img-fit',
+        'px-img-filled',
+        'px-flip-active',
+        'px-btn-passthrough',
+        'px-has-grad',
+        'px-img-grad'
+      );
+    }
+    targetEl.style.removeProperty('--px-flip-x');
+    targetEl.style.removeProperty('--px-flip-y');
+    targetEl.style.removeProperty('--px-fill-clip');
+    targetEl.style.removeProperty('--px-fill-mask');
+    targetEl.style.removeProperty('--px-grad-bg');
+    const existingGrad = Array.from(targetEl.children).find(c => c.classList && c.classList.contains('px-grad-overlay'));
+    if (existingGrad) existingGrad.remove();
+    if (hostEl && hostEl !== targetEl) {
+      hostEl.classList.remove('px-btn-passthrough');
+    }
+    state.widgetImageStates.delete(targetEl);
+    applyTintToElement(targetEl, targetEl.getAttribute('data-slice-id'));
+  }
+
+  function exportImageCraftlandJson(targetEl, img, isBtn = false) {
+    const sliceId = targetEl.getAttribute('data-slice-id') || '';
+    const fillMap = { 0: 0, 1: 1, 2: 2, 3: 3, 5: 4 };
+    if (isBtn) {
+      return {
+        component: 'HudButtonWidget',
+        'button.spriteName': sliceId,
+        'button.normal': normalizeHexColor(img.color, '#FFFFFF'),
+        alpha: roundTfNum(img.alpha ?? 100, 1),
+        'button.pressed': normalizeHexColor(img.pressedColor, '#C5C5C5'),
+        'button.disabled': normalizeHexColor(img.disableColor, '#808080'),
+        pressedSprite: targetEl.getAttribute('data-slice-pressed') || '',
+        'button.fillType': fillMap[img.fillType] ?? 0,
+        centerInvisible: Boolean(img.centerInvisible),
+        flipX: Boolean(img.flipX),
+        flipY: Boolean(img.flipY),
+        'button.disableCollider': Boolean(img.passthrough),
+        ...(Number(img.fillType) === 3
+          ? { fillDir: Number(img.fillDir) || 0, fillAmount: roundTfNum(img.fillAmount ?? 1, 3), invertFill: Boolean(img.invertFill) }
+          : {}),
+        gradient: Number(img.gradient) || 0,
+        gradientTop: normalizeHexColor(img.gradientTop, '#FFFFFF'),
+        gradientTopAlpha: roundTfNum(img.gradientTopAlpha ?? 100, 1),
+        gradientBottom: normalizeHexColor(img.gradientBottom, '#FFFFFF'),
+        gradientBottomAlpha: roundTfNum(img.gradientBottomAlpha ?? 100, 1),
+      };
+    }
+    return {
+      component: 'HudImageWidget',
+      'image.source': sliceId,
+      'image.color': normalizeHexColor(img.color, '#FFFFFF'),
+      alpha: roundTfNum(img.alpha ?? 100, 1),
+      'image.reverse.x': Boolean(img.flipX),
+      'image.reverse.y': Boolean(img.flipY),
+      'image.fillType': fillMap[img.fillType] ?? 0,
+      centerInvisible: Boolean(img.centerInvisible),
+      ...(Number(img.fillType) === 3
+        ? { fillDir: Number(img.fillDir) || 0, fillAmount: roundTfNum(img.fillAmount ?? 1, 3), invertFill: Boolean(img.invertFill) }
+        : {}),
+      gradient: Number(img.gradient) || 0,
+      gradientTop: normalizeHexColor(img.gradientTop, '#FFFFFF'),
+      gradientTopAlpha: roundTfNum(img.gradientTopAlpha ?? 100, 1),
+      gradientBottom: normalizeHexColor(img.gradientBottom, '#FFFFFF'),
+      gradientBottomAlpha: roundTfNum(img.gradientBottomAlpha ?? 100, 1),
+    };
+  }
+
+  /* ---- Reusable Craftland Inspector Field Builders ---- */
+
+  function renderClColorRow(opts) {
+    const { scope, field, label, hex, alphaField, alphaVal, title } = opts;
+    const normHex = normalizeHexColor(hex, '#FFFFFF');
+    const alphaHtml = alphaField
+      ? `<div class="wb-cl-alpha-inline">
+           <input type="number" min="0" max="100" step="1" value="${Math.round(alphaVal ?? 100)}" data-${scope}-field="${alphaField}" aria-label="${escapeHtml(label)} Alpha">
+           <span>%</span>
+         </div>`
+      : '';
+    return `
+      <div class="wb-cl-row">
+        <span class="wb-cl-label" title="${escapeHtml(title || label)}">${escapeHtml(label)}</span>
+        <div class="wb-cl-color-wrap">
+          <div class="wb-cl-color-box">
+            <span class="wb-cl-swatch" style="background:${normHex};">
+              <input type="color" value="${normHex}" data-${scope}-color="${field}" aria-label="${escapeHtml(label)} Color Picker">
+            </span>
+            <input type="text" class="wb-cl-hex" value="${normHex}" maxlength="7" data-${scope}-hex="${field}" aria-label="${escapeHtml(label)} Hex">
+          </div>
+          ${alphaHtml}
+          <button type="button" class="wb-cl-eyedropper" data-cl-eyedropper="${scope}:${field}" title="Pick color from screen" aria-label="Eyedropper for ${escapeHtml(label)}">
+            ${CL_EYEDROPPER_SVG}
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderClSliderRow(opts) {
+    const { scope, field, label, value, min, max, step, suffix, decimals, title } = opts;
+    const numVal = Number.isFinite(Number(value)) ? Number(value) : max;
+    const pct = roundTfNum(clamp01((numVal - min) / Math.max(0.0001, max - min)) * 100, 2);
+    const displayVal = decimals > 0 ? formatTfVal(numVal, decimals) : String(Math.round(numVal));
+    return `
+      <div class="wb-cl-row">
+        <span class="wb-cl-label" title="${escapeHtml(title || label)}">${escapeHtml(label)}</span>
+        <div class="wb-cl-slider-row">
+          <input
+            type="range"
+            class="wb-cl-slider"
+            min="${min}"
+            max="${max}"
+            step="${step}"
+            value="${numVal}"
+            style="--pct:${pct}%;"
+            data-${scope}-slider="${field}"
+            aria-label="${escapeHtml(label)} Slider"
+          >
+          <div class="wb-cl-num-box">
+            <input
+              type="number"
+              min="${min}"
+              max="${max}"
+              step="${step}"
+              value="${displayVal}"
+              data-${scope}-field="${field}"
+              aria-label="${escapeHtml(label)} Value"
+            >
+            ${suffix ? `<span class="wb-cl-num-suffix">${escapeHtml(suffix)}</span>` : ''}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderClGradientSection(scope, cardKey, obj, collapsed) {
+    const gradType = Number(obj.gradient) || 0;
+    const isHoriz = gradType === 2;
+    const showStops = gradType > 0;
+    return `
+      <div class="wb-cl-sub">
+        <button type="button" class="wb-cl-subhead" data-cl-grad-toggle="${cardKey}" aria-expanded="${collapsed ? 'false' : 'true'}">
+          <span class="wb-tf-caret">${collapsed ? '▸' : '▾'}</span>
+          <span>Gradient</span>
+        </button>
+        <div class="wb-cl-subbody${collapsed ? ' is-collapsed' : ''}" data-cl-grad-body="${cardKey}">
+          <div class="wb-cl-row">
+            <span class="wb-cl-label">Gradient Type</span>
+            <select class="wb-cl-select" data-${scope}-field="gradient" aria-label="Gradient Type">
+              <option value="0" ${gradType === 0 ? 'selected' : ''}>None</option>
+              <option value="1" ${gradType === 1 ? 'selected' : ''}>Vertical Gradient</option>
+              <option value="2" ${gradType === 2 ? 'selected' : ''}>Horizontal Gradient</option>
+            </select>
+          </div>
+          <div class="wb-cl-conditional${showStops ? '' : ' is-hidden'}" data-cl-cond="${cardKey}-grad-stops">
+            ${renderClColorRow({
+              scope,
+              field: 'gradientTop',
+              label: isHoriz ? 'Left' : 'Top',
+              hex: obj.gradientTop || '#FFFFFF',
+              alphaField: 'gradientTopAlpha',
+              alphaVal: obj.gradientTopAlpha ?? 100,
+            })}
+            ${renderClColorRow({
+              scope,
+              field: 'gradientBottom',
+              label: isHoriz ? 'Right' : 'Bottom',
+              hex: obj.gradientBottom || '#FFFFFF',
+              alphaField: 'gradientBottomAlpha',
+              alphaVal: obj.gradientBottomAlpha ?? 100,
+            })}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderClSpriteWidget(sliceId, attrName, options = {}) {
+    const resolved = sliceId ? resolveSliceUrl(sliceId) : null;
+    const rec = resolved ? resolved.rec : null;
+    const compact = Boolean(options.compact);
+    const allowClear = Boolean(options.allowClear);
+    const displayName = rec ? rec.id : sliceId || '';
+
+    const barHtml = `
+      <div class="wb-cl-sprite-bar${compact ? ' wb-cl-sprite-bar--compact' : ''}">
+        <span class="wb-cl-sprite-mini">
+          ${resolved ? `<img src="${escapeHtml(resolved.url)}" alt="${escapeHtml(sliceId)}">` : '—'}
+        </span>
+        <input
+          type="text"
+          class="wb-cl-sprite-name"
+          list="wb-catalog-slices-list"
+          value="${escapeHtml(displayName)}"
+          placeholder="${compact ? 'None (fallback)' : 'Slice ID...'}"
+          data-cl-sprite-input="${attrName}"
+          title="${rec ? escapeHtml(rec.source_file) : 'Enter Slice ID or click picker'}"
+          aria-label="Sprite Slice ID (${attrName})"
+        >
+        ${
+          allowClear && sliceId
+            ? `<button type="button" class="wb-cl-sprite-clear-btn" data-cl-sprite-clear="${attrName}" title="Clear sprite" aria-label="Clear sprite">×</button>`
+            : ''
+        }
+        <button type="button" class="wb-cl-sprite-pick-btn" data-cl-sprite-pick="${attrName}" title="Choose Sprite…" aria-label="Choose Sprite">
+          ${CL_TARGET_PICK_SVG}
+        </button>
+      </div>
+    `;
+
+    if (compact) return barHtml;
+
+    return `
+      <div class="wb-cl-sprite-widget">
+        ${barHtml}
+        <div class="wb-cl-sprite-preview" data-cl-sprite-pick="${attrName}" title="Click to choose sprite">
+          ${
+            resolved
+              ? `<img src="${escapeHtml(resolved.url)}" alt="${escapeHtml(sliceId)}">`
+              : '<span class="wb-cl-sprite-empty">No sprite assigned</span>'
+          }
+          ${rec ? `<span class="wb-cl-sprite-dim">${rec.width}×${rec.height}</span>` : ''}
+          ${
+            sliceId && rec
+              ? `<button type="button" class="wb-cl-edit-s9-link" data-insp-edit-resource-s9="${escapeHtml(sliceId)}" title="Edit 9-slice borders in Resource Editor">Edit 9-Slice →</button>`
+              : ''
+          }
+        </div>
+      </div>
+    `;
+  }
+
+  function renderLabelComponentCard(el) {
+    const bundle = getWidgetLabelState(el);
+    if (!bundle) return '';
+    const { lbl, info } = bundle;
+    const isCollapsed = Boolean(state.labelCollapsed);
+    const isMenuOpen = Boolean(state.labelMenuOpen);
+    const currentText = info ? info.currentText : '';
+    const shX = Array.isArray(lbl.shadowOffset) ? lbl.shadowOffset[0] : 1;
+    const shY = Array.isArray(lbl.shadowOffset) ? lbl.shadowOffset[1] : 1;
+
+    return `
+      <div class="wb-insp-card wb-cl-card" data-cl-card="label">
+        <div class="wb-tf-head">
+          <button type="button" class="wb-tf-toggle" data-cl-toggle="label" aria-expanded="${isCollapsed ? 'false' : 'true'}">
+            <span class="wb-tf-caret">${isCollapsed ? '▸' : '▾'}</span>
+            <span>UI Widget Label</span>
+          </button>
+          <div class="wb-tf-menu-wrap">
+            <button type="button" class="wb-tf-dots-btn${isMenuOpen ? ' is-open' : ''}" data-cl-menu-toggle="label" title="UI Widget Label Actions" aria-label="UI Widget Label Actions">⋯</button>
+            <div class="wb-tf-menu-dropdown${isMenuOpen ? ' is-open' : ''}" id="wb-cl-menu-label">
+              <button type="button" class="wb-tf-menu-item" data-cl-menu-action="label:copy">Copy Craftland JSON</button>
+              <div class="wb-tf-menu-sep"></div>
+              <button type="button" class="wb-tf-menu-item wb-tf-menu-item--danger" data-cl-menu-action="label:reset">Reset Label</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="wb-cl-body${isCollapsed ? ' is-collapsed' : ''}" data-cl-body="label">
+          <div class="wb-cl-row wb-cl-row--top">
+            <span class="wb-cl-label">Content</span>
+            <textarea id="wb-insp-text-input" class="wb-cl-textarea" rows="2" placeholder="Enter label text...">${escapeHtml(currentText)}</textarea>
+          </div>
+
+          ${renderClColorRow({ scope: 'lbl', field: 'color', label: 'Color', hex: lbl.color })}
+
+          ${renderClSliderRow({
+            scope: 'lbl',
+            field: 'alpha',
+            label: 'Alpha',
+            value: lbl.alpha,
+            min: 0,
+            max: 100,
+            step: 1,
+            suffix: '%',
+            decimals: 0,
+          })}
+
+          <div class="wb-cl-row">
+            <span class="wb-cl-label">Font Size</span>
+            <div class="wb-cl-icon-num">
+              <span class="wb-cl-prefix-icon" aria-hidden="true">T</span>
+              <input type="number" class="wb-cl-stepper-input" min="4" max="256" step="1" value="${Math.round(lbl.fontSize || 16)}" data-lbl-field="fontSize" aria-label="Font Size">
+            </div>
+          </div>
+
+          <div class="wb-cl-row wb-cl-row--top">
+            <span class="wb-cl-label">Text Align</span>
+            <div class="wb-cl-ctrl">
+              <div class="wb-cl-seg-row" role="group" aria-label="Horizontal Alignment">
+                ${['left', 'center', 'right', 'fillH']
+                  .map(
+                    key => `<button type="button" class="wb-cl-seg-btn${lbl.alignH === key ? ' is-active' : ''}" data-lbl-align-h="${key}" title="Align ${key}" aria-pressed="${lbl.alignH === key ? 'true' : 'false'}">${CL_ALIGN_H_SVGS[key]}</button>`
+                  )
+                  .join('')}
+              </div>
+              <div class="wb-cl-seg-row" role="group" aria-label="Vertical Alignment">
+                ${['top', 'middle', 'bottom', 'fillV']
+                  .map(
+                    key => `<button type="button" class="wb-cl-seg-btn${lbl.alignV === key ? ' is-active' : ''}" data-lbl-align-v="${key}" title="Vertical ${key}" aria-pressed="${lbl.alignV === key ? 'true' : 'false'}">${CL_ALIGN_V_SVGS[key]}</button>`
+                  )
+                  .join('')}
+              </div>
+            </div>
+          </div>
+
+          <div class="wb-cl-row">
+            <span class="wb-cl-label">Font</span>
+            <div class="wb-cl-seg-row" role="group" aria-label="Font Style">
+              <button type="button" class="wb-cl-seg-btn${lbl.bold ? ' is-active' : ''}" data-lbl-font-toggle="bold" aria-pressed="${lbl.bold ? 'true' : 'false'}" title="Bold"><strong>B</strong></button>
+              <button type="button" class="wb-cl-seg-btn${lbl.italic ? ' is-active' : ''}" data-lbl-font-toggle="italic" aria-pressed="${lbl.italic ? 'true' : 'false'}" title="Italic"><em>I</em></button>
+              <button type="button" class="wb-cl-seg-btn${lbl.underline ? ' is-active' : ''}" data-lbl-font-toggle="underline" aria-pressed="${lbl.underline ? 'true' : 'false'}" title="Underline"><span style="text-decoration:underline;">U</span></button>
+            </div>
+          </div>
+
+          <div class="wb-cl-row">
+            <span class="wb-cl-label">Line Spacing</span>
+            <div class="wb-cl-icon-num">
+              <span class="wb-cl-prefix-icon" aria-hidden="true">${CL_LINE_SPACE_SVG}</span>
+              <input type="number" class="wb-cl-stepper-input" min="-64" max="128" step="1" value="${escapeHtml(formatTfVal(lbl.lineSpacing || 0, 1))}" data-lbl-field="lineSpacing" aria-label="Line Spacing">
+            </div>
+          </div>
+
+          <div class="wb-cl-row">
+            <span class="wb-cl-label">Overflow</span>
+            <select class="wb-cl-select" data-lbl-field="overflow" aria-label="Overflow">
+              <option value="0" ${Number(lbl.overflow) === 0 ? 'selected' : ''}>Reduce Font Size</option>
+              <option value="1" ${Number(lbl.overflow) === 1 ? 'selected' : ''}>Wrap around</option>
+              <option value="2" ${Number(lbl.overflow) === 2 ? 'selected' : ''}>Overflow</option>
+            </select>
+          </div>
+
+          <div class="wb-cl-row">
+            <span class="wb-cl-label">Is Apply Shadow</span>
+            <input type="checkbox" class="wb-cl-check" data-lbl-field="shadow" ${lbl.shadow ? 'checked' : ''} aria-label="Is Apply Shadow">
+          </div>
+
+          <div class="wb-cl-conditional${lbl.shadow ? '' : ' is-hidden'}" data-cl-cond="label-shadow">
+            ${renderClColorRow({ scope: 'lbl', field: 'shadowColor', label: 'Shadow Color', hex: lbl.shadowColor })}
+            <div class="wb-cl-row">
+              <span class="wb-cl-label">Shadow Offset</span>
+              <div class="wb-tf-vec2">
+                <label class="wb-tf-axis-field is-x" data-cl-scrub="shadowOffsetX">
+                  <span class="wb-tf-scrub-edge" data-cl-scrub-handle="shadowOffsetX" title="Drag left/right to adjust Shadow Offset X"></span>
+                  <span class="wb-tf-axis-tag">X</span>
+                  <input type="number" step="1" value="${escapeHtml(formatTfVal(shX, 1))}" data-lbl-field="shadowOffsetX" aria-label="Shadow Offset X">
+                </label>
+                <label class="wb-tf-axis-field is-y" data-cl-scrub="shadowOffsetY">
+                  <span class="wb-tf-scrub-edge" data-cl-scrub-handle="shadowOffsetY" title="Drag left/right to adjust Shadow Offset Y"></span>
+                  <span class="wb-tf-axis-tag">Y</span>
+                  <input type="number" step="1" value="${escapeHtml(formatTfVal(shY, 1))}" data-lbl-field="shadowOffsetY" aria-label="Shadow Offset Y">
+                </label>
+              </div>
+            </div>
+            ${renderClSliderRow({
+              scope: 'lbl',
+              field: 'shadowAlpha',
+              label: 'Shadow Alpha',
+              value: lbl.shadowAlpha,
+              min: 0,
+              max: 1,
+              step: 0.05,
+              suffix: '',
+              decimals: 2,
+            })}
+          </div>
+
+          <div class="wb-cl-row">
+            <span class="wb-cl-label">Is Apply Outline</span>
+            <input type="checkbox" class="wb-cl-check" data-lbl-field="outline" ${lbl.outline ? 'checked' : ''} aria-label="Is Apply Outline">
+          </div>
+
+          <div class="wb-cl-conditional${lbl.outline ? '' : ' is-hidden'}" data-cl-cond="label-outline">
+            ${renderClColorRow({ scope: 'lbl', field: 'outlineColor', label: 'Outline Color', hex: lbl.outlineColor })}
+            ${renderClSliderRow({
+              scope: 'lbl',
+              field: 'outlineAlpha',
+              label: 'Outline Alpha',
+              title: 'The transparency of the outline',
+              value: lbl.outlineAlpha,
+              min: 0,
+              max: 1,
+              step: 0.05,
+              suffix: '',
+              decimals: 2,
+            })}
+            <div class="wb-cl-row">
+              <span class="wb-cl-label">Width</span>
+              <input type="number" class="wb-cl-stepper-input" min="0" max="24" step="0.5" value="${escapeHtml(formatTfVal(lbl.outlineWidth ?? 1, 1))}" data-lbl-field="outlineWidth" aria-label="Outline Width">
+            </div>
+          </div>
+
+          ${renderClGradientSection('lbl', 'label', lbl, Boolean(state.labelGradientCollapsed))}
+
+          <div id="wb-text-feedback" class="wb-insp-feedback"></div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderClImageTypeControls(img, cardKey) {
+    const ft = Number.isFinite(Number(img.fillType)) ? Number(img.fillType) : 0;
+    const is9Grid = ft === 1;
+    const isFilled = ft === 3;
+    return `
+      <div class="wb-cl-row">
+        <span class="wb-cl-label">Type</span>
+        <select class="wb-cl-select" data-img-field="fillType" aria-label="Image Type">
+          <option value="0" ${ft === 0 ? 'selected' : ''}>Simple</option>
+          <option value="1" ${ft === 1 ? 'selected' : ''}>9-Grid Pattern</option>
+          <option value="2" ${ft === 2 ? 'selected' : ''}>Tiled</option>
+          <option value="3" ${ft === 3 ? 'selected' : ''}>Filled</option>
+          <option value="5" ${ft === 5 ? 'selected' : ''}>Fit</option>
+        </select>
+      </div>
+
+      <div class="wb-cl-conditional${is9Grid ? '' : ' is-hidden'}" data-cl-cond="${cardKey}-9grid">
+        <div class="wb-cl-row">
+          <span class="wb-cl-label" title="Invisible to Center (omits 9-slice center fill)">Invisible to Center</span>
+          <input type="checkbox" class="wb-cl-check" data-img-field="centerInvisible" ${img.centerInvisible ? 'checked' : ''} aria-label="Invisible to Center">
+        </div>
+      </div>
+
+      <div class="wb-cl-conditional${isFilled ? '' : ' is-hidden'}" data-cl-cond="${cardKey}-filled">
+        <div class="wb-cl-row">
+          <span class="wb-cl-label">Fill Direction</span>
+          <select class="wb-cl-select" data-img-field="fillDir" aria-label="Fill Direction">
+            <option value="0" ${Number(img.fillDir) === 0 ? 'selected' : ''}>Horizontal</option>
+            <option value="1" ${Number(img.fillDir) === 1 ? 'selected' : ''}>Vertical</option>
+            <option value="2" ${Number(img.fillDir) === 2 ? 'selected' : ''}>Radial 90°</option>
+            <option value="3" ${Number(img.fillDir) === 3 ? 'selected' : ''}>Radial 180°</option>
+            <option value="4" ${Number(img.fillDir) === 4 ? 'selected' : ''}>Radial 360°</option>
+          </select>
+        </div>
+        ${renderClSliderRow({
+          scope: 'img',
+          field: 'fillAmount',
+          label: 'Fill Value',
+          value: img.fillAmount ?? 1,
+          min: 0,
+          max: 1,
+          step: 0.01,
+          suffix: '',
+          decimals: 2,
+        })}
+        <div class="wb-cl-row">
+          <span class="wb-cl-label">Invert Fill</span>
+          <input type="checkbox" class="wb-cl-check" data-img-field="invertFill" ${img.invertFill ? 'checked' : ''} aria-label="Invert Fill">
+        </div>
+      </div>
+    `;
+  }
+
+  function renderImageComponentCard(el) {
+    if (!el) return '';
+    const img = getWidgetImageState(el);
+    const isCollapsed = Boolean(state.imageCollapsed);
+    const isMenuOpen = Boolean(state.imageMenuOpen);
+    const sliceAttrs = ['data-slice-id', 'data-slice-on', 'data-slice-off'].filter(a => Boolean(el.getAttribute(a)));
+    if (sliceAttrs.length === 0) sliceAttrs.push('data-slice-id');
+    const activeAttr = sliceAttrs.includes(state.activeEditorSliceAttr) ? state.activeEditorSliceAttr : sliceAttrs[0];
+    const activeSliceId = el.getAttribute(activeAttr) || '';
+    const resolved = activeSliceId ? resolveSliceUrl(activeSliceId) : null;
+    const autoModeLabel = resolveEffectiveTintMode(el, activeSliceId, resolved ? resolved.rec : null);
+    const matchingCount = activeSliceId ? findMatchingSpriteTargets(el, activeAttr).length : 0;
+
+    const attrTabsHtml =
+      sliceAttrs.length > 1
+        ? `<div class="slice9-actions-row">${sliceAttrs
+            .map(
+              attr =>
+                `<button type="button" class="wb-btn wb-btn-sm ${attr === activeAttr ? 'is-active' : ''}" data-insp-slice-attr="${attr}">${attr.replace('data-slice-', '')}</button>`
+            )
+            .join('')}</div>`
+        : '';
+
+    return `
+      <div class="wb-insp-card wb-cl-card" data-cl-card="image">
+        <div class="wb-tf-head">
+          <button type="button" class="wb-tf-toggle" data-cl-toggle="image" aria-expanded="${isCollapsed ? 'false' : 'true'}">
+            <span class="wb-tf-caret">${isCollapsed ? '▸' : '▾'}</span>
+            <span>UI Widget Image</span>
+          </button>
+          <div class="wb-tf-menu-wrap">
+            <button type="button" class="wb-tf-dots-btn${isMenuOpen ? ' is-open' : ''}" data-cl-menu-toggle="image" title="UI Widget Image Actions" aria-label="UI Widget Image Actions">⋯</button>
+            <div class="wb-tf-menu-dropdown${isMenuOpen ? ' is-open' : ''}" id="wb-cl-menu-image">
+              <div class="wb-tf-menu-heading">Tint Mode</div>
+              <button type="button" class="wb-tf-menu-item${img.tintMode === 'auto' ? ' is-checked' : ''}" data-cl-menu-action="image:tint-auto">Auto (${autoModeLabel})</button>
+              <button type="button" class="wb-tf-menu-item${img.tintMode === 'mask' ? ' is-checked' : ''}" data-cl-menu-action="image:tint-mask">Mask (White Icons)</button>
+              <button type="button" class="wb-tf-menu-item${img.tintMode === 'multiply' ? ' is-checked' : ''}" data-cl-menu-action="image:tint-multiply">Multiply (Shaded Art)</button>
+              <div class="wb-tf-menu-sep"></div>
+              <button type="button" class="wb-tf-menu-item${state.swapAllSprites ? ' is-checked' : ''}" data-cl-menu-action="image:swap-all">Swap all matching (${matchingCount})</button>
+              <button type="button" class="wb-tf-menu-item" data-cl-menu-action="image:copy">Copy Craftland JSON</button>
+              <div class="wb-tf-menu-sep"></div>
+              <button type="button" class="wb-tf-menu-item wb-tf-menu-item--danger" data-cl-menu-action="image:reset">Reset Image</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="wb-cl-body${isCollapsed ? ' is-collapsed' : ''}" data-cl-body="image">
+          ${attrTabsHtml}
+          ${renderClColorRow({ scope: 'img', field: 'color', label: 'Color', hex: img.color })}
+
+          <div class="wb-cl-row wb-cl-row--top">
+            <span class="wb-cl-label">Sprite Shape</span>
+            ${renderClSpriteWidget(activeSliceId, activeAttr)}
+          </div>
+
+          ${renderClSliderRow({
+            scope: 'img',
+            field: 'alpha',
+            label: 'Alpha',
+            value: img.alpha,
+            min: 0,
+            max: 100,
+            step: 1,
+            suffix: '%',
+            decimals: 0,
+          })}
+
+          <div class="wb-cl-row">
+            <span class="wb-cl-label">Flip</span>
+            <div class="wb-cl-seg-row" role="group" aria-label="Flip Sprite">
+              <button type="button" class="wb-cl-seg-btn${img.flipX ? ' is-active' : ''}" data-img-flip="x" aria-pressed="${img.flipX ? 'true' : 'false'}" title="Flip Horizontal">${CL_FLIP_SVGS.x}</button>
+              <button type="button" class="wb-cl-seg-btn${img.flipY ? ' is-active' : ''}" data-img-flip="y" aria-pressed="${img.flipY ? 'true' : 'false'}" title="Flip Vertical">${CL_FLIP_SVGS.y}</button>
+            </div>
+          </div>
+
+          ${renderClImageTypeControls(img, 'image')}
+
+          ${renderClGradientSection('img', 'image', img, Boolean(state.imageGradientCollapsed))}
+
+          <div id="wb-sprite-feedback" class="wb-insp-feedback"></div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderButtonComponentCard(el, spriteTargetEl) {
+    const target = spriteTargetEl || el;
+    const img = getWidgetImageState(target);
+    const isCollapsed = Boolean(state.buttonCollapsed);
+    const isMenuOpen = Boolean(state.buttonMenuOpen);
+    const idleId = target.getAttribute('data-slice-id') || '';
+    const pressedId = target.getAttribute('data-slice-pressed') || '';
+    const hoverId = target.getAttribute('data-slice-hover') || '';
+    const resolved = idleId ? resolveSliceUrl(idleId) : null;
+    const autoModeLabel = resolveEffectiveTintMode(target, idleId, resolved ? resolved.rec : null);
+    const matchingCount = idleId ? findMatchingSpriteTargets(target, 'data-slice-id').length : 0;
+    const showHover = Boolean(hoverId || state.showHoverSpriteSlot);
+
+    const targetInfoHtml =
+      target !== el
+        ? `<div class="wb-insp-hint">Targets sprite child <code>${escapeHtml(describeElementSelector(target))}</code></div>`
+        : '';
+
+    return `
+      <div class="wb-insp-card wb-cl-card" data-cl-card="button">
+        <div class="wb-tf-head">
+          <button type="button" class="wb-tf-toggle" data-cl-toggle="button" aria-expanded="${isCollapsed ? 'false' : 'true'}">
+            <span class="wb-tf-caret">${isCollapsed ? '▸' : '▾'}</span>
+            <span>UI Widget Button</span>
+          </button>
+          <div class="wb-tf-menu-wrap">
+            <button type="button" class="wb-tf-dots-btn${isMenuOpen ? ' is-open' : ''}" data-cl-menu-toggle="button" title="UI Widget Button Actions" aria-label="UI Widget Button Actions">⋯</button>
+            <div class="wb-tf-menu-dropdown${isMenuOpen ? ' is-open' : ''}" id="wb-cl-menu-button">
+              <div class="wb-tf-menu-heading">Tint Mode</div>
+              <button type="button" class="wb-tf-menu-item${img.tintMode === 'auto' ? ' is-checked' : ''}" data-cl-menu-action="button:tint-auto">Auto (${autoModeLabel})</button>
+              <button type="button" class="wb-tf-menu-item${img.tintMode === 'mask' ? ' is-checked' : ''}" data-cl-menu-action="button:tint-mask">Mask (White Icons)</button>
+              <button type="button" class="wb-tf-menu-item${img.tintMode === 'multiply' ? ' is-checked' : ''}" data-cl-menu-action="button:tint-multiply">Multiply (Shaded Art)</button>
+              <div class="wb-tf-menu-sep"></div>
+              <button type="button" class="wb-tf-menu-item${showHover ? ' is-checked' : ''}" data-cl-menu-action="button:toggle-hover-slot">Show Hover Sprite Slot</button>
+              <button type="button" class="wb-tf-menu-item${state.swapAllSprites ? ' is-checked' : ''}" data-cl-menu-action="button:swap-all">Swap all matching (${matchingCount})</button>
+              <button type="button" class="wb-tf-menu-item" data-cl-menu-action="button:copy">Copy Craftland JSON</button>
+              <div class="wb-tf-menu-sep"></div>
+              <button type="button" class="wb-tf-menu-item wb-tf-menu-item--danger" data-cl-menu-action="button:reset">Reset Button</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="wb-cl-body${isCollapsed ? ' is-collapsed' : ''}" data-cl-body="button">
+          ${targetInfoHtml}
+          <div class="wb-cl-row wb-cl-row--top">
+            <span class="wb-cl-label">Sprite Resource</span>
+            ${renderClSpriteWidget(idleId, 'data-slice-id')}
+          </div>
+
+          ${renderClColorRow({ scope: 'img', field: 'color', label: 'Color', hex: img.color })}
+
+          ${renderClSliderRow({
+            scope: 'img',
+            field: 'alpha',
+            label: 'Alpha',
+            value: img.alpha,
+            min: 0,
+            max: 100,
+            step: 1,
+            suffix: '%',
+            decimals: 0,
+          })}
+
+          ${renderClColorRow({ scope: 'img', field: 'pressedColor', label: 'Pressed Color', hex: img.pressedColor || '#C5C5C5' })}
+
+          ${renderClColorRow({ scope: 'img', field: 'disableColor', label: 'Disable Color', hex: img.disableColor || '#808080' })}
+
+          <div class="wb-cl-row">
+            <span class="wb-cl-label">Pressed Sprite</span>
+            ${renderClSpriteWidget(pressedId, 'data-slice-pressed', { compact: true, allowClear: true })}
+          </div>
+
+          ${
+            showHover
+              ? `<div class="wb-cl-row">
+                   <span class="wb-cl-label">Hover Sprite</span>
+                   ${renderClSpriteWidget(hoverId, 'data-slice-hover', { compact: true, allowClear: true })}
+                 </div>`
+              : ''
+          }
+
+          <div class="wb-cl-row">
+            <span class="wb-cl-label">Flip Type</span>
+            <div class="wb-cl-seg-row" role="group" aria-label="Flip Button Sprite">
+              <button type="button" class="wb-cl-seg-btn${img.flipX ? ' is-active' : ''}" data-img-flip="x" aria-pressed="${img.flipX ? 'true' : 'false'}" title="Flip Horizontal">${CL_FLIP_SVGS.x}</button>
+              <button type="button" class="wb-cl-seg-btn${img.flipY ? ' is-active' : ''}" data-img-flip="y" aria-pressed="${img.flipY ? 'true' : 'false'}" title="Flip Vertical">${CL_FLIP_SVGS.y}</button>
+            </div>
+          </div>
+
+          ${renderClImageTypeControls(img, 'button')}
+
+          <div class="wb-cl-row">
+            <span class="wb-cl-label" title="Disable Collider (click-through in Interactive mode)">Passthrough</span>
+            <input type="checkbox" class="wb-cl-check" data-img-field="passthrough" ${img.passthrough ? 'checked' : ''} aria-label="Passthrough">
+          </div>
+
+          ${renderClGradientSection('img', 'button', img, Boolean(state.buttonGradientCollapsed))}
+
+          <div id="wb-sprite-feedback" class="wb-insp-feedback"></div>
+        </div>
+      </div>
+    `;
+  }
+
   function resetWidgetEdits(el) {
     if (!el) return Promise.resolve({ ok: false });
     const edits = loadUiEdits();
 
-    resetSingleElementSpriteAttrs(el, edits);
+    resetSingleElementImage(el, edits);
     const spriteTarget = getButtonSpriteTargetEl(el);
     if (spriteTarget && spriteTarget !== el) {
-      resetSingleElementSpriteAttrs(spriteTarget, edits);
-    }
-    const elPath = getElementCanvasPath(el);
-    if (elPath && edits.tintEdits[elPath]) delete edits.tintEdits[elPath];
-    if (spriteTarget && spriteTarget !== el) {
-      const spPath = getElementCanvasPath(spriteTarget);
-      if (spPath && edits.tintEdits[spPath]) delete edits.tintEdits[spPath];
-    }
-    applyTintToElement(el, el.getAttribute('data-slice-id'));
-    if (spriteTarget && spriteTarget !== el) {
-      applyTintToElement(spriteTarget, spriteTarget.getAttribute('data-slice-id'));
+      resetSingleElementImage(spriteTarget, edits, el);
     }
     resetSingleElementTransform(el, edits);
-
-    // Reset text edits on el or its targetEl
-    const info = getEditableTextInfo(el);
-    const textTarget = (info && info.targetEl) || el;
-    const textPath = getElementCanvasPath(textTarget);
-    if (textPath && edits.textEdits[textPath] !== undefined) {
-      delete edits.textEdits[textPath];
-    }
-    if (state.originalWidgetText.has(textTarget)) {
-      setTargetElementText(textTarget, state.originalWidgetText.get(textTarget));
-    }
+    resetSingleElementLabel(el, edits);
 
     saveUiEdits(edits);
     renderManifestTable();
@@ -1592,6 +3011,8 @@
     const textEntries = Object.entries(edits.textEdits || {});
     const transformEntries = Object.entries(edits.transformEdits || {});
     const tintEntries = Object.entries(edits.tintEdits || {});
+    const labelEntries = Object.entries(edits.labelEdits || {});
+    const imageEntries = Object.entries(edits.imageEdits || {});
 
     spriteEntries.forEach(([pathKey, attrMap]) => {
       const el = resolveElementByCanvasPath(pathKey);
@@ -1659,7 +3080,34 @@
       applyTintToElement(el, el.getAttribute('data-slice-id'));
     });
 
-    return spriteEntries.length + textEntries.length + transformEntries.length + tintEntries.length;
+    labelEntries.forEach(([pathKey, savedLbl]) => {
+      const el = resolveElementByCanvasPath(pathKey);
+      if (!el || !savedLbl || typeof savedLbl !== 'object') return;
+      const base = readInitialLabelState(el);
+      const lbl = Object.assign(base, savedLbl, {
+        _alignVEdited: Object.prototype.hasOwnProperty.call(savedLbl, 'alignV'),
+        dirty: true,
+      });
+      applyWidgetLabelToDom(el, lbl);
+    });
+
+    imageEntries.forEach(([pathKey, savedImg]) => {
+      const el = resolveElementByCanvasPath(pathKey);
+      if (!el || !savedImg || typeof savedImg !== 'object') return;
+      const base = readInitialImageState(el);
+      const img = Object.assign(base, savedImg, { dirty: true });
+      const hostBtn = el.closest ? el.closest('button, .px-btn') : null;
+      applyWidgetImageToDom(el, img, hostBtn && getButtonSpriteTargetEl(hostBtn) === el ? hostBtn : null);
+    });
+
+    return (
+      spriteEntries.length +
+      textEntries.length +
+      transformEntries.length +
+      tintEntries.length +
+      labelEntries.length +
+      imageEntries.length
+    );
   }
 
   function parseSlice9Attr(raw) {
@@ -1803,6 +3251,7 @@
 
     if (el.tagName === 'IMG') {
       el.src = url;
+      el.style.setProperty('--skin-url', `url("${url}")`);
       if (!el.style.getPropertyValue('--w')) el.style.setProperty('--w', String(rec.width));
       if (!el.style.getPropertyValue('--h')) el.style.setProperty('--h', String(rec.height));
       applyTintToElement(el, sliceId);
@@ -3283,85 +4732,12 @@
     return clsList ? `${tagSel}.${clsList}` : tagSel;
   }
 
-  function renderButtonComponentCard(el, spriteTargetEl, canAddOrEditText) {
-    const target = spriteTargetEl || el;
-    const idleId = target.getAttribute('data-slice-id') || '';
-    const matchingCount = idleId ? findMatchingSpriteTargets(target, 'data-slice-id').length : 0;
-    const targetInfoHtml =
-      target !== el
-        ? `<div class="wb-insp-hint">Sprite states target child <code>${escapeHtml(describeElementSelector(target))}</code></div>`
-        : '';
-
-    const rowsHtml = BUTTON_STATE_DEFS.map(stateDef => {
-      const stId = target.getAttribute(stateDef.attr) || '';
-      const stResolved = stId ? resolveSliceUrl(stId) : null;
-      const stRec = stResolved ? stResolved.rec : null;
-      return `
-        <div class="wb-btn-state-row" data-btn-state="${stateDef.key}">
-          <div class="wb-btn-state-head">
-            <div class="wb-btn-state-thumb">
-              ${stResolved ? `<img src="${escapeHtml(stResolved.url)}" alt="${escapeHtml(stId)}">` : '<span>—</span>'}
-            </div>
-            <div class="wb-btn-state-meta">
-              <div class="wb-btn-state-title-line">
-                <span class="wb-btn-state-badge is-${stateDef.key}">${stateDef.label}</span>
-                <span class="wb-btn-state-dim">${stRec ? `${stRec.width}×${stRec.height}` : 'Unassigned'}</span>
-              </div>
-              <div class="wb-btn-state-file" title="${stRec ? escapeHtml(stRec.source_file) : ''}">
-                ${stRec ? escapeHtml(stRec.source_file) : stateDef.optional ? 'Optional (falls back to Idle)' : 'Base resting button sprite'}
-              </div>
-            </div>
-          </div>
-          <div class="wb-slice-edit-row">
-            <input
-              class="wb-slice-input"
-              type="text"
-              list="wb-catalog-slices-list"
-              value="${escapeHtml(stId)}"
-              placeholder="${stateDef.optional ? 'Optional Slice ID...' : 'Slice ID...'}"
-              data-btn-state-input="${stateDef.attr}"
-              aria-label="${stateDef.label} Slice ID"
-            >
-            <button type="button" class="wb-btn wb-btn-sm" data-btn-state-apply="${stateDef.attr}">Apply</button>
-          </div>
-          <div class="slice9-actions-row">
-            <button type="button" class="wb-btn wb-btn-sm wb-btn--primary" data-btn-state-browse="${stateDef.attr}">Browse…</button>
-            ${
-              stId && stRec
-                ? `<button type="button" class="wb-btn wb-btn-sm" data-insp-edit-resource-s9="${escapeHtml(stId)}">Edit 9-Slice →</button>`
-                : ''
-            }
-            ${
-              stateDef.optional && stId
-                ? `<button type="button" class="wb-btn wb-btn-sm wb-btn--warn" data-btn-state-clear="${stateDef.attr}">Clear</button>`
-                : ''
-            }
-          </div>
-        </div>
-      `;
-    }).join('');
-
-    return `
-      <div class="wb-insp-card">
-        <div class="wb-insp-section-title">Button</div>
-        ${targetInfoHtml}
-        <div class="wb-btn-state-list">${rowsHtml}</div>
-        <label class="wb-check-row">
-          <input type="checkbox" id="wb-swap-all-sprites-cb" ${state.swapAllSprites ? 'checked' : ''}>
-          <span>Swap on all ${matchingCount} matching button${matchingCount === 1 ? '' : 's'}</span>
-        </label>
-        ${!canAddOrEditText ? '<div class="slice9-actions-row"><button type="button" class="wb-btn wb-btn-sm wb-btn--warn" data-reset-widget-edits>Reset Widget</button></div>' : ''}
-        <div id="wb-sprite-feedback" class="wb-insp-feedback"></div>
-      </div>
-    `;
-  }
-
   function renderWidgetInspector(body, badge) {
     const el = state.selectedEl;
     if (!el || !document.body.contains(el)) {
       badge.textContent = 'None';
       body.innerHTML =
-        '<div class="wb-insp-empty">Select any sprite from the bottom Resources tab to edit its 9-slice, or click a UI widget on the canvas to edit its text &amp; sprite.</div>';
+        '<div class="wb-insp-empty">Select any sprite from the bottom Resources tab to edit its 9-slice, or click a UI widget on the canvas to inspect its Transform, Label, Image, or Button components.</div>';
       return;
     }
 
@@ -3387,21 +4763,16 @@
       state.activeEditorSliceAttr = sliceAttrs[0] || 'data-slice-id';
     }
     const activeSliceId = sliceAttrs.length > 0 ? el.getAttribute(state.activeEditorSliceAttr) : null;
-    const resolved = activeSliceId ? resolveSliceUrl(activeSliceId) : null;
-    const rec = resolved ? resolved.rec : null;
 
     const textInfo = getEditableTextInfo(el);
     const canAddOrEditText = Boolean(textInfo);
-    const currentTextValue = textInfo ? textInfo.currentText : '';
 
     badge.textContent = isBtnComp
-      ? 'Button Widget'
+      ? 'UI Widget Button'
       : activeSliceId
-        ? el.classList.contains('px-9slice')
-          ? '9-Slice Widget'
-          : 'Sprite Widget'
+        ? 'UI Widget Image'
         : canAddOrEditText
-          ? 'Text Widget'
+          ? 'UI Widget Label'
           : 'Layout Widget';
 
     const is9SliceEl = el.classList.contains('px-9slice');
@@ -3445,95 +4816,13 @@
     html += renderTransformComponentCard(el);
 
     if (canAddOrEditText) {
-      html += `
-        <div class="wb-insp-card">
-          <div class="wb-insp-section-title">Text</div>
-          <textarea id="wb-insp-text-input" class="wb-text-input" rows="2" placeholder="Enter widget text...">${escapeHtml(currentTextValue)}</textarea>
-          <div class="wb-insp-hint">Tip: You can also double-click text on the canvas in Edit UI mode.</div>
-          <div class="slice9-actions-row">
-            <button type="button" class="wb-btn wb-btn-sm wb-btn--primary" data-ui-edits-save>Save Text &amp; Sprites</button>
-            <button type="button" class="wb-btn wb-btn-sm wb-btn--warn" data-reset-widget-edits>Reset Widget</button>
-          </div>
-          <div id="wb-text-feedback" class="wb-insp-feedback"></div>
-        </div>
-      `;
+      html += renderLabelComponentCard(el);
     }
 
     if (isBtnComp) {
-      html += renderButtonComponentCard(el, buttonSpriteTargetEl, canAddOrEditText);
+      html += renderButtonComponentCard(el, buttonSpriteTargetEl);
     } else if (sliceAttrs.length > 0) {
-      const sameSliceCount = activeSliceId ? findMatchingSpriteTargets(el, state.activeEditorSliceAttr).length : 0;
-      const attrTabsHtml =
-        sliceAttrs.length > 1
-          ? `<div class="slice9-actions-row">${sliceAttrs
-              .map(
-                attr =>
-                  `<button type="button" class="wb-btn wb-btn-sm ${attr === state.activeEditorSliceAttr ? 'is-active' : ''}" data-insp-slice-attr="${attr}">${attr.replace('data-slice-', '')}</button>`
-              )
-              .join('')}</div>`
-          : '';
-
-      html += `
-        <div class="wb-insp-card">
-          <div class="wb-insp-section-title">Sprite</div>
-          ${attrTabsHtml}
-          <div class="wb-slice-edit-row">
-            <input id="wb-insp-slice-input" class="wb-slice-input" type="text" list="wb-catalog-slices-list" value="${escapeHtml(activeSliceId || '')}" placeholder="Slice ID...">
-            <button type="button" class="wb-btn wb-btn-sm" data-insp-apply-slice>Apply</button>
-          </div>
-          <div class="slice9-actions-row">
-            <button type="button" class="wb-btn wb-btn-sm wb-btn--primary" data-open-sprite-picker>Browse Sprites…</button>
-            ${
-              activeSliceId && rec
-                ? `<button type="button" class="wb-btn wb-btn-sm" data-insp-edit-resource-s9="${escapeHtml(activeSliceId)}">Edit 9-Slice →</button>`
-                : ''
-            }
-            ${!canAddOrEditText ? '<button type="button" class="wb-btn wb-btn-sm wb-btn--warn" data-reset-widget-edits>Reset Widget</button>' : ''}
-          </div>
-          <label class="wb-check-row">
-            <input type="checkbox" id="wb-swap-all-sprites-cb" ${state.swapAllSprites ? 'checked' : ''}>
-            <span>Swap on all ${sameSliceCount} matching widget${sameSliceCount === 1 ? '' : 's'}</span>
-          </label>
-          ${
-            rec
-              ? `<div class="wb-insp-kv">
-                  <span class="wb-insp-k">Native Size</span><span class="wb-insp-v">${rec.width} × ${rec.height} px</span>
-                  <span class="wb-insp-k">Category</span><span class="wb-insp-v">${escapeHtml(rec.category)}</span>
-                  <span class="wb-insp-k">Source PNG</span><span class="wb-insp-v">${escapeHtml(rec.source_file)}</span>
-                </div>`
-              : '<div class="wb-insp-hint">No sprite currently assigned. Click Browse Sprites… to pick one.</div>'
-          }
-          <div id="wb-sprite-feedback" class="wb-insp-feedback"></div>
-        </div>
-      `;
-    }
-
-    const tintTargetEl = isBtnComp ? buttonSpriteTargetEl : sliceAttrs.length > 0 ? el : null;
-    if (tintTargetEl) {
-      const tintSliceId = tintTargetEl.getAttribute('data-slice-id');
-      const tintResolved = tintSliceId ? resolveSliceUrl(tintSliceId) : null;
-      const autoModeLabel = resolveEffectiveTintMode(tintTargetEl, tintSliceId, tintResolved ? tintResolved.rec : null);
-      const currentTint = (tintTargetEl.getAttribute('data-tint') || '').trim();
-      const currentTintMode = (tintTargetEl.getAttribute('data-tint-mode') || 'auto').trim().toLowerCase();
-      const pickerColor = /^#[0-9a-fA-F]{6}$/.test(currentTint) ? currentTint : '#f3c65f';
-
-      html += `
-        <div class="wb-insp-card">
-          <div class="wb-insp-section-title">Sprite Tint</div>
-          <div class="wb-tint-row">
-            <input type="color" id="wb-insp-tint-color" class="wb-tint-color-input" value="${escapeHtml(pickerColor)}" title="Pick sprite tint color">
-            <input type="text" id="wb-insp-tint-hex" class="wb-tint-hex-input" value="${escapeHtml(currentTint)}" placeholder="#RRGGBB (none)">
-            <button type="button" class="wb-btn wb-btn-sm" data-insp-tint-clear>Clear</button>
-          </div>
-          <div class="wb-tint-modes">
-            <button type="button" class="wb-btn wb-btn-sm ${currentTintMode === 'auto' ? 'is-active' : ''}" data-insp-tint-mode="auto">Auto (${autoModeLabel})</button>
-            <button type="button" class="wb-btn wb-btn-sm ${currentTintMode === 'mask' ? 'is-active' : ''}" data-insp-tint-mode="mask">Mask</button>
-            <button type="button" class="wb-btn wb-btn-sm ${currentTintMode === 'multiply' ? 'is-active' : ''}" data-insp-tint-mode="multiply">Multiply</button>
-          </div>
-          <div class="wb-insp-hint">Mask for pure-white icons; Multiply preserves shading on wood/metal frames.</div>
-          <div id="wb-tint-feedback" class="wb-insp-feedback"></div>
-        </div>
-      `;
+      html += renderImageComponentCard(el);
     }
 
     body.innerHTML = html;
@@ -3611,6 +4900,10 @@
       state.selectedEl.classList.remove('px-selected-element');
       state.anchorPresetOpen = false;
       state.transformMenuOpen = false;
+      state.labelMenuOpen = false;
+      state.imageMenuOpen = false;
+      state.buttonMenuOpen = false;
+      state.showHoverSpriteSlot = false;
     }
 
     state.selectedEl = el;
@@ -3860,7 +5153,247 @@
         if (menu) menu.classList.remove('is-open');
         if (dots) dots.classList.remove('is-open');
       }
+      ['label', 'image', 'button'].forEach(key => {
+        const flag = `${key}MenuOpen`;
+        if (state[flag]) {
+          state[flag] = false;
+          document.getElementById(`wb-cl-menu-${key}`)?.classList.remove('is-open');
+          document.querySelector(`[data-cl-menu-toggle="${key}"]`)?.classList.remove('is-open');
+        }
+      });
     }
+
+    function getSelectedImageContext() {
+      if (!state.selectedEl) return null;
+      const isBtn = isButtonComponent(state.selectedEl);
+      const targetEl = isBtn ? getButtonSpriteTargetEl(state.selectedEl) || state.selectedEl : state.selectedEl;
+      return { hostEl: state.selectedEl, targetEl, isBtn, cardKey: isBtn ? 'button' : 'image' };
+    }
+
+    function updateClSliderVisual(sliderEl, val) {
+      if (!sliderEl) return;
+      const min = parseFloat(sliderEl.min || '0');
+      const max = parseFloat(sliderEl.max || '100');
+      const pct = roundTfNum(clamp01((val - min) / Math.max(0.0001, max - min)) * 100, 2);
+      sliderEl.value = String(val);
+      sliderEl.style.setProperty('--pct', `${pct}%`);
+    }
+
+    function updateClGradientStopLabels(cardKey, gradType) {
+      const stopsEl = document.querySelector(`[data-cl-cond="${cardKey}-grad-stops"]`);
+      if (!stopsEl) return;
+      stopsEl.classList.toggle('is-hidden', Number(gradType) === 0);
+      const labels = stopsEl.querySelectorAll('.wb-cl-label');
+      if (labels.length >= 2) {
+        labels[0].textContent = Number(gradType) === 2 ? 'Left' : 'Top';
+        labels[1].textContent = Number(gradType) === 2 ? 'Right' : 'Bottom';
+      }
+    }
+
+    function applyLabelFieldEdit(field, rawVal, persist = false) {
+      if (!state.selectedEl) return;
+      const bundle = getWidgetLabelState(state.selectedEl);
+      if (!bundle) return;
+      const { targetEl, lbl } = bundle;
+
+      switch (field) {
+        case 'color':
+        case 'shadowColor':
+        case 'outlineColor':
+        case 'gradientTop':
+        case 'gradientBottom': {
+          const hex = normalizeHexColor(rawVal, '');
+          if (!hex) return;
+          lbl[field] = hex;
+          const colIn = document.querySelector(`[data-lbl-color="${field}"]`);
+          const hexIn = document.querySelector(`[data-lbl-hex="${field}"]`);
+          if (colIn && colIn.value.toUpperCase() !== hex) colIn.value = hex;
+          if (colIn && colIn.parentElement) colIn.parentElement.style.background = hex;
+          if (hexIn && document.activeElement !== hexIn) hexIn.value = hex;
+          break;
+        }
+        case 'alpha':
+        case 'gradientTopAlpha':
+        case 'gradientBottomAlpha': {
+          const v = Math.max(0, Math.min(100, parseFloat(rawVal)));
+          if (!Number.isFinite(v)) return;
+          lbl[field] = roundTfNum(v, 1);
+          const s = document.querySelector(`[data-lbl-slider="${field}"]`);
+          const n = document.querySelector(`[data-lbl-field="${field}"]`);
+          if (s) updateClSliderVisual(s, lbl[field]);
+          if (n && document.activeElement !== n) n.value = String(Math.round(lbl[field]));
+          break;
+        }
+        case 'shadowAlpha':
+        case 'outlineAlpha': {
+          const v = clamp01(parseFloat(rawVal));
+          if (!Number.isFinite(v)) return;
+          lbl[field] = roundTfNum(v, 2);
+          const s = document.querySelector(`[data-lbl-slider="${field}"]`);
+          const n = document.querySelector(`[data-lbl-field="${field}"]`);
+          if (s) updateClSliderVisual(s, lbl[field]);
+          if (n && document.activeElement !== n) n.value = formatTfVal(lbl[field], 2);
+          break;
+        }
+        case 'fontSize': {
+          const v = Math.max(4, Math.min(256, parseFloat(rawVal)));
+          if (!Number.isFinite(v)) return;
+          lbl.fontSize = roundTfNum(v, 1);
+          break;
+        }
+        case 'lineSpacing': {
+          const v = Math.max(-64, Math.min(128, parseFloat(rawVal)));
+          if (!Number.isFinite(v)) return;
+          lbl.lineSpacing = roundTfNum(v, 1);
+          break;
+        }
+        case 'outlineWidth': {
+          const v = Math.max(0, Math.min(24, parseFloat(rawVal)));
+          if (!Number.isFinite(v)) return;
+          lbl.outlineWidth = roundTfNum(v, 2);
+          break;
+        }
+        case 'shadowOffsetX': {
+          const v = parseFloat(rawVal);
+          if (!Number.isFinite(v)) return;
+          lbl.shadowOffset = [roundTfNum(v, 1), Array.isArray(lbl.shadowOffset) ? lbl.shadowOffset[1] : 1];
+          break;
+        }
+        case 'shadowOffsetY': {
+          const v = parseFloat(rawVal);
+          if (!Number.isFinite(v)) return;
+          lbl.shadowOffset = [Array.isArray(lbl.shadowOffset) ? lbl.shadowOffset[0] : 1, roundTfNum(v, 1)];
+          break;
+        }
+        case 'overflow': {
+          const v = parseInt(rawVal, 10);
+          lbl.overflow = [0, 1, 2].includes(v) ? v : 1;
+          break;
+        }
+        case 'gradient': {
+          const v = parseInt(rawVal, 10);
+          lbl.gradient = [0, 1, 2].includes(v) ? v : 0;
+          updateClGradientStopLabels('label', lbl.gradient);
+          break;
+        }
+        case 'shadow': {
+          lbl.shadow = Boolean(rawVal);
+          document.querySelector('[data-cl-cond="label-shadow"]')?.classList.toggle('is-hidden', !lbl.shadow);
+          break;
+        }
+        case 'outline': {
+          lbl.outline = Boolean(rawVal);
+          document.querySelector('[data-cl-cond="label-outline"]')?.classList.toggle('is-hidden', !lbl.outline);
+          break;
+        }
+        default:
+          return;
+      }
+
+      lbl.dirty = true;
+      applyWidgetLabelToDom(targetEl, lbl);
+      updateInspectorGeometryReadout();
+      renderTransformGizmo();
+      saveWidgetLabelEdit(targetEl, lbl, persist).then(result => {
+        const fb = document.getElementById('wb-text-feedback');
+        if (fb && persist) {
+          fb.textContent =
+            result.method === 'studio-server'
+              ? '✓ Label saved to ui-edits.js'
+              : '✓ Label saved in browser storage';
+        }
+      });
+    }
+
+    function applyImageFieldEdit(field, rawVal, persist = false) {
+      const ctx = getSelectedImageContext();
+      if (!ctx) return;
+      const { hostEl, targetEl, isBtn, cardKey } = ctx;
+      const img = getWidgetImageState(targetEl);
+      if (!img) return;
+
+      switch (field) {
+        case 'color':
+        case 'pressedColor':
+        case 'disableColor':
+        case 'gradientTop':
+        case 'gradientBottom': {
+          const hex = normalizeHexColor(rawVal, '');
+          if (!hex) return;
+          img[field] = hex;
+          const colIn = document.querySelector(`[data-img-color="${field}"]`);
+          const hexIn = document.querySelector(`[data-img-hex="${field}"]`);
+          if (colIn && colIn.value.toUpperCase() !== hex) colIn.value = hex;
+          if (colIn && colIn.parentElement) colIn.parentElement.style.background = hex;
+          if (hexIn && document.activeElement !== hexIn) hexIn.value = hex;
+          break;
+        }
+        case 'alpha':
+        case 'gradientTopAlpha':
+        case 'gradientBottomAlpha': {
+          const v = Math.max(0, Math.min(100, parseFloat(rawVal)));
+          if (!Number.isFinite(v)) return;
+          img[field] = roundTfNum(v, 1);
+          const s = document.querySelector(`[data-img-slider="${field}"]`);
+          const n = document.querySelector(`[data-img-field="${field}"]`);
+          if (s) updateClSliderVisual(s, img[field]);
+          if (n && document.activeElement !== n) n.value = String(Math.round(img[field]));
+          break;
+        }
+        case 'fillAmount': {
+          const v = clamp01(parseFloat(rawVal));
+          if (!Number.isFinite(v)) return;
+          img.fillAmount = roundTfNum(v, 2);
+          const s = document.querySelector('[data-img-slider="fillAmount"]');
+          const n = document.querySelector('[data-img-field="fillAmount"]');
+          if (s) updateClSliderVisual(s, img.fillAmount);
+          if (n && document.activeElement !== n) n.value = formatTfVal(img.fillAmount, 2);
+          break;
+        }
+        case 'fillType': {
+          const v = parseInt(rawVal, 10);
+          img.fillType = [0, 1, 2, 3, 5].includes(v) ? v : 0;
+          document.querySelector(`[data-cl-cond="${cardKey}-9grid"]`)?.classList.toggle('is-hidden', img.fillType !== 1);
+          document.querySelector(`[data-cl-cond="${cardKey}-filled"]`)?.classList.toggle('is-hidden', img.fillType !== 3);
+          break;
+        }
+        case 'fillDir': {
+          const v = parseInt(rawVal, 10);
+          img.fillDir = [0, 1, 2, 3, 4].includes(v) ? v : 0;
+          break;
+        }
+        case 'centerInvisible':
+        case 'invertFill':
+        case 'passthrough': {
+          img[field] = Boolean(rawVal);
+          break;
+        }
+        case 'gradient': {
+          const v = parseInt(rawVal, 10);
+          img.gradient = [0, 1, 2].includes(v) ? v : 0;
+          updateClGradientStopLabels(cardKey, img.gradient);
+          break;
+        }
+        default:
+          return;
+      }
+
+      img.dirty = true;
+      applyWidgetImageToDom(targetEl, img, isBtn ? hostEl : null);
+      updateInspectorGeometryReadout();
+      renderTransformGizmo();
+      saveWidgetImageEdit(targetEl, img, persist).then(result => {
+        const fb = document.getElementById('wb-sprite-feedback');
+        if (fb && persist) {
+          fb.textContent =
+            result.method === 'studio-server'
+              ? `✓ ${isBtn ? 'Button' : 'Image'} saved to ui-edits.js`
+              : `✓ ${isBtn ? 'Button' : 'Image'} saved in browser storage`;
+        }
+      });
+    }
+
+    let clScrub = null;
 
     // Left hierarchy tree clicks & inspector actions
     document.addEventListener('click', evt => {
@@ -3877,10 +5410,274 @@
       }
 
       if (
-        (state.anchorPresetOpen || state.transformMenuOpen) &&
-        !evt.target.closest('#wb-tf-preset-popover, [data-tf-preset-btn], #wb-tf-menu-dropdown, [data-tf-menu-toggle]')
+        (state.anchorPresetOpen || state.transformMenuOpen || state.labelMenuOpen || state.imageMenuOpen || state.buttonMenuOpen) &&
+        !evt.target.closest(
+          '#wb-tf-preset-popover, [data-tf-preset-btn], #wb-tf-menu-dropdown, [data-tf-menu-toggle], .wb-tf-menu-dropdown, [data-cl-menu-toggle]'
+        )
       ) {
         closeTransformPopovers();
+      }
+
+      const clToggleBtn = evt.target.closest('[data-cl-toggle]');
+      if (clToggleBtn) {
+        const key = clToggleBtn.getAttribute('data-cl-toggle');
+        const flag = `${key}Collapsed`;
+        state[flag] = !state[flag];
+        clToggleBtn.setAttribute('aria-expanded', state[flag] ? 'false' : 'true');
+        const caret = clToggleBtn.querySelector('.wb-tf-caret');
+        if (caret) caret.textContent = state[flag] ? '▸' : '▾';
+        document.querySelector(`[data-cl-body="${key}"]`)?.classList.toggle('is-collapsed', state[flag]);
+        if (state[flag]) closeTransformPopovers();
+        return;
+      }
+
+      const clGradToggleBtn = evt.target.closest('[data-cl-grad-toggle]');
+      if (clGradToggleBtn) {
+        const key = clGradToggleBtn.getAttribute('data-cl-grad-toggle');
+        const flag = `${key}GradientCollapsed`;
+        state[flag] = !state[flag];
+        clGradToggleBtn.setAttribute('aria-expanded', state[flag] ? 'false' : 'true');
+        const caret = clGradToggleBtn.querySelector('.wb-tf-caret');
+        if (caret) caret.textContent = state[flag] ? '▸' : '▾';
+        document.querySelector(`[data-cl-grad-body="${key}"]`)?.classList.toggle('is-collapsed', state[flag]);
+        return;
+      }
+
+      const clMenuBtn = evt.target.closest('[data-cl-menu-toggle]');
+      if (clMenuBtn) {
+        evt.stopPropagation();
+        const key = clMenuBtn.getAttribute('data-cl-menu-toggle');
+        const flag = `${key}MenuOpen`;
+        const nextOpen = !state[flag];
+        closeTransformPopovers();
+        state[flag] = nextOpen;
+        clMenuBtn.classList.toggle('is-open', nextOpen);
+        document.getElementById(`wb-cl-menu-${key}`)?.classList.toggle('is-open', nextOpen);
+        return;
+      }
+
+      const clMenuAction = evt.target.closest('[data-cl-menu-action]');
+      if (clMenuAction && state.selectedEl) {
+        const rawAct = clMenuAction.getAttribute('data-cl-menu-action') || '';
+        const [scope, act] = rawAct.split(':');
+        closeTransformPopovers();
+        if (scope === 'label') {
+          const bundle = getWidgetLabelState(state.selectedEl);
+          if (!bundle) return;
+          if (act === 'copy') {
+            const payload = JSON.stringify(exportLabelCraftlandJson(bundle.targetEl, bundle.lbl), null, 2);
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(payload).catch(() => {});
+            }
+            const fb = document.getElementById('wb-text-feedback');
+            if (fb) fb.textContent = '✓ Craftland Label JSON copied!';
+          } else if (act === 'reset') {
+            const edits = loadUiEdits();
+            resetSingleElementLabel(state.selectedEl, edits);
+            saveUiEdits(edits);
+            renderHierarchyTree();
+            renderInspector();
+            persistUiEditsToDisk().then(result => {
+              const fb = document.getElementById('wb-text-feedback');
+              if (fb) {
+                fb.textContent =
+                  result.method === 'studio-server'
+                    ? '✓ Label reset & saved to ui-edits.js'
+                    : '✓ Label reset to default';
+              }
+            });
+          }
+          return;
+        }
+        if (scope === 'image' || scope === 'button') {
+          const ctx = getSelectedImageContext();
+          if (!ctx) return;
+          const img = getWidgetImageState(ctx.targetEl);
+          if (act === 'tint-auto' || act === 'tint-mask' || act === 'tint-multiply') {
+            img.tintMode = act.replace('tint-', '');
+            img.dirty = true;
+            applyWidgetImageToDom(ctx.targetEl, img, ctx.isBtn ? ctx.hostEl : null);
+            renderInspector();
+            saveWidgetImageEdit(ctx.targetEl, img, true).then(result => {
+              const fb = document.getElementById('wb-sprite-feedback');
+              if (fb) {
+                fb.textContent =
+                  result.method === 'studio-server'
+                    ? `✓ Tint mode (${img.tintMode}) saved`
+                    : `✓ Tint mode (${img.tintMode}) applied`;
+              }
+            });
+          } else if (act === 'swap-all') {
+            state.swapAllSprites = !state.swapAllSprites;
+            const spCb = document.getElementById('wb-sp-swap-all');
+            if (spCb) spCb.checked = state.swapAllSprites;
+            renderInspector();
+          } else if (act === 'toggle-hover-slot') {
+            state.showHoverSpriteSlot = !state.showHoverSpriteSlot;
+            renderInspector();
+          } else if (act === 'copy') {
+            const payload = JSON.stringify(exportImageCraftlandJson(ctx.targetEl, img, ctx.isBtn), null, 2);
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(payload).catch(() => {});
+            }
+            const fb = document.getElementById('wb-sprite-feedback');
+            if (fb) fb.textContent = `✓ Craftland ${ctx.isBtn ? 'Button' : 'Image'} JSON copied!`;
+          } else if (act === 'reset') {
+            const edits = loadUiEdits();
+            resetSingleElementImage(ctx.targetEl, edits, ctx.isBtn ? ctx.hostEl : null);
+            saveUiEdits(edits);
+            renderManifestTable();
+            renderResourcesDockGrid();
+            renderHierarchyTree();
+            renderInspector();
+            persistUiEditsToDisk().then(result => {
+              const fb = document.getElementById('wb-sprite-feedback');
+              if (fb) {
+                fb.textContent =
+                  result.method === 'studio-server'
+                    ? `✓ ${ctx.isBtn ? 'Button' : 'Image'} reset & saved`
+                    : `✓ ${ctx.isBtn ? 'Button' : 'Image'} reset to default`;
+              }
+            });
+          }
+          return;
+        }
+      }
+
+      const eyedropBtn = evt.target.closest('[data-cl-eyedropper]');
+      if (eyedropBtn && state.selectedEl) {
+        const [scope, field] = (eyedropBtn.getAttribute('data-cl-eyedropper') || '').split(':');
+        if (typeof global.EyeDropper === 'function') {
+          const ed = new global.EyeDropper();
+          ed.open()
+            .then(res => {
+              if (res && res.sRGBHex) {
+                if (scope === 'lbl') applyLabelFieldEdit(field, res.sRGBHex, true);
+                else if (scope === 'img') applyImageFieldEdit(field, res.sRGBHex, true);
+              }
+            })
+            .catch(() => {});
+        } else {
+          const colIn = document.querySelector(`[data-${scope}-color="${field}"]`);
+          if (colIn) colIn.click();
+        }
+        return;
+      }
+
+      const alignHBtn = evt.target.closest('[data-lbl-align-h]');
+      if (alignHBtn && state.selectedEl) {
+        const bundle = getWidgetLabelState(state.selectedEl);
+        if (bundle) {
+          const val = alignHBtn.getAttribute('data-lbl-align-h');
+          bundle.lbl.alignH = val;
+          bundle.lbl.dirty = true;
+          document.querySelectorAll('[data-lbl-align-h]').forEach(b => {
+            const active = b.getAttribute('data-lbl-align-h') === val;
+            b.classList.toggle('is-active', active);
+            b.setAttribute('aria-pressed', active ? 'true' : 'false');
+          });
+          applyWidgetLabelToDom(bundle.targetEl, bundle.lbl);
+          saveWidgetLabelEdit(bundle.targetEl, bundle.lbl, true).then(result => {
+            const fb = document.getElementById('wb-text-feedback');
+            if (fb) fb.textContent = result.method === 'studio-server' ? '✓ Label saved to ui-edits.js' : '✓ Label saved';
+          });
+        }
+        return;
+      }
+
+      const alignVBtn = evt.target.closest('[data-lbl-align-v]');
+      if (alignVBtn && state.selectedEl) {
+        const bundle = getWidgetLabelState(state.selectedEl);
+        if (bundle) {
+          const val = alignVBtn.getAttribute('data-lbl-align-v');
+          bundle.lbl.alignV = val;
+          bundle.lbl._alignVEdited = true;
+          bundle.lbl.dirty = true;
+          document.querySelectorAll('[data-lbl-align-v]').forEach(b => {
+            const active = b.getAttribute('data-lbl-align-v') === val;
+            b.classList.toggle('is-active', active);
+            b.setAttribute('aria-pressed', active ? 'true' : 'false');
+          });
+          applyWidgetLabelToDom(bundle.targetEl, bundle.lbl);
+          saveWidgetLabelEdit(bundle.targetEl, bundle.lbl, true).then(result => {
+            const fb = document.getElementById('wb-text-feedback');
+            if (fb) fb.textContent = result.method === 'studio-server' ? '✓ Label saved to ui-edits.js' : '✓ Label saved';
+          });
+        }
+        return;
+      }
+
+      const fontToggleBtn = evt.target.closest('[data-lbl-font-toggle]');
+      if (fontToggleBtn && state.selectedEl) {
+        const bundle = getWidgetLabelState(state.selectedEl);
+        if (bundle) {
+          const prop = fontToggleBtn.getAttribute('data-lbl-font-toggle');
+          bundle.lbl[prop] = !bundle.lbl[prop];
+          bundle.lbl.dirty = true;
+          fontToggleBtn.classList.toggle('is-active', Boolean(bundle.lbl[prop]));
+          fontToggleBtn.setAttribute('aria-pressed', bundle.lbl[prop] ? 'true' : 'false');
+          applyWidgetLabelToDom(bundle.targetEl, bundle.lbl);
+          saveWidgetLabelEdit(bundle.targetEl, bundle.lbl, true).then(result => {
+            const fb = document.getElementById('wb-text-feedback');
+            if (fb) fb.textContent = result.method === 'studio-server' ? '✓ Label saved to ui-edits.js' : '✓ Label saved';
+          });
+        }
+        return;
+      }
+
+      const flipBtn = evt.target.closest('[data-img-flip]');
+      if (flipBtn && state.selectedEl) {
+        const ctx = getSelectedImageContext();
+        if (ctx) {
+          const axis = flipBtn.getAttribute('data-img-flip');
+          const img = getWidgetImageState(ctx.targetEl);
+          if (axis === 'x') img.flipX = !img.flipX;
+          else if (axis === 'y') img.flipY = !img.flipY;
+          img.dirty = true;
+          const active = axis === 'x' ? img.flipX : img.flipY;
+          flipBtn.classList.toggle('is-active', Boolean(active));
+          flipBtn.setAttribute('aria-pressed', active ? 'true' : 'false');
+          applyWidgetImageToDom(ctx.targetEl, img, ctx.isBtn ? ctx.hostEl : null);
+          saveWidgetImageEdit(ctx.targetEl, img, true).then(result => {
+            const fb = document.getElementById('wb-sprite-feedback');
+            if (fb) {
+              fb.textContent =
+                result.method === 'studio-server'
+                  ? `✓ ${ctx.isBtn ? 'Button' : 'Image'} saved to ui-edits.js`
+                  : `✓ ${ctx.isBtn ? 'Button' : 'Image'} saved`;
+            }
+          });
+        }
+        return;
+      }
+
+      const clSpriteClearBtn = evt.target.closest('[data-cl-sprite-clear]');
+      if (clSpriteClearBtn && state.selectedEl) {
+        evt.stopPropagation();
+        const attrName = clSpriteClearBtn.getAttribute('data-cl-sprite-clear');
+        const ctx = getSelectedImageContext();
+        if (ctx && attrName) {
+          clearWidgetSpriteAttr(ctx.targetEl, attrName, state.swapAllSprites).then(result => {
+            const fb = document.getElementById('wb-sprite-feedback');
+            if (fb) {
+              fb.textContent =
+                result.method === 'studio-server'
+                  ? `✓ Cleared ${formatSliceAttrStateLabel(attrName)} & saved`
+                  : `✓ Cleared ${formatSliceAttrStateLabel(attrName)}`;
+            }
+          });
+        }
+        return;
+      }
+
+      const clSpritePickBtn = evt.target.closest('[data-cl-sprite-pick]');
+      if (clSpritePickBtn && !evt.target.closest('[data-insp-edit-resource-s9]') && state.selectedEl) {
+        const attrName = clSpritePickBtn.getAttribute('data-cl-sprite-pick') || 'data-slice-id';
+        const ctx = getSelectedImageContext();
+        if (ctx) {
+          openSpritePicker(attrName, ctx.targetEl);
+        }
+        return;
       }
 
       const tfToggleBtn = evt.target.closest('[data-tf-toggle]');
@@ -4563,13 +6360,53 @@
         if (res && typeof res.then === 'function') {
           res.then(result => {
             const fb = document.getElementById('wb-text-feedback');
-            if (fb && !fb.textContent) {
+            if (fb) {
               fb.textContent =
                 result.method === 'studio-server'
                   ? '✓ Saved permanently to ui-edits.js!'
                   : '✓ Saved in browser storage';
             }
           });
+        }
+      } else if (evt.target.hasAttribute && evt.target.hasAttribute('data-lbl-color') && state.selectedEl) {
+        applyLabelFieldEdit(evt.target.getAttribute('data-lbl-color'), evt.target.value, true);
+      } else if (evt.target.hasAttribute && evt.target.hasAttribute('data-lbl-hex') && state.selectedEl) {
+        applyLabelFieldEdit(evt.target.getAttribute('data-lbl-hex'), evt.target.value, true);
+      } else if (evt.target.hasAttribute && evt.target.hasAttribute('data-lbl-slider') && state.selectedEl) {
+        applyLabelFieldEdit(evt.target.getAttribute('data-lbl-slider'), evt.target.value, true);
+      } else if (evt.target.hasAttribute && evt.target.hasAttribute('data-lbl-field') && state.selectedEl) {
+        const f = evt.target.getAttribute('data-lbl-field');
+        const val = evt.target.type === 'checkbox' ? evt.target.checked : evt.target.value;
+        applyLabelFieldEdit(f, val, true);
+      } else if (evt.target.hasAttribute && evt.target.hasAttribute('data-img-color') && state.selectedEl) {
+        applyImageFieldEdit(evt.target.getAttribute('data-img-color'), evt.target.value, true);
+      } else if (evt.target.hasAttribute && evt.target.hasAttribute('data-img-hex') && state.selectedEl) {
+        applyImageFieldEdit(evt.target.getAttribute('data-img-hex'), evt.target.value, true);
+      } else if (evt.target.hasAttribute && evt.target.hasAttribute('data-img-slider') && state.selectedEl) {
+        applyImageFieldEdit(evt.target.getAttribute('data-img-slider'), evt.target.value, true);
+      } else if (evt.target.hasAttribute && evt.target.hasAttribute('data-img-field') && state.selectedEl) {
+        const f = evt.target.getAttribute('data-img-field');
+        const val = evt.target.type === 'checkbox' ? evt.target.checked : evt.target.value;
+        applyImageFieldEdit(f, val, true);
+      } else if (evt.target.hasAttribute && evt.target.hasAttribute('data-cl-sprite-input') && state.selectedEl) {
+        const attrName = evt.target.getAttribute('data-cl-sprite-input') || 'data-slice-id';
+        const ctx = getSelectedImageContext();
+        if (ctx) {
+          const val = String(evt.target.value || '').trim();
+          if (!val && (attrName === 'data-slice-pressed' || attrName === 'data-slice-hover')) {
+            clearWidgetSpriteAttr(ctx.targetEl, attrName, state.swapAllSprites);
+          } else if (val) {
+            changeWidgetSprite(ctx.targetEl, attrName, val, state.swapAllSprites).then(result => {
+              const fb = document.getElementById('wb-sprite-feedback');
+              if (fb) {
+                fb.textContent = !result.ok
+                  ? result.error || `Unknown slice ID: "${val}"`
+                  : result.method === 'studio-server'
+                    ? `✓ Set ${formatSliceAttrStateLabel(attrName)} → "${val}" & saved`
+                    : `✓ Set ${formatSliceAttrStateLabel(attrName)} → "${val}"`;
+              }
+            });
+          }
         }
       } else if (evt.target.closest && evt.target.closest('[data-tf-input]') && state.selectedEl) {
         const tfInp = evt.target.closest('[data-tf-input]');
@@ -4601,6 +6438,9 @@
           closeSpritePicker();
         }
         closeTransformPopovers();
+      } else if (evt.key === 'Enter' && evt.target && evt.target.hasAttribute('data-cl-sprite-input')) {
+        evt.preventDefault();
+        evt.target.blur();
       } else if (evt.key === 'Enter' && evt.target && evt.target.id === 'wb-insp-slice-input') {
         evt.preventDefault();
         const applyBtn = document.querySelector('[data-insp-apply-slice]');
@@ -4641,6 +6481,42 @@
       if (evt.target && evt.target.id === 'wb-insp-text-input' && state.selectedEl) {
         applyWidgetTextEdit(state.selectedEl, evt.target.value, false);
         return;
+      }
+      if (evt.target && evt.target.hasAttribute && state.selectedEl) {
+        if (evt.target.hasAttribute('data-lbl-color')) {
+          applyLabelFieldEdit(evt.target.getAttribute('data-lbl-color'), evt.target.value, false);
+          return;
+        }
+        if (evt.target.hasAttribute('data-lbl-hex')) {
+          const hex = normalizeHexColor(evt.target.value, '');
+          if (hex) applyLabelFieldEdit(evt.target.getAttribute('data-lbl-hex'), hex, false);
+          return;
+        }
+        if (evt.target.hasAttribute('data-lbl-slider')) {
+          applyLabelFieldEdit(evt.target.getAttribute('data-lbl-slider'), evt.target.value, false);
+          return;
+        }
+        if (evt.target.hasAttribute('data-lbl-field') && evt.target.type !== 'checkbox' && evt.target.tagName !== 'SELECT') {
+          applyLabelFieldEdit(evt.target.getAttribute('data-lbl-field'), evt.target.value, false);
+          return;
+        }
+        if (evt.target.hasAttribute('data-img-color')) {
+          applyImageFieldEdit(evt.target.getAttribute('data-img-color'), evt.target.value, false);
+          return;
+        }
+        if (evt.target.hasAttribute('data-img-hex')) {
+          const hex = normalizeHexColor(evt.target.value, '');
+          if (hex) applyImageFieldEdit(evt.target.getAttribute('data-img-hex'), hex, false);
+          return;
+        }
+        if (evt.target.hasAttribute('data-img-slider')) {
+          applyImageFieldEdit(evt.target.getAttribute('data-img-slider'), evt.target.value, false);
+          return;
+        }
+        if (evt.target.hasAttribute('data-img-field') && evt.target.type !== 'checkbox' && evt.target.tagName !== 'SELECT') {
+          applyImageFieldEdit(evt.target.getAttribute('data-img-field'), evt.target.value, false);
+          return;
+        }
       }
       if (evt.target && evt.target.id === 'wb-sp-search') {
         state.spritePicker.search = evt.target.value || '';
@@ -4691,14 +6567,40 @@
     // Direct canvas widget drag-move & Transform gizmo resize handles
     document.addEventListener('mousedown', evt => {
       if (
-        (state.anchorPresetOpen || state.transformMenuOpen) &&
+        (state.anchorPresetOpen || state.transformMenuOpen || state.labelMenuOpen || state.imageMenuOpen || state.buttonMenuOpen) &&
         evt.target &&
         evt.target.closest &&
-        !evt.target.closest('#wb-tf-preset-popover, [data-tf-preset-btn], #wb-tf-menu-dropdown, [data-tf-menu-toggle]')
+        !evt.target.closest(
+          '#wb-tf-preset-popover, [data-tf-preset-btn], #wb-tf-menu-dropdown, [data-tf-menu-toggle], .wb-tf-menu-dropdown, [data-cl-menu-toggle]'
+        )
       ) {
         closeTransformPopovers();
       }
       if (evt.button !== 0 || !evt.target || typeof evt.target.closest !== 'function') return;
+
+      const clScrubHandle = state.selectedEl ? evt.target.closest('[data-cl-scrub-handle]') : null;
+      if (clScrubHandle) {
+        const field = clScrubHandle.getAttribute('data-cl-scrub-handle');
+        const bundle = getWidgetLabelState(state.selectedEl);
+        if (bundle && (field === 'shadowOffsetX' || field === 'shadowOffsetY')) {
+          const scrubWrap = clScrubHandle.closest('[data-cl-scrub]') || clScrubHandle.parentElement;
+          const inp = scrubWrap ? scrubWrap.querySelector(`[data-lbl-field="${field}"]`) : null;
+          const startVal = field === 'shadowOffsetX'
+            ? (Array.isArray(bundle.lbl.shadowOffset) ? bundle.lbl.shadowOffset[0] : 1)
+            : (Array.isArray(bundle.lbl.shadowOffset) ? bundle.lbl.shadowOffset[1] : 1);
+          evt.preventDefault();
+          document.body.classList.add('is-tf-scrubbing');
+          if (scrubWrap) scrubWrap.classList.add('is-scrubbing');
+          clScrub = {
+            field,
+            inp,
+            scrubWrap,
+            lastClientX: evt.clientX,
+            accumVal: Number(startVal) || 0,
+          };
+          return;
+        }
+      }
 
       const scrubHandle = state.selectedEl ? evt.target.closest('[data-tf-scrub-handle]') : null;
       if (scrubHandle) {
@@ -4796,6 +6698,18 @@
     });
 
     document.addEventListener('mousemove', evt => {
+      if (clScrub) {
+        const dx = evt.clientX - clScrub.lastClientX;
+        clScrub.lastClientX = evt.clientX;
+        if (dx === 0) return;
+        const step = evt.altKey ? 0.1 : evt.shiftKey ? 2 : 0.5;
+        clScrub.accumVal += dx * step;
+        const nextVal = evt.altKey ? roundTfNum(clScrub.accumVal, 1) : Math.round(clScrub.accumVal);
+        if (clScrub.inp) clScrub.inp.value = formatTfVal(nextVal, 1);
+        applyLabelFieldEdit(clScrub.field, nextVal, false);
+        return;
+      }
+
       if (tfScrub) {
         if (!tfScrub.started) {
           if (Math.abs(evt.clientX - tfScrub.startClientX) <= 3) return;
@@ -4940,6 +6854,18 @@
     });
 
     document.addEventListener('mouseup', () => {
+      if (clScrub) {
+        const endedCl = clScrub;
+        clScrub = null;
+        document.body.classList.remove('is-tf-scrubbing');
+        if (endedCl.scrubWrap) endedCl.scrubWrap.classList.remove('is-scrubbing');
+        const val = endedCl.inp ? parseFloat(endedCl.inp.value) : Math.round(endedCl.accumVal);
+        if (Number.isFinite(val)) {
+          applyLabelFieldEdit(endedCl.field, val, true);
+        }
+        return;
+      }
+
       if (tfScrub) {
         const endedScrub = tfScrub;
         tfScrub = null;
@@ -5186,43 +7112,6 @@
     }
 
     ensureStudioShell();
-    const inspBody = document.getElementById('wb-inspector-body');
-    if (inspBody && !inspBody.dataset.tintWired) {
-      inspBody.dataset.tintWired = '1';
-      const applyTintFromInputs = persist => {
-        if (!state.selectedEl) return;
-        const hexEl = document.getElementById('wb-insp-tint-hex');
-        const activeModeBtn = inspBody.querySelector('[data-insp-tint-mode].is-active');
-        const modeVal = (activeModeBtn && activeModeBtn.getAttribute('data-insp-tint-mode')) || 'auto';
-        const rawHex = hexEl ? hexEl.value.trim() : '';
-        if (rawHex && !/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(rawHex)) return;
-        setWidgetTint(state.selectedEl, rawHex, modeVal, persist).then(result => {
-          const fb = document.getElementById('wb-tint-feedback');
-          if (fb && persist) {
-            fb.textContent =
-              result.method === 'studio-server' ? '✓ Tint saved to ui-edits.js' : '✓ Tint saved in browser storage';
-          }
-        });
-      };
-      inspBody.addEventListener('input', evt => {
-        if (evt.target && evt.target.id === 'wb-insp-tint-color') {
-          const hexEl = document.getElementById('wb-insp-tint-hex');
-          if (hexEl) hexEl.value = evt.target.value;
-          applyTintFromInputs(false);
-        } else if (evt.target && evt.target.id === 'wb-insp-tint-hex') {
-          const colEl = document.getElementById('wb-insp-tint-color');
-          if (colEl && /^#[0-9a-fA-F]{6}$/.test(evt.target.value.trim())) {
-            colEl.value = evt.target.value.trim();
-          }
-          applyTintFromInputs(false);
-        }
-      });
-      inspBody.addEventListener('change', evt => {
-        if (evt.target && (evt.target.id === 'wb-insp-tint-color' || evt.target.id === 'wb-insp-tint-hex')) {
-          applyTintFromInputs(true);
-        }
-      });
-    }
     applySavedUiEdits();
     hydrateSprites(document);
     loadSavedBackdrop();
@@ -5305,6 +7194,10 @@
     openSpritePicker,
     getWidgetTransform: getWidgetTransformState,
     applyWidgetTransform: applyWidgetTransformToDom,
+    getWidgetLabel: getWidgetLabelState,
+    applyWidgetLabel: applyWidgetLabelToDom,
+    getWidgetImage: getWidgetImageState,
+    applyWidgetImage: applyWidgetImageToDom,
   };
 
   if (document.readyState === 'loading') {
