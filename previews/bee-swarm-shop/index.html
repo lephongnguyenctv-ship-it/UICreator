@@ -1,0 +1,1556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bee Swarm — Shop UI — Game UI Preview</title>
+  <link rel="stylesheet" href="./pixel-ui-kit.css">
+  <style>
+    /* ========================================================================
+       Bee Swarm (Tame Your Dragon) — ShopPet & Daily Shop UI Reconstruction
+       Source: Assets/HUDs/ShopPet.ui (1500x750 scaled cleanly to 1280x720)
+       ======================================================================== */
+
+    .bs-canvas-stage {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+    }
+
+    /* Full-screen dark scrim (Shop/BlurBG: alpha 80 #000000) */
+    .bs-blur-bg {
+      position: absolute;
+      inset: 0;
+      background: rgba(8, 10, 16, 0.72);
+      z-index: 1;
+    }
+
+    /* Top bar: Wallet context + Edge-Case Stress-Test Toggles */
+    .bs-top-utility {
+      position: absolute;
+      top: 12px;
+      left: 20px;
+      right: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      z-index: 20;
+      pointer-events: none;
+    }
+
+    .bs-wallet-pill {
+      pointer-events: auto;
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      min-width: 148px;
+      height: 36px;
+      color: #4A3524;
+      font-weight: 800;
+      font-size: 16px;
+      font-variant-numeric: tabular-nums;
+      justify-content: center;
+    }
+
+    .bs-wallet-pill .px-icon {
+      width: 22px;
+      height: 22px;
+      object-fit: contain;
+      position: relative;
+      z-index: 2;
+    }
+
+    .bs-wallet-val {
+      position: relative;
+      z-index: 2;
+    }
+
+    /* Main Shop Stall Frame (Shop/BG: 1100x605 -> 960x538 exact aspect) */
+    .bs-shop-modal {
+      position: absolute;
+      left: 160px;
+      top: 86px;
+      width: 960px;
+      height: 538px;
+      z-index: 5;
+    }
+
+    /* Override .px-sprite-box auto-scaling (high-res painted Bee-Swarm sprites fill their exact widget rect) */
+    .bs-canvas-stage .bs-shop-bg.px-sprite-box,
+    .bs-canvas-stage .bs-pill-bg-layer.px-sprite-box,
+    .bs-canvas-stage .bs-slot-card-bg.px-sprite-box {
+      width: 100% !important;
+      height: 100% !important;
+      background-size: 100% 100% !important;
+      background-position: center !important;
+      background-repeat: no-repeat !important;
+      image-rendering: auto !important;
+    }
+
+    /* Craftland/Unity-style 1:1 9-Slice on ::before (exact .meta 9-Grid Pattern insets:
+       Img_commer_Check box.png = 15,15,15,15; Img_commer_Itembg01 (1).png = 12,12,12,12).
+       Applied in both modes with border:none so layout geometry never shifts. */
+    #game-canvas .bs-canvas-stage .px-9slice {
+      border: none !important;
+      background-image: none !important;
+      isolation: isolate;
+      --pixel-scale: 1;
+    }
+
+    body:not(.mode-wireframe) #game-canvas .bs-canvas-stage .px-9slice::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: -1;
+      box-sizing: border-box;
+      border-style: solid;
+      border-width:
+        calc(var(--slice-t, 12) * 1px * var(--pixel-scale, 1))
+        calc(var(--slice-r, 12) * 1px * var(--pixel-scale, 1))
+        calc(var(--slice-b, 12) * 1px * var(--pixel-scale, 1))
+        calc(var(--slice-l, 12) * 1px * var(--pixel-scale, 1));
+      border-image-source: var(--skin-url);
+      border-image-slice: var(--slice-t, 12) var(--slice-r, 12) var(--slice-b, 12) var(--slice-l, 12) fill;
+      border-image-repeat: stretch;
+      image-rendering: auto;
+    }
+
+    /* Keep multiply tint overlay strictly aligned to ::before 9-slice bounds (zero outer bleed) */
+    #game-canvas .bs-canvas-stage .px-tint-multiply.px-9slice > .px-tint-overlay {
+      inset: 0 !important;
+      border-radius: 10px !important;
+    }
+
+    .bs-canvas-stage .px-icon {
+      image-rendering: auto !important;
+    }
+
+    .bs-shop-bg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      background-size: 100% 100%;
+      background-repeat: no-repeat;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* Wireframe-only architectural divider to show the 2-column stall split */
+    .bs-wire-divider {
+      position: absolute;
+      left: 590px;
+      top: 90px;
+      bottom: 18px;
+      width: 0;
+      border-left: 2px dashed rgba(96, 165, 250, 0.55);
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    /* Top Title Signboard (Shop/Title: pos=(-3,238), sz=(246,64)) */
+    .bs-title-bar {
+      position: absolute;
+      left: 330px;
+      top: 32px;
+      width: 300px;
+      height: 54px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 6;
+    }
+
+    .bs-title-text {
+      margin: 0;
+      font-size: 34px;
+      font-weight: 900;
+      letter-spacing: 0.06em;
+      color: #FFFFFF;
+      text-transform: uppercase;
+      text-shadow: 0 3px 0 #3b2210, 0 0 6px rgba(0, 0, 0, 0.65);
+      line-height: 1;
+    }
+
+    /* Close Button (Shop/CloseButton: top-right 66x66 -> 54x54) */
+    .bs-close-btn {
+      position: absolute;
+      right: 30px;
+      top: 32px;
+      width: 54px;
+      height: 54px;
+      padding: 0;
+      border: none;
+      background-color: transparent;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 8;
+    }
+
+    .bs-close-wire-x {
+      position: relative;
+      z-index: 3;
+      font-size: 24px;
+      font-weight: 900;
+      color: #e2e8f0;
+      line-height: 1;
+    }
+
+    /* Left Chamber: ScrollView + 3x2 ItemsLayout */
+    .bs-scroll-area {
+      position: absolute;
+      left: 86px;
+      top: 108px;
+      width: 484px;
+      height: 334px;
+      z-index: 5;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .bs-items-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 152px);
+      grid-template-rows: repeat(2, 160px);
+      column-gap: 14px;
+      row-gap: 14px;
+      justify-content: center;
+      align-content: start;
+    }
+
+    /* Individual Shop Slot (ItemShopComponent) */
+    .bs-slot {
+      position: relative;
+      width: 152px;
+      height: 160px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: 0;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .bs-slot-card {
+      position: relative;
+      width: 122px;
+      height: 122px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .bs-slot-card-bg {
+      position: absolute;
+      inset: 0;
+      background-size: 100% 100%;
+      z-index: 1;
+    }
+
+    .bs-slot-sprite {
+      position: relative;
+      width: 72px;
+      height: 72px;
+      object-fit: contain;
+      margin-top: -14px;
+      z-index: 4;
+      pointer-events: none;
+    }
+
+    .bs-slot-name {
+      position: absolute;
+      left: 10px;
+      right: 10px;
+      bottom: 11px;
+      text-align: center;
+      font-size: 12.5px;
+      font-weight: 800;
+      color: #4A3524;
+      line-height: 1.1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      z-index: 5;
+      pointer-events: none;
+    }
+
+    /* Daily Shop per-slot stock badge (AmountLeft: top-left inside slot card) */
+    .bs-slot-amount {
+      position: absolute;
+      top: 11px;
+      left: 13px;
+      font-size: 14px;
+      font-weight: 900;
+      color: #4A3524;
+      line-height: 1;
+      z-index: 5;
+      pointer-events: none;
+    }
+
+    /* Selection Highlight Border (Item/Select: 50x50 9-Grid Pattern 15,15,15,15) */
+    .bs-slot-select {
+      position: absolute;
+      inset: -1px;
+      z-index: 6;
+      pointer-events: none;
+      display: none;
+    }
+
+    .bs-slot.is-selected .bs-slot-select {
+      display: block;
+    }
+
+    /* Sold Out Scrim Overlay sits above Select */
+    .bs-slot-soldout {
+      position: absolute;
+      inset: 0;
+      border-radius: 14px;
+      background: rgba(0, 0, 0, 0.64);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 7;
+      pointer-events: none;
+    }
+
+    .bs-slot.is-sold-out .bs-slot-soldout {
+      display: flex;
+    }
+
+    .bs-slot-soldout-txt {
+      font-size: 18px;
+      font-weight: 900;
+      color: #FFFFFF;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.9);
+      letter-spacing: 0.02em;
+    }
+
+    /* Price Pill Below Slot Card (Item/Price: 139x35 -> 122x30) */
+    .bs-slot-price {
+      position: relative;
+      width: 122px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .bs-pill-bg-layer {
+      position: absolute;
+      inset: 0;
+      background-size: 100% 100%;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .bs-slot-price-val {
+      position: relative;
+      z-index: 2;
+      font-size: 15px;
+      font-weight: 800;
+      color: #4A3524;
+      font-variant-numeric: tabular-nums;
+      min-width: 52px;
+      text-align: right;
+    }
+
+    .bs-slot-price-coin {
+      position: relative;
+      z-index: 2;
+      width: 20px;
+      height: 20px;
+      object-fit: contain;
+    }
+
+    /* Refresh / Reset Countdown Bar (Shop/Image + RefreshTimer: 540x46 -> 476x40) */
+    .bs-refresh-bar {
+      position: absolute;
+      left: 90px;
+      bottom: 34px;
+      width: 476px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 6;
+    }
+
+    .bs-refresh-text {
+      position: relative;
+      z-index: 2;
+      font-size: 18px;
+      font-weight: 700;
+      color: #EDE0C6;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+      letter-spacing: 0.01em;
+    }
+
+    /* Right Chamber: PetDetails / ItemDetails (299x452 -> 264x396) */
+    .bs-detail-panel {
+      position: absolute;
+      left: 616px;
+      top: 108px;
+      width: 264px;
+      height: 396px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 10px;
+      z-index: 6;
+    }
+
+    .bs-detail-panel.is-empty {
+      justify-content: center;
+    }
+
+    .bs-detail-empty-note {
+      display: none;
+      width: 226px;
+      padding: 18px 14px;
+      text-align: center;
+      font-size: 13px;
+      line-height: 1.45;
+      color: #cbd5e1;
+      border-radius: 10px;
+    }
+
+    .bs-detail-panel.is-empty .bs-detail-empty-note {
+      display: block;
+    }
+
+    .bs-detail-panel.is-empty .bs-detail-content {
+      display: none;
+    }
+
+    .bs-detail-content {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 9px;
+    }
+
+    /* Large Preview Portrait Box (156x157 -> 134x134) */
+    .bs-detail-portrait {
+      position: relative;
+      width: 134px;
+      height: 134px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .bs-detail-portrait .px-icon {
+      position: relative;
+      z-index: 2;
+      width: 102px;
+      height: 102px;
+      object-fit: contain;
+    }
+
+    /* Name Banner (256x48 -> 226x40) */
+    .bs-detail-name-bar {
+      position: relative;
+      width: 226px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .bs-detail-name-txt {
+      position: relative;
+      z-index: 2;
+      font-size: 20px;
+      font-weight: 900;
+      color: #4A3524;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 202px;
+    }
+
+    /* Rarity Banner (PetDetails/BG Rarity: 252x46 -> 222x36) */
+    .bs-detail-rarity-bar {
+      position: relative;
+      width: 222px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .bs-detail-rarity-txt {
+      position: relative;
+      z-index: 2;
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: 0.03em;
+    }
+
+    /* PetDetails 2+1 Stat Grid (Health + Attack row, Defense centered row) */
+    .bs-stat-grid {
+      width: 226px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .bs-stat-row {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .bs-stat-pill {
+      position: relative;
+      width: 108px;
+      height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .bs-stat-icon {
+      position: relative;
+      z-index: 2;
+      width: 24px;
+      height: 24px;
+      object-fit: contain;
+    }
+
+    .bs-stat-val {
+      position: relative;
+      z-index: 2;
+      font-size: 18px;
+      font-weight: 800;
+      color: #F7EEDC;
+      font-variant-numeric: tabular-nums;
+      min-width: 42px;
+      text-align: center;
+    }
+
+    /* ItemDetails Description Box (BG Des: 252x103 -> 224x92) */
+    .bs-detail-desc-box {
+      position: relative;
+      width: 224px;
+      height: 92px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 12px;
+      flex-shrink: 0;
+    }
+
+    .bs-detail-desc-txt {
+      position: relative;
+      z-index: 2;
+      font-size: 15px;
+      font-weight: 600;
+      line-height: 1.32;
+      color: #F7EEDC;
+      text-align: center;
+    }
+
+    /* ItemDetails Daily Stock Counter (Amount: 170x43 -> 166x38) */
+    .bs-detail-stock-pill {
+      position: relative;
+      width: 166px;
+      height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .bs-detail-stock-txt {
+      position: relative;
+      z-index: 2;
+      font-size: 16px;
+      font-weight: 800;
+      color: #F7EEDC;
+    }
+
+    /* Primary CTA Buy Button (252x61 -> 222x54) */
+    .bs-buy-btn {
+      position: relative;
+      margin-top: auto;
+      width: 222px;
+      height: 54px;
+      border: none;
+      padding: 0;
+      background: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .bs-buy-btn-txt {
+      position: relative;
+      z-index: 2;
+      font-size: 28px;
+      font-weight: 900;
+      letter-spacing: 0.06em;
+      color: #F7EEDC;
+      text-shadow: 0 2px 0 rgba(59, 34, 16, 0.75);
+      line-height: 1;
+    }
+
+    .bs-buy-btn.is-disabled {
+      cursor: not-allowed;
+    }
+
+    .bs-buy-btn.is-disabled .bs-buy-btn-txt {
+      color: #b5a795;
+    }
+
+    /* GMT Debug Reset Button (Shop/ResetButton: bottom-left outside stall) */
+    .bs-reset-btn {
+      position: absolute;
+      left: 34px;
+      bottom: 24px;
+      width: 112px;
+      height: 42px;
+      border: none;
+      padding: 0;
+      background: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 12;
+    }
+
+    .bs-reset-btn.is-hidden {
+      display: none;
+    }
+
+    .bs-reset-btn-txt {
+      position: relative;
+      z-index: 2;
+      font-size: 16px;
+      font-weight: 900;
+      color: #1c1008;
+    }
+
+    /* Prompt Toast Feedback (PROMPT_BUY_SUCCESS_ITEM / PROMPT_NOT_ENOUGH_MONEY_BUY_ITEM) */
+    .bs-prompt-toast {
+      position: absolute;
+      left: 50%;
+      bottom: 22px;
+      transform: translateX(-50%);
+      padding: 8px 18px;
+      border-radius: 8px;
+      background: rgba(15, 23, 42, 0.92);
+      border: 1px solid rgba(251, 191, 36, 0.55);
+      color: #fef3c7;
+      font-size: 14px;
+      font-weight: 700;
+      z-index: 30;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    .bs-prompt-toast.is-visible {
+      opacity: 1;
+    }
+
+    /* ========================================================================
+       View 3: NPC Proximity Trigger — Floating OpenButton HUD
+       (ShopPet/OpenButton: pos=(288,82) from center -> right-center safe zone)
+       ======================================================================== */
+    .bs-open-btn-wrap {
+      position: absolute;
+      left: 874px;
+      top: 268px;
+      width: 118px;
+      height: 126px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      border: none;
+      background: transparent;
+      padding: 0;
+      cursor: pointer;
+      z-index: 10;
+    }
+
+    .bs-open-circle {
+      position: relative;
+      width: 96px;
+      height: 96px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .bs-open-circle-icon {
+      position: relative;
+      z-index: 3;
+      width: 56px;
+      height: 56px;
+      object-fit: contain;
+    }
+
+    .bs-open-ribbon {
+      position: relative;
+      width: 116px;
+      height: 32px;
+      margin-top: -12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 4;
+    }
+
+    .bs-open-ribbon-txt {
+      position: relative;
+      z-index: 2;
+      font-size: 18px;
+      font-weight: 900;
+      color: #4A3722;
+      letter-spacing: 0.04em;
+    }
+
+    .bs-npc-context-tag {
+      position: absolute;
+      left: 24px;
+      bottom: 24px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      line-height: 1.4;
+      max-width: 340px;
+      z-index: 8;
+    }
+
+    /* ========================================================================
+       Wireframe Mode Polish (Keep clean blueprint clarity & zero overlap)
+       ======================================================================== */
+    #game-canvas.is-wireframe .bs-blur-bg {
+      background: rgba(15, 23, 42, 0.38);
+    }
+
+    #game-canvas.is-wireframe .bs-title-bar {
+      border: 2px dashed #60a5fa;
+      background: rgba(30, 41, 59, 0.92);
+      border-radius: 6px;
+    }
+
+    #game-canvas.is-wireframe .bs-slot-select {
+      background-color: transparent !important;
+      box-shadow: inset 0 0 0 3px #facc15 !important;
+      border-radius: 10px;
+    }
+
+    #game-canvas.is-wireframe .bs-slot.is-sold-out .bs-slot-soldout {
+      background: rgba(15, 23, 42, 0.82) !important;
+      border: 2px dashed #f87171 !important;
+    }
+
+    #game-canvas.is-wireframe .bs-open-circle .bs-pill-bg-layer {
+      border-radius: 50%;
+    }
+
+    #game-canvas.is-wireframe .bs-detail-panel {
+      outline: 1px dashed rgba(96, 165, 250, 0.5);
+      outline-offset: 6px;
+    }
+
+    #game-canvas.is-wireframe .bs-scroll-area {
+      outline: 1px dashed rgba(96, 165, 250, 0.45);
+      outline-offset: 6px;
+    }
+
+    #game-canvas.is-wireframe .bs-buy-btn.is-disabled .bs-pill-bg-layer {
+      background-color: rgba(30, 41, 59, 0.55) !important;
+      box-shadow: inset 0 0 0 2px #64748b !important;
+    }
+
+    /* Keep non-wireframe detail empty panel truly hidden like in-game */
+    body:not(.mode-wireframe) .bs-detail-panel.is-empty {
+      visibility: hidden;
+    }
+
+    /* Hide wireframe divider and wire X when art is active */
+    body:not(.mode-wireframe) .bs-wire-divider,
+    body:not(.mode-wireframe) .bs-close-wire-x {
+      display: none;
+    }
+
+    /* Rounded dark brown stat / description pills matching ShopPet.ui */
+    .bs-stat-bg-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body data-catalog-base="../_catalog/" data-default-mode="wireframe">
+  <header class="workbench-bar">
+    <div class="workbench-title">
+      <span>Bee Swarm — Shop UI</span>
+      <span class="workbench-badge">1280×720 Wireframe + Sprite Preview</span>
+    </div>
+    <div class="workbench-controls">
+      <div class="wb-group">
+        <span class="wb-label">Mode</span>
+        <button class="wb-btn is-active" data-wb-mode="wireframe">Wireframe</button>
+        <button class="wb-btn" data-wb-mode="edit">Edit UI</button>
+        <button class="wb-btn" data-wb-mode="final">Interactive</button>
+      </div>
+      <div class="wb-group">
+        <span class="wb-label">View</span>
+        <button class="wb-btn is-active" data-ui-state-trigger="pet-shop">Pet Shop</button>
+        <button class="wb-btn" data-ui-state-trigger="daily-shop">Daily Shop</button>
+        <button class="wb-btn" data-ui-state-trigger="npc-prompt">NPC Open Button</button>
+      </div>
+      <div class="wb-group">
+        <span class="wb-label">State</span>
+        <button class="wb-btn is-active" type="button" data-shop-state="normal">Selected</button>
+        <button class="wb-btn" type="button" data-shop-state="empty">No Selection</button>
+        <button class="wb-btn" type="button" data-shop-state="broke">Low Coins</button>
+        <button class="wb-btn" type="button" data-shop-state="soldout">Sold Out</button>
+        <button class="wb-btn" type="button" data-shop-state="gmt">GMT Reset</button>
+      </div>
+      <div class="wb-group">
+        <span class="wb-label">Scale</span>
+        <button class="wb-btn" data-wb-scale="2">2x</button>
+        <button class="wb-btn is-active" data-wb-scale="3">3x</button>
+        <button class="wb-btn" data-wb-scale="4">4x</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="workbench-stage">
+    <div id="game-canvas" class="px-canvas scene-cozy-meadow">
+
+      <!-- ================================================================
+           VIEW 1: PET SHOP (ShopPet.ui + HUDShopPet.fcg)
+           6-slot 3x2 grid + RefreshTimer + PetDetails (HP/ATK/DEF + BUY)
+           ================================================================ -->
+      <div class="px-hud-layer bs-canvas-stage" data-ui-view="pet-shop">
+        <div class="bs-blur-bg" data-ui-role="Modal Scrim (BlurBG)"></div>
+
+        <!-- Top Utility Row: Player Money Context (State controls live in .workbench-bar) -->
+        <div class="bs-top-utility">
+          <div class="bs-wallet-pill" data-ui-role="Player Money Display">
+            <div class="bs-pill-bg-layer px-sprite-box" data-slice-id="bs_shop_pill_bg" data-tint="#EAD5AC" data-tint-mode="multiply"></div>
+            <img class="px-icon" data-slice-id="bs_shop_coin_icon" alt="Money Coin">
+            <span class="bs-wallet-val" id="pet-wallet-val">12,500</span>
+          </div>
+        </div>
+
+        <!-- Wooden Shop Stall Modal (ShopPet/Shop) -->
+        <section class="bs-shop-modal" aria-label="Pet Shop Modal" data-ui-role="Shop Panel Root (Shop)">
+          <div class="bs-shop-bg px-sprite-box" data-slice-id="bs_shop_shop_bg" data-ui-role="Wooden Stall Backdrop (Shop/BG)"></div>
+          <div class="bs-wire-divider" aria-hidden="true"></div>
+
+          <!-- Header Title (Shop/Title: HUD_SHOP_TITLE) -->
+          <div class="bs-title-bar" data-ui-role="Shop Header Signboard (Title)">
+            <h1 class="bs-title-text">SHOP</h1>
+          </div>
+
+          <!-- Close Button (Shop/CloseButton) -->
+          <button class="bs-close-btn px-btn" type="button" data-ui-state-trigger="npc-prompt" data-ui-role="Close Shop Button (CloseButton)" aria-label="Close Shop">
+            <div class="bs-pill-bg-layer px-sprite-box" data-slice-id="bs_shop_close_button"></div>
+            <span class="bs-close-wire-x" aria-hidden="true">×</span>
+          </button>
+
+          <!-- Left Chamber: 3x2 Pet Slots Grid (Scroll View / ItemsLayout) -->
+          <div class="bs-scroll-area" data-ui-role="Catalog Scroll Area (Scroll View / ItemsLayout)">
+            <div class="bs-items-grid" id="pet-items-grid">
+              <!-- Slot 0: Water Petal (Common) -->
+              <button class="bs-slot" type="button" data-slot-index="0" data-ui-role="Pet Shop Slot Card (Item)">
+                <div class="bs-slot-card">
+                  <div class="bs-slot-card-bg px-sprite-box" data-slice-id="bs_shop_slot_bg" data-tint="#AFB6BE" data-tint-mode="multiply"></div>
+                  <img class="bs-slot-sprite px-icon" data-slice-id="bs_shop_pet_water_petal" alt="Water Petal">
+                  <span class="bs-slot-name">Water Petal</span>
+                  <div class="bs-slot-select px-9slice" data-slice-id="bs_shop_select_frame" data-slice-9="15,15,15,15"></div>
+                  <div class="bs-slot-soldout"><span class="bs-slot-soldout-txt">Sold Out</span></div>
+                </div>
+                <div class="bs-slot-price">
+                  <div class="bs-pill-bg-layer px-sprite-box" data-slice-id="bs_shop_pill_bg" data-tint="#EAD5AC" data-tint-mode="multiply"></div>
+                  <span class="bs-slot-price-val">200</span>
+                  <img class="bs-slot-price-coin px-icon" data-slice-id="bs_shop_coin_icon" alt="Coins">
+                </div>
+              </button>
+
+              <!-- Slot 1: Leaf Pumkyn (Common) -->
+              <button class="bs-slot" type="button" data-slot-index="1" data-ui-role="Pet Shop Slot Card (Item)">
+                <div class="bs-slot-card">
+                  <div class="bs-slot-card-bg px-sprite-box" data-slice-id="bs_shop_slot_bg" data-tint="#AFB6BE" data-tint-mode="multiply"></div>
+                  <img class="bs-slot-sprite px-icon" data-slice-id="bs_shop_pet_leaf_pumkyn" alt="Leaf Pumkyn">
+                  <span class="bs-slot-name">Leaf Pumkyn</span>
+                  <div class="bs-slot-select px-9slice" data-slice-id="bs_shop_select_frame" data-slice-9="15,15,15,15"></div>
+                  <div class="bs-slot-soldout"><span class="bs-slot-soldout-txt">Sold Out</span></div>
+                </div>
+                <div class="bs-slot-price">
+                  <div class="bs-pill-bg-layer px-sprite-box" data-slice-id="bs_shop_pill_bg" data-tint="#EAD5AC" data-tint-mode="multiply"></div>
+                  <span class="bs-slot-price-val">200</span>
+                  <img class="bs-slot-price-coin px-icon" data-slice-id="bs_shop_coin_icon" alt="Coins">
+                </div>
+              </button>
+
+              <!-- Slot 2: Water Cocoa (Rare, Sold Out Example) -->
+              <button class="bs-slot is-sold-out" type="button" data-slot-index="2" data-ui-role="Pet Shop Slot Card (Sold Out)">
+                <div class="bs-slot-card">
+                  <div class="bs-slot-card-bg px-sprite-box" data-slice-id="bs_shop_slot_bg" data-tint="#3FBFFF" data-tint-mode="multiply"></div>
+                  <img class="bs-slot-sprite px-icon" data-slice-id="bs_shop_pet_water_cocoa" alt="Water Cocoa">
+                  <span class="bs-slot-name">Water Cocoa</span>
+                  <div class="bs-slot-select px-9slice" data-slice-id="bs_shop_select_frame" data-slice-9="15,15,15,15"></div>
+                  <div class="bs-slot-soldout"><span class="bs-slot-soldout-txt">Sold Out</span></div>
+                </div>
+                <div class="bs-slot-price">
+                  <div class="bs-pill-bg-layer px-sprite-box" data-slice-id="bs_shop_pill_bg" data-tint="#EAD5AC" data-tint-mode="multiply"></div>
+                  <span class="bs-slot-price-val">800</span>
+                  <img class="bs-slot-price-coin px-icon" data-slice-id="bs_shop_coin_icon" alt="Coins">
+                </div>
+              </button>
+
+              <!-- Slot 3: Fire Bitterbud (Epic, Selected Default) -->
+              <button class="bs-slot is-selected" type="button" data-slot-index="3" data-ui-role="Pet Shop Slot Card (Selected)">
+                <div class="bs-slot-card">
+                  <div class="bs-slot-card-bg px-sprite-box" data-slice-id="bs_shop_slot_bg" data-tint="#C86BFF" data-tint-mode="multiply"></div>
+                  <img class="bs-slot-sprite px-icon" data-slice-id="bs_shop_pet_fire_bitterbud" alt="Fire Bitterbud">
+                  <span class="bs-slot-name">Fire Bitterbud</span>
+                  <div class="bs-slot-select px-9slice" data-slice-id="bs_shop_select_frame" data-slice-9="15,15,15,15"></div>
+                  <div class="bs-slot-soldout"><span class="bs-slot-soldout-txt">Sold Out</span></div>
+                </div>
+                <div class="bs-slot-price">
+                  <div class="bs-pill-bg-layer px-sprite-box" data-slice-id="bs_shop_pill_bg" data-tint="#EAD5AC" data-tint-mode="multiply"></div>
+                  <span class="bs-slot-price-val">7K</span>
+                  <img class="bs-slot-price-coin px-icon" data-slice-id="bs_shop_coin_icon" alt="Coins">
+                </div>
+              </button>
+
+              <!-- Slot 4: Fire Sobby (Legendary) -->
+              <button class="bs-slot" type="button" data-slot-index="4" data-ui-role="Pet Shop Slot Card (Item)">
+                <div class="bs-slot-card">
+                  <div class="bs-slot-card-bg px-sprite-box" data-slice-id="bs_shop_slot_bg" data-tint="#FFC81E" data-tint-mode="multiply"></div>
+                  <img class="bs-slot-sprite px-icon" data-slice-id="bs_shop_pet_fire_sobby" alt="Fire Sobby">
+                  <span class="bs-slot-name">Fire Sobby</span>
+                  <div class="bs-slot-select px-9slice" data-slice-id="bs_shop_select_frame" data-slice-9="15,15,15,15"></div>
+                  <div class="bs-slot-soldout"><span class="bs-slot-soldout-txt">Sold Out</span></div>
+                </div>
+                <div class="bs-slot-price">
+                  <div class="bs-pill-bg-layer px-sprite-box" data-slice-id="bs_shop_pill_bg" data-tint="#EAD5AC" data-tint-mode="multiply"></div>
+                  <span class="bs-slot-price-val">50K</span>
+                  <img class="bs-slot-price-coin px-icon" data-slice-id="bs_shop_coin_icon" alt="Coins">
+                </div>
+              </button>
+
+              <!-- Slot 5: Leaf Chomp (Mythic) -->
+              <button class="bs-slot" type="button" data-slot-index="5" data-ui-role="Pet Shop Slot Card (Item)">
+                <div class="bs-slot-card">
+                  <div class="bs-slot-card-bg px-sprite-box" data-slice-id="bs_shop_slot_bg" data-tint="#FF5555" data-tint-mode="multiply"></div>
+                  <img class="bs-slot-sprite px-icon" data-slice-id="bs_shop_pet_leaf_chomp" alt="Leaf Chomp">
+                  <span class="bs-slot-name">Leaf Chomp</span>
+                  <div class="bs-slot-select px-9slice" data-slice-id="bs_shop_select_frame" data-slice-9="15,15,15,15"></div>
+                  <div class="bs-slot-soldout"><span class="bs-slot-soldout-txt">Sold Out</span></div>
+                </div>
+                <div class="bs-slot-price">
+                  <div class="bs-pill-bg-layer px-sprite-box" data-slice-id="bs_shop_pill_bg" data-tint="#EAD5AC" data-tint-mode="multiply"></div>
+                  <span class="bs-slot-price-val">100K</span>
+                  <img class="bs-slot-price-coin px-icon" data-slice-id="bs_shop_coin_icon" alt="Coins">
+                </div>
+              </button>
+            </div>
+          </div>
+
+          <!-- Rotation Countdown Banner (Shop/Image + RefreshTimer) -->
+          <div class="bs-refresh-bar" data-ui-role="Rotation Countdown Banner (RefreshTimer)">
+            <div class="bs-pill-bg-layer px-sprite-box" data-slice-id="bs_shop_pill_bg" data-tint="#687C91" data-tint-mode="multiply"></div>
+            <span class="bs-refresh-text" id="pet-refresh-timer">Shop will be refreshed after 04:32</span>
+          </div>
+
+          <!-- Right Chamber: PetDetails Panel (ItemDetailShopComponent) -->
+          <aside class="bs-detail-panel" id="pet-detail-panel" aria-label="Selected Dragon Details" data-ui-role="Pet Details Panel (PetDetails)">
+            <div class="bs-detail-empty-note px-wire-box">
+              <strong>PetDetails (Hidden)</strong><br>
+              Select a dragon slot on the left to inspect HP / ATK / DEF and unlock the BUY CTA.
+            </div>
+
+            <div class="bs-detail-content">
+              <!-- Large Rarity Frame + Dragon Portrait -->
+              <div class="bs-detail-portrait" data-ui-role="Selected Pet Portrait (PetDetails/BG)">
+                <div class="bs-slot-card-bg px-sprite-box" id="pet-detail-rarity-bg" data-slice-id="bs_shop_slot_bg" data-tint="#C86BFF" data-tint-mode="multiply"></div>
+                <img class="px-icon" id="pet-detail-img" data-slice-id="bs_shop_pet_fire_bitterbud" alt="Selected Dragon">
+              </div>
+
+              <!-- Pet Name Pill -->
+              <div class="bs-detail-name-bar" data-ui-role="Selected Pet Name (BG Name)">
+                <div class="bs-pill-bg-layer px-sprite-box" data-slice-id="bs_shop_pill_bg" data-tint="#EAD5AC" data-tint-mode="multiply"></div>
+                <span class="bs-detail-name-txt" id="pet-detail-name">Fire Bitterbud</span>
+              </div>
+
+              <!-- Pet Rarity Pill -->
+              <div class="bs-detail-rarity-bar" data-ui-role="Selected Pet Rarity (BG Rarity)">
+                <div class="bs-stat-bg-layer px-9slice" data-slice-id="bs_shop_stat_pill_bg" data-slice-9="12,12,12,12" data-tint="#5A3A22" data-tint-mode="multiply"></div>
+                <span class="bs-detail-rarity-txt" id="pet-detail-rarity" style="color: #C86BFF;">Epic</span>
+              </div>
+
+              <!-- 2+1 Base Stats (Health, Attack, Defense) -->
+              <div class="bs-stat-grid" data-ui-role="Pet Stat Pills (HP / ATK / DEF)">
+                <div class="bs-stat-row">
+                  <div class="bs-stat-pill" data-ui-role="Health Stat Badge">
+                    <div class="bs-stat-bg-layer px-9slice" data-slice-id="bs_shop_stat_pill_bg" data-slice-9="12,12,12,12" data-tint="#5A3A22" data-tint-mode="multiply"></div>
+                    <img class="bs-stat-icon px-icon" data-slice-id="bs_shop_health_icon" alt="HP">
+                    <span class="bs-stat-val" id="pet-detail-hp">706</span>
+                  </div>
+                  <div class="bs-stat-pill" data-ui-role="Attack Stat Badge">
+                    <div class="bs-stat-bg-layer px-9slice" data-slice-id="bs_shop_stat_pill_bg" data-slice-9="12,12,12,12" data-tint="#5A3A22" data-tint-mode="multiply"></div>
+                    <img class="bs-stat-icon px-icon" data-slice-id="bs_shop_attack_icon" alt="ATK">
+                    <span class="bs-stat-val" id="pet-detail-atk">98</span>
+                  </div>
+                </div>
+                <div class="bs-stat-row">
+                  <div class="bs-stat-pill" data-ui-role="Defense Stat Badge">
+                    <div class="bs-stat-bg-layer px-9slice" data-slice-id="bs_shop_stat_pill_bg" data-slice-9="12,12,12,12" data-tint="#5A3A22" data-tint-mode="multiply"></div>
+                    <img class="bs-stat-icon px-icon" data-slice-id="bs_shop_defense_icon" alt="DEF">
+                    <span class="bs-stat-val" id="pet-detail-def">78</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Primary CTA: BuyButton -->
+              <button class="bs-buy-btn px-btn" id="pet-buy-btn" type="button" data-ui-role="Primary Purchase CTA (BuyButton)">
+                <div class="bs-pill-bg-layer px-sprite-box" id="pet-buy-bg" data-slice-id="bs_shop_buy_button" data-tint="#FFB305" data-tint-mode="multiply"></div>
+                <span class="bs-buy-btn-txt">BUY</span>
+              </button>
+            </div>
+          </aside>
+        </section>
+
+        <!-- GMT Debug Reset Button (visible only when GMT permission enabled) -->
+        <button class="bs-reset-btn px-btn is-hidden" id="pet-reset-btn" type="button" data-ui-role="GMT Debug Reset Button (ResetButton)">
+          <div class="bs-pill-bg-layer px-sprite-box" data-slice-id="bs_shop_reset_button" data-tint="#E14545" data-tint-mode="multiply"></div>
+          <span class="bs-reset-btn-txt">Reset</span>
+        </button>
+
+        <div class="bs-prompt-toast" id="pet-toast" role="status" aria-live="polite"></div>
+      </div>
+
+      <!-- ================================================================
+           VIEW 2: DAILY RARE SHOP (ShopPet.ui reused by HudShopDaily.fcg)
+           Void Shard slot (x5) + ItemDetails (Description + Left today: 5/5)
+           ================================================================ -->
+      <div class="px-hud-layer bs-canvas-stage" data-ui-view="daily-shop" hidden>
+        <div class="bs-blur-bg" data-ui-role="Modal Scrim (BlurBG)"></div>
+
+        <div class="bs-top-utility">
+          <div class="bs-wallet-pill" data-ui-role="Player Money Display">
+            <div class="bs-pill-bg-layer px-sprite-box" data-slice-id="bs_shop_pill_bg" data-tint="#EAD5AC" data-tint-mode="multiply"></div>
+            <img class="px-icon" data-slice-id="bs_shop_coin_icon" alt="Money Coin">
+            <span class="bs-wallet-val" id="daily-wallet-val">2,000</span>
+          </div>
+        </div>
+
+        <section class="bs-shop-modal" aria-label="Daily Rare Shop Modal" data-ui-role="Daily Shop Panel Root (Shop)">
+          <div class="bs-shop-bg px-sprite-box" data-slice-id="bs_shop_shop_bg" data-ui-role="Wooden Stall Backdrop (Shop/BG)"></div>
+          <div class="bs-wire-divider" aria-hidden="true"></div>
+
+          <div class="bs-title-bar" data-ui-role="Daily Shop Signboard (Title)">
+            <h1 class="bs-title-text">SHOP</h1>
+          </div>
+
+          <button class="bs-close-btn px-btn" type="button" data-ui-state-trigger="npc-prompt" data-ui-role="Close Daily Shop Button (CloseButton)" aria-label="Close Daily Shop">
+            <div class="bs-pill-bg-layer px-sprite-box" data-slice-id="bs_shop_close_button"></div>
+            <span class="bs-close-wire-x" aria-hidden="true">×</span>
+          </button>
+
+          <!-- Left Chamber: Daily Shop Item Grid (currently 1 item: Void Shard id=107) -->
+          <div class="bs-scroll-area" data-ui-role="Daily Items Grid (ItemsLayout)">
+            <div class="bs-items-grid" id="daily-items-grid">
+              <button class="bs-slot is-selected" id="daily-slot-0" type="button" data-ui-role="Daily Shop Item Slot (Void Shard)">
+                <div class="bs-slot-card">
+                  <div class="bs-slot-card-bg px-sprite-box" data-slice-id="bs_shop_slot_bg" data-tint="#FF5555" data-tint-mode="multiply"></div>
+                  <span class="bs-slot-amount" id="daily-slot-amount">x5</span>
+                  <img class="bs-slot-sprite px-icon" data-slice-id="bs_shop_void_shard" alt="Void Shard">
+                  <span class="bs-slot-name">Void Shard</span>
+                  <div class="bs-slot-select px-9slice" data-slice-id="bs_shop_select_frame" data-slice-9="15,15,15,15"></div>
+                  <div class="bs-slot-soldout"><span class="bs-slot-soldout-txt">Sold Out</span></div>
+                </div>
+                <div class="bs-slot-price">
+                  <div class="bs-pill-bg-layer px-sprite-box" data-slice-id="bs_shop_pill_bg" data-tint="#EAD5AC" data-tint-mode="multiply"></div>
+                  <span class="bs-slot-price-val">500</span>
+                  <img class="bs-slot-price-coin px-icon" data-slice-id="bs_shop_coin_icon" alt="Coins">
+                </div>
+              </button>
+            </div>
+          </div>
+
+          <!-- Daily Midnight Reset Countdown (HUD_DAILY_SHOP_COUNTDOWN) -->
+          <div class="bs-refresh-bar" data-ui-role="Daily Reset Countdown Banner (RefreshTimer)">
+            <div class="bs-pill-bg-layer px-sprite-box" data-slice-id="bs_shop_pill_bg" data-tint="#687C91" data-tint-mode="multiply"></div>
+            <span class="bs-refresh-text">Stock resets in 08:41:12</span>
+          </div>
+
+          <!-- Right Chamber: ItemDetails Panel (ItemDetailBackpackComponent) -->
+          <aside class="bs-detail-panel" id="daily-detail-panel" aria-label="Daily Item Details" data-ui-role="Item Details Panel (ItemDetails)">
+            <div class="bs-detail-empty-note px-wire-box">
+              <strong>ItemDetails (Hidden)</strong><br>
+              Select an item slot on the left to inspect its description, daily stock, and BUY CTA.
+            </div>
+
+            <div class="bs-detail-content">
+              <div class="bs-detail-portrait" data-ui-role="Item Portrait Frame (ItemDetails/BG Rarity)">
+                <div class="bs-slot-card-bg px-sprite-box" data-slice-id="bs_shop_slot_bg" data-tint="#FF5555" data-tint-mode="multiply"></div>
+                <img class="px-icon" data-slice-id="bs_shop_void_shard" alt="Void Shard">
+              </div>
+
+              <div class="bs-detail-name-bar" data-ui-role="Item Name Banner (BG Name)">
+                <div class="bs-pill-bg-layer px-sprite-box" data-slice-id="bs_shop_pill_bg" data-tint="#EAD5AC" data-tint-mode="multiply"></div>
+                <span class="bs-detail-name-txt">Void Shard</span>
+              </div>
+
+              <div class="bs-detail-desc-box" data-ui-role="Item Description Box (BG Des)">
+                <div class="bs-stat-bg-layer px-9slice" data-slice-id="bs_shop_stat_pill_bg" data-slice-9="12,12,12,12" data-tint="#5A3A22" data-tint-mode="multiply"></div>
+                <span class="bs-detail-desc-txt">A special material used to break through your dragon's level cap.</span>
+              </div>
+
+              <div class="bs-detail-stock-pill" data-ui-role="Daily Stock Counter (Amount / AmountLeft)">
+                <div class="bs-stat-bg-layer px-9slice" data-slice-id="bs_shop_stat_pill_bg" data-slice-9="12,12,12,12" data-tint="#5A3A22" data-tint-mode="multiply"></div>
+                <span class="bs-detail-stock-txt" id="daily-stock-txt">Left today: 5/5</span>
+              </div>
+
+              <button class="bs-buy-btn px-btn" id="daily-buy-btn" type="button" data-ui-role="Daily Shop Purchase CTA (BuyButton)">
+                <div class="bs-pill-bg-layer px-sprite-box" id="daily-buy-bg" data-slice-id="bs_shop_buy_button" data-tint="#FFB305" data-tint-mode="multiply"></div>
+                <span class="bs-buy-btn-txt">BUY</span>
+              </button>
+            </div>
+          </aside>
+        </section>
+
+        <button class="bs-reset-btn px-btn is-hidden" id="daily-reset-btn" type="button" data-ui-role="GMT Daily Stock Reset Button (ResetButton)">
+          <div class="bs-pill-bg-layer px-sprite-box" data-slice-id="bs_shop_reset_button" data-tint="#E14545" data-tint-mode="multiply"></div>
+          <span class="bs-reset-btn-txt">Reset</span>
+        </button>
+
+        <div class="bs-prompt-toast" id="daily-toast" role="status" aria-live="polite"></div>
+      </div>
+
+      <!-- ================================================================
+           VIEW 3: NPC PROXIMITY HUD (ShopPet/OpenButton)
+           Shown when player enters ShopTrigger / DailyShopTrigger zone
+           ================================================================ -->
+      <div class="px-hud-layer bs-canvas-stage" data-ui-view="npc-prompt" hidden>
+        <div class="bs-top-utility">
+          <div class="bs-wallet-pill" data-ui-role="HUD Player Money">
+            <div class="bs-pill-bg-layer px-sprite-box" data-slice-id="bs_shop_pill_bg" data-tint="#EAD5AC" data-tint-mode="multiply"></div>
+            <img class="px-icon" data-slice-id="bs_shop_coin_icon" alt="Money Coin">
+            <span class="bs-wallet-val">12,500</span>
+          </div>
+        </div>
+
+        <!-- Floating Right-Center OpenButton (Center 40% Focus Zone Clear) -->
+        <button class="bs-open-btn-wrap px-btn" type="button" data-ui-state-trigger="pet-shop" data-ui-role="NPC Proximity Shop Trigger (OpenButton)" aria-label="Open Shop">
+          <div class="bs-open-circle">
+            <div class="bs-pill-bg-layer px-sprite-box" data-slice-id="bs_shop_open_btn_base" data-tint="#F2C86B" data-tint-mode="multiply"></div>
+            <div class="bs-pill-bg-layer px-sprite-box" data-slice-id="bs_shop_open_btn_bg"></div>
+            <img class="bs-open-circle-icon px-icon" data-slice-id="bs_shop_open_btn_icon" alt="Shop Coin Bag">
+          </div>
+          <div class="bs-open-ribbon">
+            <div class="bs-pill-bg-layer px-sprite-box" data-slice-id="bs_shop_open_btn_ribbon"></div>
+            <span class="bs-open-ribbon-txt">SHOP</span>
+          </div>
+        </button>
+
+        <div class="bs-npc-context-tag px-wire-box" data-render-mode="wireframe" data-ui-role="NPC Trigger Zone Spec Note">
+          <strong>NPC Proximity State (ShopTrigger / DailyShopTrigger)</strong><br>
+          Appears when entering the merchant collider at Base. Tapping <strong>SHOP</strong> opens the shop modal (or fires <code>PROMPT_DAILY_SHOP_LOCKED</code> if Boss 1 is not yet defeated).
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ====================================================================
+         GROUPED ELEMENT BEHAVIOR SPECIFICATION (Auto-open in Wireframe Mode)
+         ==================================================================== -->
+    <section id="wb-behavior-drawer" class="workbench-drawer is-open" aria-label="Element Behavior Specification">
+      <h3>Element Behavior Specification (Grouped by Interaction Role — Derived from ShopPet.ui, HUDShopPet.fcg &amp; HudShopDaily.fcg)</h3>
+      <table class="behavior-table">
+        <thead>
+          <tr>
+            <th>Element / Group</th>
+            <th>View</th>
+            <th>Count</th>
+            <th>Behavior Description</th>
+          </tr>
+        </thead>
+        <tbody id="wb-behavior-body">
+          <tr>
+            <td><strong>NPC Open Button (<code>OpenButton</code>)</strong> <span class="behavior-group-tag">Trigger</span></td>
+            <td><span class="behavior-view-badge">npc-prompt</span></td>
+            <td>1</td>
+            <td>Shown when entering <code>ShopTrigger</code> (Base/Fire/Leaf/Water) or <code>DailyShopTrigger</code>. Hides the full modal until tapped; tapping calls <code>OpenShop()</code> (for Daily Shop, checks <code>DailyShopManager.IsReady</code> and Boss 1 unlock first, firing <code>PROMPT_DAILY_SHOP_LOCKED</code> on fail).</td>
+          </tr>
+          <tr>
+            <td><strong>Shop Modal Shell &amp; Scrim (<code>BlurBG</code>, <code>BG</code>, <code>Title</code>, <code>CloseButton</code>)</strong> <span class="behavior-group-tag">Container</span></td>
+            <td><span class="behavior-view-badge">pet-shop</span> <span class="behavior-view-badge">daily-shop</span></td>
+            <td>1</td>
+            <td>Centered 2-column wooden stall frame over an 80%-alpha black scrim. <code>CloseButton</code> collapses the modal back to <code>OpenButton</code> (<code>CloseShop()</code>) and clears active selection; leaving the NPC zone hides the entire HUD.</td>
+          </tr>
+          <tr>
+            <td><strong>Pet Catalog Slots (<code>ItemsLayout / Item</code>, 3×2 Grid)</strong> <span class="behavior-group-tag">Group</span></td>
+            <td><span class="behavior-view-badge">pet-shop</span></td>
+            <td>6</td>
+            <td>Cloned from <code>ItemTemplate</code>. Each card displays rarity-tinted frame (<code>#AFB6BE</code> Common → <code>#FF5555</code> Mythic), dragon icon, name, and gold cost pill below. Tapping toggles the yellow <code>Select</code> border, opens <code>PetDetails</code>, and refreshes <code>BuyButton</code> affordability. Purchased slots display the 62%-alpha <code>Sold Out</code> scrim until the 5-minute rotation.</td>
+          </tr>
+          <tr>
+            <td><strong>Daily Item Slots (<code>ItemsLayout / Item</code>)</strong> <span class="behavior-group-tag">Group</span></td>
+            <td><span class="behavior-view-badge">daily-shop</span></td>
+            <td>1+</td>
+            <td>Reuses <code>ItemShopComponent</code> via <code>SetDataShopItem()</code>. Displays <code>AmountLeft</code> (<code>x5</code>) in the top-left corner of the card, item icon (<code>Void_Shard</code>), name, price pill (<code>500</code>), and switches to <code>Sold Out</code> when <code>stockLeft &lt;= 0</code>.</td>
+          </tr>
+          <tr>
+            <td><strong>Refresh / Reset Countdown Bar (<code>RefreshTimer</code>)</strong> <span class="behavior-group-tag">Status</span></td>
+            <td><span class="behavior-view-badge">pet-shop</span> <span class="behavior-view-badge">daily-shop</span></td>
+            <td>1</td>
+            <td>Bottom-left steel-blue banner ticking every ~1s. In Pet Shop shows <code>Shop will be refreshed after MM:SS</code> (5-minute global roll); in Daily Shop shows <code>Stock resets in HH:MM:SS</code> until server midnight (<code>ResetHour = 0</code>), auto-refreshing stock across day rollover.</td>
+          </tr>
+          <tr>
+            <td><strong>Pet Details Inspector (<code>PetDetails</code>)</strong> <span class="behavior-group-tag">Panel</span></td>
+            <td><span class="behavior-view-badge">pet-shop</span></td>
+            <td>1</td>
+            <td>Hidden when no slot is selected. Displays large rarity portrait, dragon name banner, rarity-colored tier pill, and 3 base Level-1 stat badges (<code>HP</code>, <code>ATK</code>, <code>DEF</code>) in a 2+1 layout above the <code>BUY</code> button.</td>
+          </tr>
+          <tr>
+            <td><strong>Item Details Inspector (<code>ItemDetails</code>)</strong> <span class="behavior-group-tag">Panel</span></td>
+            <td><span class="behavior-view-badge">daily-shop</span></td>
+            <td>1</td>
+            <td>Reuses <code>ItemDetailBackpackComponent.ShowShopItem()</code>. Displays large rarity portrait, item name banner, multi-line description box, and <code>AmountLeft</code> pill (<code>Left today: X/Y</code>) above the <code>BUY</code> button.</td>
+          </tr>
+          <tr>
+            <td><strong>Primary Purchase CTA (<code>BuyButton</code>)</strong> <span class="behavior-group-tag">Action</span></td>
+            <td><span class="behavior-view-badge">pet-shop</span> <span class="behavior-view-badge">daily-shop</span></td>
+            <td>1</td>
+            <td>Golden gradient (<code>#FFB305 → #D88403</code>) when selected item is in stock and player has enough Money; dark disabled brown (<code>#5E4003</code>) when unaffordable or sold out. Protected by <code>ActionThrottleManager</code>; Pet Shop adds dragon, marks slot Sold Out, and opens <code>HudInfoPet</code>; Daily Shop deducts Money, grants Void Shard, and decrements DB stock in one server tick.</td>
+          </tr>
+          <tr>
+            <td><strong>GMT Debug Reset Button (<code>ResetButton</code>)</strong> <span class="behavior-group-tag">Debug</span></td>
+            <td><span class="behavior-view-badge">pet-shop</span> <span class="behavior-view-badge">daily-shop</span></td>
+            <td>1</td>
+            <td>Visible only when <code>PlayerGMT.HasGMTPermission()</code> is true. Resets shop rotation (Pet Shop) or clears player daily purchase count (Daily Shop) for QA testing.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="wb-manifest-drawer" class="workbench-drawer" aria-label="Sprite Asset Manifest">
+      <h3>Sprite Asset Manifest (Auto-scanned from #game-canvas)</h3>
+      <table class="manifest-table">
+        <thead>
+          <tr>
+            <th>Preview</th>
+            <th>Slice ID</th>
+            <th>Role</th>
+            <th>Source PNG</th>
+            <th>Native Size</th>
+            <th>9-Slice</th>
+          </tr>
+        </thead>
+        <tbody id="wb-manifest-body"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="../_catalog/catalog-data.js"></script>
+  <script src="../_catalog/previews-data.js"></script>
+  <script src="./ui-edits.js"></script>
+  <script src="./pixel-ui-kit.js"></script>
+  <script>
+    (function () {
+      'use strict';
+
+      const PET_SLOTS = [
+        { name: 'Water Petal', rarity: 'Common', color: '#AFB6BE', cost: 200, costLabel: '200', hp: 360, atk: 50, def: 40, slice: 'bs_shop_pet_water_petal', soldOut: false },
+        { name: 'Leaf Pumkyn', rarity: 'Common', color: '#AFB6BE', cost: 200, costLabel: '200', hp: 540, atk: 40, def: 40, slice: 'bs_shop_pet_leaf_pumkyn', soldOut: false },
+        { name: 'Water Cocoa', rarity: 'Rare', color: '#3FBFFF', cost: 800, costLabel: '800', hp: 504, atk: 70, def: 56, slice: 'bs_shop_pet_water_cocoa', soldOut: true },
+        { name: 'Fire Bitterbud', rarity: 'Epic', color: '#C86BFF', cost: 7000, costLabel: '7K', hp: 706, atk: 98, def: 78, slice: 'bs_shop_pet_fire_bitterbud', soldOut: false },
+        { name: 'Fire Sobby', rarity: 'Legendary', color: '#FFC81E', cost: 50000, costLabel: '50K', hp: 988, atk: 137, def: 110, slice: 'bs_shop_pet_fire_sobby', soldOut: false },
+        { name: 'Leaf Chomp', rarity: 'Mythic', color: '#FF5555', cost: 100000, costLabel: '100K', hp: 1383, atk: 192, def: 154, slice: 'bs_shop_pet_leaf_chomp', soldOut: false },
+      ];
+
+      const petState = {
+        wallet: 12500,
+        selectedIdx: 3,
+        gmt: false,
+      };
+
+      const dailyState = {
+        wallet: 2000,
+        price: 500,
+        stock: 5,
+        maxStock: 5,
+        selected: true,
+        gmt: false,
+      };
+
+      function showToast(id, msg) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = msg;
+        el.classList.add('is-visible');
+        clearTimeout(el._t);
+        el._t = setTimeout(() => el.classList.remove('is-visible'), 2200);
+      }
+
+      function applySpriteAndTint(el, sliceId, tintColor) {
+        if (!el) return;
+        if (sliceId) el.setAttribute('data-slice-id', sliceId);
+        if (tintColor !== undefined) {
+          if (tintColor) el.setAttribute('data-tint', tintColor);
+          else el.removeAttribute('data-tint');
+        }
+        if (window.PixelUI && typeof window.PixelUI.hydrateSprites === 'function') {
+          window.PixelUI.hydrateSprites(el.parentElement || document);
+        }
+      }
+
+      function renderPetShop() {
+        const walletEl = document.getElementById('pet-wallet-val');
+        if (walletEl) walletEl.textContent = petState.wallet.toLocaleString();
+
+        const resetBtn = document.getElementById('pet-reset-btn');
+        if (resetBtn) resetBtn.classList.toggle('is-hidden', !petState.gmt);
+
+        const slotEls = document.querySelectorAll('#pet-items-grid .bs-slot');
+        slotEls.forEach((slotEl, idx) => {
+          const item = PET_SLOTS[idx];
+          if (!item) return;
+          slotEl.classList.toggle('is-selected', idx === petState.selectedIdx);
+          slotEl.classList.toggle('is-sold-out', item.soldOut);
+        });
+
+        const detailPanel = document.getElementById('pet-detail-panel');
+        if (!detailPanel) return;
+
+        if (petState.selectedIdx < 0 || !PET_SLOTS[petState.selectedIdx]) {
+          detailPanel.classList.add('is-empty');
+          return;
+        }
+
+        detailPanel.classList.remove('is-empty');
+        const pet = PET_SLOTS[petState.selectedIdx];
+        document.getElementById('pet-detail-name').textContent = pet.name;
+        const rarityTxt = document.getElementById('pet-detail-rarity');
+        rarityTxt.textContent = pet.rarity;
+        rarityTxt.style.color = pet.color;
+        document.getElementById('pet-detail-hp').textContent = String(pet.hp);
+        document.getElementById('pet-detail-atk').textContent = String(pet.atk);
+        document.getElementById('pet-detail-def').textContent = String(pet.def);
+
+        applySpriteAndTint(document.getElementById('pet-detail-img'), pet.slice);
+        applySpriteAndTint(document.getElementById('pet-detail-rarity-bg'), 'bs_shop_slot_bg', pet.color);
+
+        const canBuy = !pet.soldOut && petState.wallet >= pet.cost;
+        const buyBtn = document.getElementById('pet-buy-btn');
+        const buyBg = document.getElementById('pet-buy-bg');
+        buyBtn.classList.toggle('is-disabled', !canBuy);
+        applySpriteAndTint(buyBg, 'bs_shop_buy_button', canBuy ? '#FFB305' : '#5E4003');
+      }
+
+      function renderDailyShop() {
+        const walletEl = document.getElementById('daily-wallet-val');
+        if (walletEl) walletEl.textContent = dailyState.wallet.toLocaleString();
+
+        const resetBtn = document.getElementById('daily-reset-btn');
+        if (resetBtn) resetBtn.classList.toggle('is-hidden', !dailyState.gmt);
+
+        const soldOut = dailyState.stock <= 0;
+        const slotEl = document.getElementById('daily-slot-0');
+        if (slotEl) {
+          slotEl.classList.toggle('is-sold-out', soldOut);
+          slotEl.classList.toggle('is-selected', dailyState.selected);
+        }
+
+        const detailPanel = document.getElementById('daily-detail-panel');
+        if (detailPanel) detailPanel.classList.toggle('is-empty', !dailyState.selected);
+
+        const slotAmt = document.getElementById('daily-slot-amount');
+        if (slotAmt) slotAmt.textContent = 'x' + dailyState.stock;
+
+        const stockTxt = document.getElementById('daily-stock-txt');
+        if (stockTxt) stockTxt.textContent = 'Left today: ' + dailyState.stock + '/' + dailyState.maxStock;
+
+        const canBuy = !soldOut && dailyState.wallet >= dailyState.price;
+        const buyBtn = document.getElementById('daily-buy-btn');
+        const buyBg = document.getElementById('daily-buy-bg');
+        buyBtn.classList.toggle('is-disabled', !canBuy);
+        applySpriteAndTint(buyBg, 'bs_shop_buy_button', canBuy ? '#FFB305' : '#5E4003');
+      }
+
+      // Wire Pet Shop Slot Selection (interactive mode only)
+      document.querySelectorAll('#pet-items-grid .bs-slot').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          if (window.PixelUI && window.PixelUI.isWireframeMode()) return;
+          const idx = Number(btn.getAttribute('data-slot-index'));
+          petState.selectedIdx = idx;
+          renderPetShop();
+        });
+      });
+
+      // Wire Pet Shop BUY CTA
+      const petBuyBtn = document.getElementById('pet-buy-btn');
+      if (petBuyBtn) {
+        petBuyBtn.addEventListener('click', () => {
+          if (window.PixelUI && window.PixelUI.isWireframeMode()) return;
+          const pet = PET_SLOTS[petState.selectedIdx];
+          if (!pet) return;
+          if (pet.soldOut) {
+            showToast('pet-toast', 'This dragon slot is already Sold Out.');
+            return;
+          }
+          if (petState.wallet < pet.cost) {
+            showToast('pet-toast', "You don't have enough money to buy this item");
+            return;
+          }
+          petState.wallet -= pet.cost;
+          pet.soldOut = true;
+          renderPetShop();
+          showToast('pet-toast', 'You have purchased ' + pet.name + '!');
+        });
+      }
+
+      // Wire Pet Shop GMT Reset
+      const petResetBtn = document.getElementById('pet-reset-btn');
+      if (petResetBtn) {
+        petResetBtn.addEventListener('click', () => {
+          if (window.PixelUI && window.PixelUI.isWireframeMode()) return;
+          PET_SLOTS.forEach((p, i) => { p.soldOut = i === 2 ? false : false; });
+          petState.wallet = Math.max(petState.wallet, 12500);
+          renderPetShop();
+          showToast('pet-toast', 'The shop just got a refresh!');
+        });
+      }
+
+      // Unified Workbench Top-Bar State Toggles (same .workbench-bar pattern as loot-forge-gun)
+      document.querySelectorAll('[data-shop-state]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const preset = btn.getAttribute('data-shop-state');
+          if (preset === 'gmt') {
+            petState.gmt = !petState.gmt;
+            dailyState.gmt = petState.gmt;
+            btn.classList.toggle('is-active', petState.gmt);
+            renderPetShop();
+            renderDailyShop();
+            return;
+          }
+          document.querySelectorAll('[data-shop-state]').forEach((b) => {
+            if (b.getAttribute('data-shop-state') !== 'gmt') b.classList.remove('is-active');
+          });
+          btn.classList.add('is-active');
+
+          if (preset === 'normal') {
+            petState.wallet = 12500;
+            petState.selectedIdx = 3;
+            PET_SLOTS[3].soldOut = false;
+            dailyState.wallet = 2000;
+            dailyState.stock = 5;
+            dailyState.selected = true;
+          } else if (preset === 'empty') {
+            petState.selectedIdx = -1;
+            dailyState.selected = false;
+          } else if (preset === 'broke') {
+            petState.wallet = 150;
+            petState.selectedIdx = 3;
+            PET_SLOTS[3].soldOut = false;
+            dailyState.wallet = 250;
+            dailyState.stock = 5;
+            dailyState.selected = true;
+          } else if (preset === 'soldout') {
+            petState.wallet = 12500;
+            petState.selectedIdx = 2;
+            PET_SLOTS[2].soldOut = true;
+            dailyState.wallet = 2000;
+            dailyState.stock = 0;
+            dailyState.selected = true;
+          }
+          renderPetShop();
+          renderDailyShop();
+        });
+      });
+
+      // Wire Daily Shop Slot Selection
+      const dailySlotEl = document.getElementById('daily-slot-0');
+      if (dailySlotEl) {
+        dailySlotEl.addEventListener('click', () => {
+          if (window.PixelUI && window.PixelUI.isWireframeMode()) return;
+          dailyState.selected = true;
+          renderDailyShop();
+        });
+      }
+
+      // Wire Daily Shop BUY CTA
+      const dailyBuyBtn = document.getElementById('daily-buy-btn');
+      if (dailyBuyBtn) {
+        dailyBuyBtn.addEventListener('click', () => {
+          if (window.PixelUI && window.PixelUI.isWireframeMode()) return;
+          if (dailyState.stock <= 0) {
+            showToast('daily-toast', 'Sold out for today. Come back after the daily reset');
+            return;
+          }
+          if (dailyState.wallet < dailyState.price) {
+            showToast('daily-toast', "You don't have enough money to buy this item");
+            return;
+          }
+          dailyState.wallet -= dailyState.price;
+          dailyState.stock -= 1;
+          renderDailyShop();
+          showToast('daily-toast', 'You have purchased Void Shard (Left: ' + dailyState.stock + '/' + dailyState.maxStock + ')');
+        });
+      }
+
+      // Wire Daily Shop GMT Reset
+      const dailyResetBtn = document.getElementById('daily-reset-btn');
+      if (dailyResetBtn) {
+        dailyResetBtn.addEventListener('click', () => {
+          if (window.PixelUI && window.PixelUI.isWireframeMode()) return;
+          dailyState.stock = dailyState.maxStock;
+          dailyState.wallet = Math.max(dailyState.wallet, 2000);
+          renderDailyShop();
+          showToast('daily-toast', 'Daily stock reset to 5/5 (GMT Debug)');
+        });
+      }
+
+      window.addEventListener('DOMContentLoaded', () => {
+        renderPetShop();
+        renderDailyShop();
+      });
+    })();
+  </script>
+</body>
+</html>

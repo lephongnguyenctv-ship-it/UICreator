@@ -1,7 +1,7 @@
 {
   "input_dir": "c:/Users/lephong.nguyen_ctv/Desktop/CraftlandProject/UICreator/Sprite sheets",
   "total_sources": 719,
-  "total_slices": 1240,
+  "total_slices": 1263,
   "contact_sheets": [
     "contact_sheets/contact_sheet_dialouge_ui_01.png",
     "contact_sheets/contact_sheet_dialouge_ui_02.png",
@@ -29993,6 +29993,407 @@
       ],
       "width": 100,
       "height": 100,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "bs_shop_attack_icon": {
+      "id": "bs_shop_attack_icon",
+      "file": "assets/bee-swarm-shop/attack_icon.png",
+      "source_file": "assets/bee-swarm-shop/attack_icon.png",
+      "group": "bee-swarm-shop",
+      "bbox": [
+        0,
+        0,
+        140,
+        256
+      ],
+      "width": 140,
+      "height": 256,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "bs_shop_buy_button": {
+      "id": "bs_shop_buy_button",
+      "file": "assets/bee-swarm-shop/buy_button.png",
+      "source_file": "assets/bee-swarm-shop/buy_button.png",
+      "group": "bee-swarm-shop",
+      "bbox": [
+        0,
+        0,
+        256,
+        87
+      ],
+      "width": 256,
+      "height": 87,
+      "category": "button",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "bs_shop_close_button": {
+      "id": "bs_shop_close_button",
+      "file": "assets/bee-swarm-shop/close_button.png",
+      "source_file": "assets/bee-swarm-shop/close_button.png",
+      "group": "bee-swarm-shop",
+      "bbox": [
+        0,
+        0,
+        256,
+        256
+      ],
+      "width": 256,
+      "height": 256,
+      "category": "button",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "bs_shop_coin_icon": {
+      "id": "bs_shop_coin_icon",
+      "file": "assets/bee-swarm-shop/coin_icon.png",
+      "source_file": "assets/bee-swarm-shop/coin_icon.png",
+      "group": "bee-swarm-shop",
+      "bbox": [
+        0,
+        0,
+        96,
+        98
+      ],
+      "width": 96,
+      "height": 98,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "bs_shop_defense_icon": {
+      "id": "bs_shop_defense_icon",
+      "file": "assets/bee-swarm-shop/defense_icon.png",
+      "source_file": "assets/bee-swarm-shop/defense_icon.png",
+      "group": "bee-swarm-shop",
+      "bbox": [
+        0,
+        0,
+        56,
+        64
+      ],
+      "width": 56,
+      "height": 64,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "bs_shop_health_icon": {
+      "id": "bs_shop_health_icon",
+      "file": "assets/bee-swarm-shop/health_icon.png",
+      "source_file": "assets/bee-swarm-shop/health_icon.png",
+      "group": "bee-swarm-shop",
+      "bbox": [
+        0,
+        0,
+        256,
+        244
+      ],
+      "width": 256,
+      "height": 244,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "bs_shop_open_btn_base": {
+      "id": "bs_shop_open_btn_base",
+      "file": "assets/bee-swarm-shop/open_btn_base.png",
+      "source_file": "assets/bee-swarm-shop/open_btn_base.png",
+      "group": "bee-swarm-shop",
+      "bbox": [
+        0,
+        0,
+        256,
+        252
+      ],
+      "width": 256,
+      "height": 252,
+      "category": "button",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "bs_shop_open_btn_bg": {
+      "id": "bs_shop_open_btn_bg",
+      "file": "assets/bee-swarm-shop/open_btn_bg.png",
+      "source_file": "assets/bee-swarm-shop/open_btn_bg.png",
+      "group": "bee-swarm-shop",
+      "bbox": [
+        0,
+        0,
+        256,
+        254
+      ],
+      "width": 256,
+      "height": 254,
+      "category": "panel",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "bs_shop_open_btn_icon": {
+      "id": "bs_shop_open_btn_icon",
+      "file": "assets/bee-swarm-shop/open_btn_icon.png",
+      "source_file": "assets/bee-swarm-shop/open_btn_icon.png",
+      "group": "bee-swarm-shop",
+      "bbox": [
+        0,
+        0,
+        243,
+        256
+      ],
+      "width": 243,
+      "height": 256,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "bs_shop_open_btn_ribbon": {
+      "id": "bs_shop_open_btn_ribbon",
+      "file": "assets/bee-swarm-shop/open_btn_ribbon.png",
+      "source_file": "assets/bee-swarm-shop/open_btn_ribbon.png",
+      "group": "bee-swarm-shop",
+      "bbox": [
+        0,
+        0,
+        256,
+        80
+      ],
+      "width": 256,
+      "height": 80,
+      "category": "panel",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "bs_shop_pet_fire_bitterbud": {
+      "id": "bs_shop_pet_fire_bitterbud",
+      "file": "assets/bee-swarm-shop/pet_fire_bitterbud.png",
+      "source_file": "assets/bee-swarm-shop/pet_fire_bitterbud.png",
+      "group": "bee-swarm-shop",
+      "bbox": [
+        0,
+        0,
+        256,
+        256
+      ],
+      "width": 256,
+      "height": 256,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "bs_shop_pet_fire_sobby": {
+      "id": "bs_shop_pet_fire_sobby",
+      "file": "assets/bee-swarm-shop/pet_fire_sobby.png",
+      "source_file": "assets/bee-swarm-shop/pet_fire_sobby.png",
+      "group": "bee-swarm-shop",
+      "bbox": [
+        0,
+        0,
+        256,
+        256
+      ],
+      "width": 256,
+      "height": 256,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "bs_shop_pet_leaf_chomp": {
+      "id": "bs_shop_pet_leaf_chomp",
+      "file": "assets/bee-swarm-shop/pet_leaf_chomp.png",
+      "source_file": "assets/bee-swarm-shop/pet_leaf_chomp.png",
+      "group": "bee-swarm-shop",
+      "bbox": [
+        0,
+        0,
+        256,
+        256
+      ],
+      "width": 256,
+      "height": 256,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "bs_shop_pet_leaf_pumkyn": {
+      "id": "bs_shop_pet_leaf_pumkyn",
+      "file": "assets/bee-swarm-shop/pet_leaf_pumkyn.png",
+      "source_file": "assets/bee-swarm-shop/pet_leaf_pumkyn.png",
+      "group": "bee-swarm-shop",
+      "bbox": [
+        0,
+        0,
+        256,
+        256
+      ],
+      "width": 256,
+      "height": 256,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "bs_shop_pet_water_cocoa": {
+      "id": "bs_shop_pet_water_cocoa",
+      "file": "assets/bee-swarm-shop/pet_water_cocoa.png",
+      "source_file": "assets/bee-swarm-shop/pet_water_cocoa.png",
+      "group": "bee-swarm-shop",
+      "bbox": [
+        0,
+        0,
+        256,
+        256
+      ],
+      "width": 256,
+      "height": 256,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "bs_shop_pet_water_petal": {
+      "id": "bs_shop_pet_water_petal",
+      "file": "assets/bee-swarm-shop/pet_water_petal.png",
+      "source_file": "assets/bee-swarm-shop/pet_water_petal.png",
+      "group": "bee-swarm-shop",
+      "bbox": [
+        0,
+        0,
+        256,
+        256
+      ],
+      "width": 256,
+      "height": 256,
+      "category": "icon",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "bs_shop_pill_bg": {
+      "id": "bs_shop_pill_bg",
+      "file": "assets/bee-swarm-shop/pill_bg.png",
+      "source_file": "assets/bee-swarm-shop/pill_bg.png",
+      "group": "bee-swarm-shop",
+      "bbox": [
+        0,
+        0,
+        256,
+        88
+      ],
+      "width": 256,
+      "height": 88,
+      "category": "panel",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "bs_shop_reset_button": {
+      "id": "bs_shop_reset_button",
+      "file": "assets/bee-swarm-shop/reset_button.png",
+      "source_file": "assets/bee-swarm-shop/reset_button.png",
+      "group": "bee-swarm-shop",
+      "bbox": [
+        0,
+        0,
+        280,
+        71
+      ],
+      "width": 280,
+      "height": 71,
+      "category": "button",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "bs_shop_select_frame": {
+      "id": "bs_shop_select_frame",
+      "file": "assets/bee-swarm-shop/select_frame.png",
+      "source_file": "assets/bee-swarm-shop/select_frame.png",
+      "group": "bee-swarm-shop",
+      "bbox": [
+        0,
+        0,
+        50,
+        50
+      ],
+      "width": 50,
+      "height": 50,
+      "category": "panel",
+      "slice_9": [
+        15,
+        15,
+        15,
+        15
+      ],
+      "is_white_mask_candidate": false
+    },
+    "bs_shop_shop_bg": {
+      "id": "bs_shop_shop_bg",
+      "file": "assets/bee-swarm-shop/shop_bg.png",
+      "source_file": "assets/bee-swarm-shop/shop_bg.png",
+      "group": "bee-swarm-shop",
+      "bbox": [
+        0,
+        0,
+        1024,
+        574
+      ],
+      "width": 1024,
+      "height": 574,
+      "category": "panel",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "bs_shop_slot_bg": {
+      "id": "bs_shop_slot_bg",
+      "file": "assets/bee-swarm-shop/slot_bg.png",
+      "source_file": "assets/bee-swarm-shop/slot_bg.png",
+      "group": "bee-swarm-shop",
+      "bbox": [
+        0,
+        0,
+        256,
+        252
+      ],
+      "width": 256,
+      "height": 252,
+      "category": "panel",
+      "slice_9": null,
+      "is_white_mask_candidate": false
+    },
+    "bs_shop_stat_pill_bg": {
+      "id": "bs_shop_stat_pill_bg",
+      "file": "assets/bee-swarm-shop/stat_pill_bg.png",
+      "source_file": "assets/bee-swarm-shop/stat_pill_bg.png",
+      "group": "bee-swarm-shop",
+      "bbox": [
+        0,
+        0,
+        32,
+        32
+      ],
+      "width": 32,
+      "height": 32,
+      "category": "panel",
+      "slice_9": [
+        12,
+        12,
+        12,
+        12
+      ],
+      "is_white_mask_candidate": true
+    },
+    "bs_shop_void_shard": {
+      "id": "bs_shop_void_shard",
+      "file": "assets/bee-swarm-shop/void_shard.png",
+      "source_file": "assets/bee-swarm-shop/void_shard.png",
+      "group": "bee-swarm-shop",
+      "bbox": [
+        0,
+        0,
+        256,
+        256
+      ],
+      "width": 256,
+      "height": 256,
       "category": "icon",
       "slice_9": null,
       "is_white_mask_candidate": false
