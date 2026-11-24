@@ -13,6 +13,14 @@
   const FS_STORE_NAME = 'handles';
   const FS_CATALOG_HANDLE_KEY = 'catalog_data_js';
 
+  const CANVAS_PRESETS = {
+    '1500x750': { w: 1500, h: 750, label: 'Default 1500×750 (2:1)', kind: 'phone' },
+    '1334x750': { w: 1334, h: 750, label: 'Regular Phone 1334×750 (16:9)', kind: 'phone' },
+    '1625x750': { w: 1625, h: 750, label: 'Large Phone 1625×750 (19.5:9)', kind: 'phone' },
+    '1280x960': { w: 1280, h: 960, label: 'Tablet 1280×960 (4:3)', kind: 'tablet' },
+    '1280x720': { w: 1280, h: 720, label: 'Legacy 1280×720 (16:9)', kind: 'legacy' },
+  };
+
   const state = {
     selectedEl: null,
     selectedResourceSliceId: null,
@@ -21,6 +29,11 @@
     currentMode: 'final',
     studioVisible: false,
     focusZoneVisible: false,
+    safeZonesVisible: false,
+    currentCanvasRes: '1280x720',
+    l10nStressMode: 'base', // 'base' | 'long' | 'rtl'
+    l10nOriginalText: new WeakMap(),
+    l10nTrackedNodes: [],
     applyAllInstances: true,
     swapAllSprites: false,
     collapsedViews: new WeakMap(),
@@ -237,6 +250,7 @@
         (el.id === '__verify_annotations__' ||
           el.id === '__px_transform_gizmo__' ||
           el.id === '__px_focus_zone__' ||
+          el.id === '__px_safe_zones__' ||
           (el.classList &&
             (el.classList.contains('px-tint-overlay') || el.classList.contains('px-grad-overlay'))))
     );
@@ -3453,6 +3467,227 @@
     return next;
   }
 
+  /* ========================================================================
+     Craftland Multi-Resolution Switcher, Safe Zones Overlay & L10n Stress
+     ======================================================================== */
+
+  function getDefaultCanvasRes() {
+    const body = document.body;
+    const explicit = body && body.getAttribute('data-default-res');
+    if (explicit && CANVAS_PRESETS[explicit]) return explicit;
+    const profile = body && body.getAttribute('data-ui-profile');
+    if (profile === 'craftland') return '1500x750';
+    return '1280x720';
+  }
+
+  function updateCanvasFitZoom() {
+    const canvas = document.getElementById('game-canvas');
+    if (!canvas) return 1;
+    const slot = canvas.parentElement;
+    if (isCleanMode()) {
+      canvas.style.transform = '';
+      if (slot && slot.classList.contains('workbench-canvas-slot')) {
+        slot.style.width = '';
+        slot.style.height = '';
+      }
+      return 1;
+    }
+    const preset = CANVAS_PRESETS[state.currentCanvasRes] || CANVAS_PRESETS['1280x720'];
+    const sidebarBudget = state.studioVisible ? 580 : 48;
+    const availW = Math.max(360, (global.innerWidth || 1440) - sidebarBudget);
+    const zoom = Math.min(1, availW / preset.w);
+    if (zoom < 0.995) {
+      canvas.style.transform = `scale(${zoom.toFixed(4)})`;
+      if (slot && slot.classList.contains('workbench-canvas-slot')) {
+        slot.style.width = `${Math.round(preset.w * zoom)}px`;
+        slot.style.height = `${Math.round(preset.h * zoom)}px`;
+      }
+    } else {
+      canvas.style.transform = '';
+      if (slot && slot.classList.contains('workbench-canvas-slot')) {
+        slot.style.width = '';
+        slot.style.height = '';
+      }
+    }
+    return zoom;
+  }
+
+  function ensureSafeZonesOverlay() {
+    const canvas = document.getElementById('game-canvas');
+    if (!canvas) return null;
+    let overlay = document.getElementById('__px_safe_zones__');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = '__px_safe_zones__';
+      overlay.setAttribute('aria-hidden', 'true');
+      overlay.innerHTML = `
+        <div class="px-sz-center"><span class="px-sz-label">1280×750 SAFE FRAME</span></div>
+        <div class="px-sz-thumb px-sz-thumb--left"><span class="px-sz-label">FF JOYSTICK</span></div>
+        <div class="px-sz-thumb px-sz-thumb--right"><span class="px-sz-label">FF CONTROLS</span></div>
+      `;
+      canvas.appendChild(overlay);
+    }
+    updateSafeZonesGeometry();
+    return overlay;
+  }
+
+  function updateSafeZonesGeometry() {
+    const overlay = document.getElementById('__px_safe_zones__');
+    if (!overlay) return;
+    const preset = CANVAS_PRESETS[state.currentCanvasRes] || CANVAS_PRESETS['1280x720'];
+    const safeW = Math.min(1280, preset.w);
+    const safeH = Math.min(750, preset.h);
+    const centerBox = overlay.querySelector('.px-sz-center');
+    if (centerBox) {
+      centerBox.style.width = `${safeW}px`;
+      centerBox.style.height = `${safeH}px`;
+      centerBox.style.left = `${Math.round((preset.w - safeW) / 2)}px`;
+      centerBox.style.top = `${Math.round((preset.h - safeH) / 2)}px`;
+    }
+  }
+
+  function toggleSafeZones(forceState) {
+    const next = typeof forceState === 'boolean' ? forceState : !state.safeZonesVisible;
+    state.safeZonesVisible = next;
+    const overlay = ensureSafeZonesOverlay();
+    if (overlay) {
+      overlay.classList.toggle('is-visible', next);
+    }
+    document.querySelectorAll('[data-wb-safe-zones]').forEach(btn => {
+      btn.classList.toggle('is-active', next);
+      btn.setAttribute('aria-pressed', next ? 'true' : 'false');
+    });
+    return next;
+  }
+
+  function setCanvasResolution(presetKey) {
+    const key = CANVAS_PRESETS[presetKey] ? presetKey : getDefaultCanvasRes();
+    const preset = CANVAS_PRESETS[key];
+    state.currentCanvasRes = key;
+
+    const root = document.documentElement;
+    root.style.setProperty('--px-canvas-w', `${preset.w}px`);
+    root.style.setProperty('--px-canvas-h', `${preset.h}px`);
+
+    const canvas = document.getElementById('game-canvas');
+    if (canvas) {
+      canvas.setAttribute('data-canvas-res', key);
+      canvas.style.width = `${preset.w}px`;
+      canvas.style.height = `${preset.h}px`;
+    }
+
+    const selectEl = document.querySelector('[data-wb-canvas-res]');
+    if (selectEl && selectEl.value !== key) {
+      selectEl.value = key;
+    }
+
+    const badgeEl = document.querySelector('.workbench-title .workbench-badge');
+    if (badgeEl) {
+      const profile = document.body && document.body.getAttribute('data-ui-profile');
+      badgeEl.textContent =
+        profile === 'craftland'
+          ? `Craftland ${preset.w}×${preset.h}`
+          : `${preset.w}×${preset.h} UI Preview`;
+    }
+
+    updateCanvasFitZoom();
+    updateSafeZonesGeometry();
+    if (typeof renderTransformGizmo === 'function') renderTransformGizmo();
+    updateHudBudgetBadge();
+    return preset;
+  }
+
+  function collectCanvasTextNodes() {
+    const canvas = document.getElementById('game-canvas');
+    if (!canvas) return [];
+    const nodes = [];
+    const walker = document.createTreeWalker(canvas, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        if (!node || !node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+        const parent = node.parentElement;
+        if (!parent || isInternalOverlayElement(parent) || parent.closest('#__px_safe_zones__, #__px_focus_zone__, #__px_transform_gizmo__, #__verify_annotations__')) {
+          return NodeFilter.FILTER_REJECT;
+        }
+        if (parent.tagName === 'SCRIPT' || parent.tagName === 'STYLE') return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      },
+    });
+    let cur = walker.nextNode();
+    while (cur) {
+      nodes.push(cur);
+      cur = walker.nextNode();
+    }
+    return nodes;
+  }
+
+  function buildLongStressText(raw) {
+    const trimmed = raw.trim();
+    if (!trimmed) return raw;
+    // Leave pure numeric/symbol readouts compact while testing tall glyph headroom
+    if (/^[\d.,:+xX×%$/\-–—\s]+$/.test(trimmed)) {
+      return `${trimmed}`;
+    }
+    const words = trimmed.split(/\s+/);
+    const mult = words.length <= 2 ? 1.8 : 1.5;
+    const targetLen = Math.max(trimmed.length + 4, Math.round(trimmed.length * mult));
+    const filler = ' ỮỚကြီးüberlang';
+    let out = `${trimmed}${filler}`;
+    while (out.length < targetLen) {
+      out += ' rozszerzenie';
+    }
+    return out.slice(0, targetLen);
+  }
+
+  function buildRtlStressText(raw) {
+    const trimmed = raw.trim();
+    if (!trimmed) return raw;
+    if (/^[\d.,:+xX×%$/\-–—\s]+$/.test(trimmed)) return trimmed;
+    const words = trimmed.split(/\s+/);
+    if (words.length <= 2) return `مجموعة ${trimmed} متقدمة`;
+    return `إعدادات الواجهة العربية المطوّلة (${trimmed})`;
+  }
+
+  function setL10nStressMode(mode) {
+    const next = mode === 'long' || mode === 'rtl' ? mode : 'base';
+    const canvas = document.getElementById('game-canvas');
+    if (!canvas) return next;
+
+    // Restore previously tracked nodes first so edits/switches never compound
+    for (const node of state.l10nTrackedNodes) {
+      if (state.l10nOriginalText.has(node)) {
+        node.nodeValue = state.l10nOriginalText.get(node);
+      }
+    }
+    state.l10nTrackedNodes = [];
+
+    if (next === 'base') {
+      canvas.removeAttribute('dir');
+      canvas.removeAttribute('data-l10n-mode');
+    } else {
+      const nodes = collectCanvasTextNodes();
+      for (const node of nodes) {
+        if (!state.l10nOriginalText.has(node)) {
+          state.l10nOriginalText.set(node, node.nodeValue);
+        }
+        const orig = state.l10nOriginalText.get(node);
+        node.nodeValue = next === 'long' ? buildLongStressText(orig) : buildRtlStressText(orig);
+        state.l10nTrackedNodes.push(node);
+      }
+      canvas.setAttribute('data-l10n-mode', next);
+      if (next === 'rtl') canvas.setAttribute('dir', 'rtl');
+      else canvas.removeAttribute('dir');
+    }
+
+    state.l10nStressMode = next;
+    const selectEl = document.querySelector('[data-wb-l10n-mode]');
+    if (selectEl) {
+      selectEl.value = next;
+      selectEl.classList.toggle('is-active', next !== 'base');
+    }
+    updateHudBudgetBadge();
+    return next;
+  }
+
   function setCustomBackdrop(dataUrl, persist = true) {
     const canvas = document.getElementById('game-canvas');
     if (!canvas || !dataUrl) return false;
@@ -4200,14 +4435,24 @@
       }
     }
 
-    // Inject mobile HUD Designer Tools (Focus Zone toggle, Custom Backdrop uploader, Advisory HUD Budget)
+    // Inject mobile HUD Designer Tools (Craftland Canvas Resolution, Safe Zones, Focus Zone, L10n Stress, Custom Backdrop, HUD Budget)
     const controlsBar = document.querySelector('.workbench-controls');
     if (controlsBar && !controlsBar.querySelector('[data-wb-focus-zone]')) {
+      const resOptionsHtml = Object.entries(CANVAS_PRESETS)
+        .map(([k, p]) => `<option value="${k}">${p.label}</option>`)
+        .join('');
       const hudGroup = document.createElement('div');
       hudGroup.className = 'wb-group';
       hudGroup.innerHTML = `
-        <span class="wb-label">HUD</span>
+        <span class="wb-label">Canvas</span>
+        <select class="wb-select" data-wb-canvas-res title="Switch viewport resolution (Craftland presets + Legacy 1280×720)">${resOptionsHtml}</select>
+        <button type="button" class="wb-btn" data-wb-safe-zones aria-pressed="false" title="Toggle Craftland 1280×750 Safe Frame & Free Fire reserved bottom-corner control zones">Safe Zones</button>
         <button type="button" class="wb-btn" data-wb-focus-zone aria-pressed="false" title="Toggle Center 40% Gameplay Focus Zone guide">Focus Zone</button>
+        <select class="wb-select" data-wb-l10n-mode title="Localization stress test (Base / Long 1.6x + Tall diacritics / RTL Arabic)">
+          <option value="base">L10n: Base</option>
+          <option value="long">L10n: Long 1.6× + Tall</option>
+          <option value="rtl">L10n: RTL (Arabic)</option>
+        </select>
         <button type="button" class="wb-btn" data-wb-backdrop-pick title="Upload or drop a gameplay screenshot as a preview-only backdrop">Backdrop…</button>
         <button type="button" class="wb-btn" data-wb-backdrop-clear style="display:none;" title="Clear custom preview backdrop">×</button>
         <input type="file" id="wb-backdrop-file-input" accept="image/*" style="display:none;">
@@ -4215,13 +4460,36 @@
       `;
       controlsBar.appendChild(hudGroup);
 
+      const resSelect = hudGroup.querySelector('[data-wb-canvas-res]');
+      const safeZonesBtn = hudGroup.querySelector('[data-wb-safe-zones]');
+      const l10nSelect = hudGroup.querySelector('[data-wb-l10n-mode]');
       const focusBtn = hudGroup.querySelector('[data-wb-focus-zone]');
       const pickBtn = hudGroup.querySelector('[data-wb-backdrop-pick]');
       const clearBtn = hudGroup.querySelector('[data-wb-backdrop-clear]');
       const fileInput = hudGroup.querySelector('#wb-backdrop-file-input');
 
+      if (resSelect) {
+        resSelect.addEventListener('change', () => setCanvasResolution(resSelect.value));
+      }
+      if (safeZonesBtn) {
+        safeZonesBtn.addEventListener('click', () => toggleSafeZones());
+      }
+      if (l10nSelect) {
+        l10nSelect.addEventListener('change', () => setL10nStressMode(l10nSelect.value));
+      }
       if (focusBtn) {
         focusBtn.addEventListener('click', () => toggleFocusZone());
+      }
+      global.addEventListener('resize', () => {
+        updateCanvasFitZoom();
+        if (typeof renderTransformGizmo === 'function') renderTransformGizmo();
+      });
+      if (typeof MutationObserver === 'function' && document.body) {
+        const bodyObs = new MutationObserver(() => {
+          updateCanvasFitZoom();
+          if (typeof renderTransformGizmo === 'function') renderTransformGizmo();
+        });
+        bodyObs.observe(document.body, { attributes: true, attributeFilter: ['class'] });
       }
       if (pickBtn && fileInput) {
         pickBtn.addEventListener('click', () => fileInput.click());
@@ -7132,6 +7400,12 @@
       renderTransformGizmo();
     }, 0);
 
+    const resParam = params.get('res');
+    setCanvasResolution(resParam || getDefaultCanvasRes());
+
+    const l10nParam = params.get('l10n');
+    if (l10nParam) setL10nStressMode(l10nParam);
+
     const scaleParam = params.get('scale');
     if (scaleParam) setPixelScale(scaleParam);
 
@@ -7168,6 +7442,10 @@
     setWidgetTint,
     clearWidgetTint,
     toggleFocusZone,
+    toggleSafeZones,
+    setCanvasResolution,
+    setL10nStressMode,
+    CANVAS_PRESETS,
     setCustomBackdrop,
     clearCustomBackdrop,
     computeHudBudget,

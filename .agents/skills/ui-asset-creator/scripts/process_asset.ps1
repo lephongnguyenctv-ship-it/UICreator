@@ -12,6 +12,9 @@ param(
     [int]$Margin = 14,
     [int]$Padding = 12,
     [switch]$KeepAllComponents,
+    [switch]$PreserveCanvas,
+    [switch]$WhiteFloor,
+    [int]$WhiteFloorThreshold = 208,
     [int]$Colors = 192,
     [switch]$Lossless,
     [switch]$KeepFull,
@@ -208,6 +211,9 @@ public static class UiAssetProcessor {
         int margin,
         int padding,
         bool keepAllComponents,
+        bool preserveCanvas,
+        bool whiteFloor,
+        int whiteFloorThreshold,
         bool powerOfTwo,
         string potMode
     ) {
@@ -400,6 +406,7 @@ public static class UiAssetProcessor {
                 }
 
                 int minX = w, minY = h, maxX = -1, maxY = -1;
+                var opaqueLumas = whiteFloor ? new List<double>() : null;
                 for (int y = 0; y < h; y++) {
                     int rowOff = y * stride;
                     for (int x = 0; x < w; x++) {
@@ -413,6 +420,10 @@ public static class UiAssetProcessor {
                             if (x > maxX) maxX = x;
                             if (y < minY) minY = y;
                             if (y > maxY) maxY = y;
+                            if (whiteFloor && bytes[off + 3] >= 200) {
+                                double luma = 0.299 * bytes[off + 2] + 0.587 * bytes[off + 1] + 0.114 * bytes[off];
+                                opaqueLumas.Add(luma);
+                            }
                         }
                     }
                 }
@@ -420,10 +431,30 @@ public static class UiAssetProcessor {
                 Marshal.Copy(bytes, 0, data.Scan0, bytes.Length);
                 bmp.UnlockBits(data);
 
-                int cx0 = Math.Max(0, minX - padding);
-                int cy0 = Math.Max(0, minY - padding);
-                int cx1 = Math.Min(w - 1, maxX + padding);
-                int cy1 = Math.Min(h - 1, maxY + padding);
+                string whiteFloorReport = "";
+                if (whiteFloor && opaqueLumas != null && opaqueLumas.Count > 0) {
+                    opaqueLumas.Sort();
+                    double sum = 0.0;
+                    int belowCount = 0;
+                    for (int i = 0; i < opaqueLumas.Count; i++) {
+                        sum += opaqueLumas[i];
+                        if (opaqueLumas[i] < whiteFloorThreshold) belowCount++;
+                    }
+                    double meanL = sum / opaqueLumas.Count;
+                    double p10 = opaqueLumas[(int)Math.Floor((opaqueLumas.Count - 1) * 0.10)];
+                    double minL = opaqueLumas[0];
+                    double darkPct = (100.0 * belowCount) / opaqueLumas.Count;
+                    string status = p10 < whiteFloorThreshold ? "WARN_BELOW_FLOOR" : "PASS";
+                    whiteFloorReport = string.Format(
+                        ", WhiteFloor={0}(mean={1:F1}, p10={2:F1}, min={3:F1}, below{4}={5:F1}%)",
+                        status, meanL, p10, minL, whiteFloorThreshold, darkPct
+                    );
+                }
+
+                int cx0 = preserveCanvas ? 0 : Math.Max(0, minX - padding);
+                int cy0 = preserveCanvas ? 0 : Math.Max(0, minY - padding);
+                int cx1 = preserveCanvas ? (w - 1) : Math.Min(w - 1, maxX + padding);
+                int cy1 = preserveCanvas ? (h - 1) : Math.Min(h - 1, maxY + padding);
                 int cw = cx1 - cx0 + 1;
                 int ch = cy1 - cy0 + 1;
 
@@ -436,7 +467,7 @@ public static class UiAssetProcessor {
                     }
 
                     Bitmap finalBmp;
-                    if (aspect == "square") {
+                    if (!preserveCanvas && aspect == "square") {
                         int targetSize = size > 0 ? size : Math.Max(cw, ch);
                         if (powerOfTwo) {
                             targetSize = potMode == "pad" ? NextPow2(targetSize) : NearestPow2(targetSize);
@@ -454,7 +485,7 @@ public static class UiAssetProcessor {
                             finalBmp = DownsampleBicubicSharper(squareFull, targetSize, targetSize);
                         }
                     } else {
-                        // Preserve aspect ratio
+                        // Preserve aspect ratio (or full canvas when preserveCanvas is true)
                         int dstW = cw;
                         int dstH = ch;
                         if (size > 0 && Math.Max(cw, ch) != size) {
@@ -462,7 +493,7 @@ public static class UiAssetProcessor {
                             dstW = Math.Max(1, (int)Math.Round(cw * scale));
                             dstH = Math.Max(1, (int)Math.Round(ch * scale));
                         }
-                        if (powerOfTwo) {
+                        if (powerOfTwo && !preserveCanvas) {
                             if (potMode == "pad") {
                                 int potW = NextPow2(dstW);
                                 int potH = NextPow2(dstH);
@@ -490,8 +521,8 @@ public static class UiAssetProcessor {
                     finalBmp.Save(rgbaOutPath, ImageFormat.Png);
                     finalBmp.Dispose();
 
-                    return string.Format("Mode={0}, Source={1}x{2}, Components={3} (Kept={4}), Crop={5}x{6}, Output={7}x{8}",
-                        activeMode, w, h, curId, keptCount, cw, ch, fw, fh);
+                    return string.Format("Mode={0}, Source={1}x{2}, Components={3} (Kept={4}), {5}={6}x{7}, Output={8}x{9}{10}",
+                        activeMode, w, h, curId, keptCount, preserveCanvas ? "CanvasPreserved" : "Crop", cw, ch, fw, fh, whiteFloorReport);
                 }
             }
         }
@@ -564,10 +595,16 @@ try {
         $Margin,
         $Padding,
         [bool]$KeepAllComponents,
+        [bool]$PreserveCanvas,
+        [bool]$WhiteFloor,
+        $WhiteFloorThreshold,
         [bool]$PowerOfTwo,
         $PotMode
     )
     Write-Output $summary
+    if ($WhiteFloor -and $summary -match 'WhiteFloor=WARN_BELOW_FLOOR') {
+        Write-Warning "Pure-white luminance check failed (p10 < $WhiteFloorThreshold / #D0D0D0). This asset may multiply-tint muddy in Craftland — re-prompt brighter pure white (#FFFFFF) or inspect before shipping."
+    }
 
     if (-not $Lossless) {
         $compressor = Join-Path $PSScriptRoot 'compress_png.mjs'

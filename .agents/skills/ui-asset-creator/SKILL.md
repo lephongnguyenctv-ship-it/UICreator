@@ -19,9 +19,14 @@ End-to-end 4-step workflow for creating transparent, game-ready UI icons, sprite
 
 ## Workflow Overview
 
-1. **Prompt Assembly**: Identify asset type (`icon`, `ui-panel`, `pixel-art`), choose background strategy (`#FFFFFF` white for closed-outline opaque sprites; `#00FF00` or `#FF00FF` chroma-key for sprites with enclosed holes or floating sparkles), and assemble a prompt from [prompt-templates.md](./references/prompt-templates.md).
-2. **Handoff to User**: Give the user the ready-to-copy prompt and point to the style reference in [resources/styles/](./resources/styles/) (e.g., [casual-rpg-icons.png](./resources/styles/casual-rpg-icons.png)) if matching an existing style.
-3. **Process Returned Image**: Once the user provides the generated image path or uploads it, inspect it with `read_file` first, then run [process_asset.ps1](./scripts/process_asset.ps1) (which calls [compress_png.mjs](./scripts/compress_png.mjs) automatically).
+0. **Pre-Generation Reuse Analysis (Always First)**: Before drafting any generation prompt, scan `assets/` and `previews/_catalog/manifest.json` (if present) and report 4 concise bullets:
+   - **Reuse**: Existing sprites/frames in `assets/` that already cover the need unchanged (name exact files).
+   - **Generate New**: Minimum truly new pieces required, with one line on why no existing asset fits.
+   - **Cut**: Purely decorative elements carrying no info or action that can be dropped.
+   - **Merge via Tint**: Near-identical states/rarities/plates that collapse into **one pure-white tintable shape** (`#FFFFFF`, shadow `≥ #D0D0D0`) tinted in Craftland or HTML preview (`data-tint`).
+1. **Prompt Assembly**: Identify asset type (`icon`, `ui-panel`, `pixel-art`, `white-tintable`, `split-layer`, `sprite-sheet`), choose background strategy (`#FFFFFF` white for closed-outline colored opaque sprites; `#00FF00` or `#FF00FF` chroma-key for **pure-white tintable pieces**, split layers, enclosed holes, or floating sparkles), and assemble a prompt from [prompt-templates.md](./references/prompt-templates.md). For Craftland mobile UI sizing, font, and tinting rules, ground decisions in [craftland-mobile-standards.md](../game-ui-preview/references/craftland-mobile-standards.md).
+2. **Handoff to User**: Give the user the ready-to-copy prompt, state explicitly which reference images to attach (max 3, one job per image — take vs. ignore), and point to [resources/styles/](./resources/styles/) if matching an existing pack.
+3. **Process Returned Image**: Once the user provides the generated image path or uploads it, inspect it with `read_file` first, then run [process_asset.ps1](./scripts/process_asset.ps1) (which calls [compress_png.mjs](./scripts/compress_png.mjs) automatically). Use `-WhiteFloor` on pure-white tintable pieces to verify they didn't return mid-grey, and `-PreserveCanvas` on multi-color split layers so layers stack pixel-for-pixel.
 4. **Visual Verification**: Inspect the `-PreviewPath` 3-backdrop strip (dark UI `#1b1a23`, checkerboard, purple UI `#4b2e5e`) with `read_file` to confirm zero halo/fringe, intact outlines, and no leftover watermark.
 
 ---
@@ -48,6 +53,33 @@ powershell -NoProfile -ExecutionPolicy Bypass -File ".agents/skills/ui-asset-cre
   -PreviewPath "<scratch_dir>/<panel_slug>_preview.png"
 ```
 
+### Pure-White Multiply-Tintable Craftland UI Piece (Chroma-Key + White Floor Check)
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File ".agents/skills/ui-asset-creator/scripts/process_asset.ps1" `
+  -InputPath "<raw_image_path>" `
+  -OutputPath "assets/<project>/<piece_slug>_white.png" `
+  -Mode green `
+  -Aspect preserve `
+  -Size 512 `
+  -WhiteFloor `
+  -PreviewPath "<scratch_dir>/<piece_slug>_preview.png"
+```
+
+### Multi-Color Split Layer (Pixel-Aligned Full Canvas)
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File ".agents/skills/ui-asset-creator/scripts/process_asset.ps1" `
+  -InputPath "<raw_layer_path>" `
+  -OutputPath "assets/<project>/<piece_slug>_trim.png" `
+  -Mode green `
+  -PreserveCanvas `
+  -Size 0 `
+  -KeepAllComponents `
+  -WhiteFloor `
+  -PreviewPath "<scratch_dir>/<piece_slug>_trim_preview.png"
+```
+
 ### Compress an Existing PNG Standalone
 
 ```powershell
@@ -60,12 +92,15 @@ node ".agents/skills/ui-asset-creator/scripts/compress_png.mjs" "<input.png>" "<
 
 | Flag | Default | Purpose |
 | :--- | :--- | :--- |
-| `-Mode` | `auto` | Background removal mode: `auto` (detects corners), `white` (border flood-fill + 2px anti-fringe), `green` (`#00FF00`), or `magenta` (`#FF00FF`). |
+| `-Mode` | `auto` | Background removal mode: `auto` (detects corners), `white` (border flood-fill + 2px anti-fringe), `green` (`#00FF00`), or `magenta` (`#FF00FF`). Always use `green`/`magenta` for pure-white tintable assets. |
 | `-Aspect` | `square` | `square` pads cutout to `1:1` canvas before Bicubic Sharper resizing; `preserve` keeps the cropped aspect ratio. |
-| `-Size` | `256` | Target side length (`square`) or max dimension (`preserve`). Set `0` with `-Aspect preserve` to keep native cropped resolution. |
+| `-Size` | `256` | Target side length (`square`) or max dimension (`preserve` / `-PreserveCanvas`). Set `0` with `-Aspect preserve` or `-PreserveCanvas` to keep native resolution. |
 | `-Margin` | `14` | Outer transparent margin (at `256px`, scaled proportionally with `-Size`) in `square` mode. |
 | `-Padding` | `12` | Source-pixel padding around the tight foreground bounding box before aspect-padding. |
 | `-KeepAllComponents` | `$false` | Keep secondary foreground islands (`>= 0.5%` of main sprite area). By default keeps only the largest connected component to strip watermarks. |
+| `-PreserveCanvas` | `$false` | Skip tight-bbox cropping and recentering so multi-color split layers preserve exact source pixel coordinates and stack pixel-for-pixel in Craftland. |
+| `-WhiteFloor` | `$false` | Check opaque foreground luminance (`mean`, `p10`, `min`) and warn if `p10 < -WhiteFloorThreshold` (mid-grey asset that will multiply-tint muddy in-engine). |
+| `-WhiteFloorThreshold` | `208` | Luminance floor (`0–255`) used by `-WhiteFloor` (default `208` = `#D0D0D0`). |
 | `-Colors` | `192` | Max palette entries passed to `compress_png.mjs` (up to `256`). |
 | `-Lossless` | `$false` | Skip PNG8 quantization and save 32-bit RGBA PNG directly. |
 | `-KeepFull` | `$false` | Also save `<output_dir>/<name>_full.png` full-resolution 32-bit RGBA cutout. |

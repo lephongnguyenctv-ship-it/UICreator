@@ -21,6 +21,16 @@ Use this skill whenever the user provides PNG sprite assets (single sprites or p
 3. **Treat auto 9-slice as a heuristic, not 100% ground truth.** Switch to **`Edit UI`** mode (`[data-wb-mode="edit"]`) in the Workbench to inspect widgets or pick any sprite directly from the bottom **`Resources`** tab to open its **9-Slice Editor** + **Live Stretch Preview** in the Right tab. You can tune 9-slice insets and click **`Save 9-Slice`** to persist them to `previews/_catalog/overrides.json`, `manifest.json`, and `catalog-data.js` (via `slice_sprites.py --serve` or `--set-slice9 <id> T,R,B,L`), edit widget text directly (via the Right Widget Inspector or by double-clicking text on the canvas), and swap widget sprites via **`Browse Sprites…`** / Slice ID input (saved per-UI to `previews/<slug>/ui-edits.js` and `ui-edits.json`).
 4. **Never skip Playwright + Visual Self-Verification.** A preview is only done when `verify_ui.mjs` exits `0` (`status: "PASSED"`) **and** you have inspected every `*-clean.png` screenshot via `read_file`.
 5. **Preserve the shared `.workbench-bar` template and respect wireframe-only requests.** Every preview must keep all preview controls (`Mode` → `View` → optional `State` → `Scale`) inside `<header class="workbench-bar">` using `.wb-group` + `.wb-label` + `.wb-btn` — **never** place custom `State`, `View`, or preset toolbars inside `#game-canvas` (keep `#game-canvas` strictly in-game UI). When the user asks for a **wireframe**, stop cleanly at Stage 2.5 (structural wireframe + grouped behavior spec) and wait for approval before implementing Stage 3 sprite hydration or interactive logic.
+6. **Apply Craftland Mobile Standards for Free Fire Craftland UIs.** When designing or auditing a Free Fire Craftland UI, follow [references/craftland-mobile-standards.md](./references/craftland-mobile-standards.md), scaffold with `--profile craftland` (default `1500×750` 2:1 canvas with live 4-resolution switching across `1500×750`, `1334×750`, `1625×750`, and `1280×960`), run a quick **Reuse Check** against existing `assets/` before requesting new art, and verify across Craftland viewports (`verify_ui.mjs --profile craftland --mode both`, or `--res all` for all 4 resolutions).
+
+---
+
+## Stage 0 (Craftland UIs): Reuse & Readability Check
+
+Before scaffolding a Craftland screen, scan `assets/` and `previews/_catalog/manifest.json` and note:
+- **Reuse**: Existing 9-slice frames/slots/icons that already fit unchanged (or via `data-tint`).
+- **New / Split**: Only the minimum new pieces required (prefer pure-white tintable 9-slice pieces via `ui-asset-creator`).
+- **Readability Floors**: Text `≥ 23` hard floor (`35–38` main reading target), touch targets `≥ 58×58` hard floor (`78×78` phone standard, `92×92` primary CTA), contrast `≥ 4.5:1`, popups inside centered `1280×750` safe frame (`≤ 640` tall), and clear of Free Fire bottom-left/bottom-right native controls.
 
 ---
 
@@ -53,15 +63,15 @@ Outputs created in `previews/_catalog/`:
 
 After understanding the user's request (including any upfront clarification or `/grill-me` interview) and mapping the available sprites, **never output a text-only / ASCII wireframe in chat as a substitute for the HTML preview page**. The user must view the wireframe in the browser on the exact same `previews/<slug>/index.html` page (or localhost URL) that will host the finished product.
 
-1. Scaffold the shared preview page in wireframe mode:
+1. Scaffold the shared preview page in wireframe mode (add `--profile craftland` for Free Fire Craftland mobile UIs):
 
 ```powershell
-python .agents/skills/game-ui-preview/scripts/scaffold_preview.py --slug "<slug>" --title "<UI Title>" --mode wireframe
+python .agents/skills/game-ui-preview/scripts/scaffold_preview.py --slug "<slug>" --title "<UI Title>" --mode wireframe --profile craftland
 ```
 
 2. Build the **structural HTML wireframe** inside `#game-canvas` in `previews/<slug>/index.html` with `data-default-mode="wireframe"`:
    - Lay out all planned views (`[data-ui-view="<stateId>"]`) and regions (`.px-hud-top`, `.px-hud-bottom`, `.px-modal-backdrop`, `.px-wire-box` / container boxes, labels, placeholder icon slots) with **no Stage 3 sprite hydration, animations, or gameplay logic yet** — if the user asked for a wireframe, deliver only Stage 2.5 and pause for review before Stage 3.
-   - **Mobile HUD Ergonomics**: Keep the **Center 40% Focus Zone** clear on active gameplay HUD views (only minimal reticles or brief prompts belong there) and aim for a clean **HUD Visual Budget** (≤ 22% screen coverage). Designers can toggle **`Focus Zone`**, drop in a **`Backdrop`** gameplay screenshot, and check the live **`HUD: X% · Center: Y%`** badge right in the Workbench bar.
+   - **Mobile HUD Ergonomics & Craftland QA Guides**: Keep the **Center 40% Focus Zone** clear on active gameplay HUD views (≤ 22% HUD Visual Budget), keep center-anchored popups inside the **`1280×750` Safe Frame**, and keep custom gameplay controls clear of Free Fire's bottom-left/bottom-right native controls. Designers can live-switch Craftland's 4 resolutions (`1500×750`, `1334×750`, `1625×750`, `1280×960`), toggle **`Safe Zones`** and **`Focus Zone`**, stress-test **`L10n`** (`Base` / `Long 1.6× + Tall` / `RTL`), drop in a **`Backdrop`** gameplay screenshot, and check the live **`HUD: X% · Center: Y%`** badge right in the Workbench bar.
    - Keep view switching (`[data-ui-state-trigger]`) and any contextual edge-case `State` toggles (Empty, Low Resource, Sold Out, Locked, Max Values) strictly inside `<header class="workbench-bar">` as `.wb-group` sections in fixed order: **`Mode` → `View` → `State` → `Scale`**. Never render workbench/state tabs inside `#game-canvas`.
    - Populate `#wb-behavior-drawer` (`.behavior-table`) right below the canvas with the **Grouped Element Behavior Spec**. **Group repeated elements that share the same behavior into a single row** (for example, describe `"Inventory Slots (4×3 grid)"` with count `12` once instead of writing 12 separate rows, or `"Hotbar Slots (1–5)"` as one entry).
 
@@ -109,12 +119,17 @@ Execute the Playwright verifier across both modes against the HTML preview:
 node .agents/skills/game-ui-preview/scripts/verify_ui.mjs --page "previews/<slug>/index.html" --out "previews/<slug>/verification" --mode both
 ```
 
-What `verify_ui.mjs` tests automatically in headless Chromium (`1280x720`, `?clean=1`) for both `final` and `wireframe` modes:
+*(For Craftland profiles, `verify_ui.mjs` auto-detects `data-ui-profile="craftland"` — or accepts `--profile craftland` — and sweeps `1500x750` + `1280x960` by default. Pass `--res all` to sweep all 4 Craftland presets: `1500x750`, `1334x750`, `1625x750`, `1280x960`.)*
+
+What `verify_ui.mjs` tests automatically in headless Chromium (`?clean=1`) for both `final` and `wireframe` modes:
 - **Console & JS Errors**: Fails on any `console.error` or uncaught `pageerror`.
 - **Asset Integrity**: Verifies every visible `<img>`, CSS `background-image`, and `border-image-source` loads with `naturalWidth > 0` (skipping unhydrated wireframe placeholders in `--mode wireframe`).
 - **Pixel Rendering**: Confirms `image-rendering: pixelated` on sprite elements in `final` mode.
 - **Computed Geometry (`getBoundingClientRect`)**: Detects viewport out-of-bounds, text/child container overflows, child overlap with `.px-9slice` inner border insets (`child-overlaps-9slice-border` in `final` mode), and unintended sibling overlaps inside layout containers in both modes.
-- **Interactive States**: Switches through every `[data-ui-view]` (preferring real in-canvas triggers) and captures `verification/screenshots/<state>-clean.png` and `<state>-wireframe-clean.png` (plus `*-annotated.png` if geometry defects appear).
+- **Craftland Tiered Mobile QA (`--profile craftland`)**:
+  - **Hard Failures**: Visible text `< 23px` (opt-out `data-font-floor-ok="true"`) and interactive touch targets `< 58×58` (opt-out `data-touch-floor-ok="true"`).
+  - **Advisory Warnings**: Main reading text `< 35px`, touch targets `< 78×78` (`92×92` recommended for primary CTAs), WCAG text contrast `< 4.5:1` (`< 3.0:1` for `≥ 65px`), modal height `> 640px` (`> 85%` of `750` phone height), center modals outside `1280×750` safe frame, or gameplay HUD widgets intruding into Free Fire bottom-left/bottom-right native controls.
+- **Interactive States**: Switches through every `[data-ui-view]` (preferring real in-canvas triggers) and captures `verification/screenshots/<state>-clean.png` and `<state>-wireframe-clean.png` (plus `<state>-<res>-clean.png` for secondary resolutions and `*-annotated.png` if geometry defects appear).
 - **Non-Blocking Design Warnings**: Logs advisory `warnings` in `report.json` (never failing the run) for silent text clipping (`nowrap + overflow:hidden` without ellipsis), fixed inline modal heights, or high gameplay HUD coverage / Center 40% focus-zone intrusion.
 
 ---

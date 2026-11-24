@@ -2,6 +2,8 @@
 
 :root {
   --pixel-scale: 3;
+  --px-canvas-w: 1280px;
+  --px-canvas-h: 720px;
 
   /* Warm Cozy Pixel-Art Palette (derived from Sprite sheets/Basic Pack) */
   --px-cream: #f4dfb6;
@@ -1853,12 +1855,12 @@ body.clean-mode .workbench-canvas-slot {
 }
 
 /* ==========================================================================
-   Game Canvas Viewport (1280x720) & Scene Backdrops
+   Game Canvas Viewport (Dynamic Multi-Resolution) & Scene Backdrops
    ========================================================================== */
 
 #game-canvas {
-  width: 1280px;
-  height: 720px;
+  width: var(--px-canvas-w, 1280px);
+  height: var(--px-canvas-h, 720px);
   position: relative;
   overflow: hidden;
   user-select: none;
@@ -1866,11 +1868,17 @@ body.clean-mode .workbench-canvas-slot {
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
   background-color: #4d784e;
   image-rendering: pixelated;
+  transform-origin: top center;
+}
+
+.workbench-canvas-slot {
+  position: relative;
 }
 
 body.clean-mode #game-canvas {
   border: none;
   box-shadow: none;
+  transform: none !important;
 }
 
 /* Pixel-art simulated gameplay backdrops */
@@ -3328,4 +3336,118 @@ body.mode-interactive .px-btn-passthrough {
   background-clip: text !important;
   -webkit-text-fill-color: transparent !important;
   color: transparent !important;
+}
+
+/* ==========================================================================
+   Craftland Multi-Resolution QA: Safe Zones Overlay & L10n Stress Controls
+   ========================================================================== */
+
+.wb-select {
+  appearance: auto;
+  background: #141821;
+  color: var(--px-workbench-text);
+  border: 1px solid #3c455c;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.wb-select:focus {
+  outline: none;
+  border-color: var(--px-accent);
+}
+
+.wb-select.is-active {
+  border-color: #f59e0b;
+  color: #fde68a;
+  background: #2b2316;
+}
+
+#__px_safe_zones__ {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  direction: ltr;
+  z-index: 952;
+  display: none;
+}
+
+#__px_safe_zones__.is-visible {
+  display: block;
+}
+
+body.clean-mode #__px_safe_zones__ {
+  display: none !important;
+}
+
+#__px_safe_zones__ .px-sz-center {
+  position: absolute;
+  border: 2px dashed rgba(52, 211, 153, 0.9);
+  background: rgba(16, 185, 129, 0.04);
+  box-sizing: border-box;
+}
+
+#__px_safe_zones__ .px-sz-label {
+  position: absolute;
+  font: 700 10px/1 var(--px-font-pixel);
+  letter-spacing: 0.04em;
+  padding: 3px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+#__px_safe_zones__ .px-sz-center > .px-sz-label {
+  top: 4px;
+  left: 6px;
+  background: rgba(6, 95, 70, 0.92);
+  color: #d1fae5;
+}
+
+#__px_safe_zones__ .px-sz-thumb {
+  position: absolute;
+  bottom: 0;
+  border: 2px dashed rgba(248, 113, 113, 0.85);
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(239, 68, 68, 0.14) 0px,
+    rgba(239, 68, 68, 0.14) 8px,
+    rgba(239, 68, 68, 0.04) 8px,
+    rgba(239, 68, 68, 0.04) 16px
+  );
+  box-sizing: border-box;
+}
+
+#__px_safe_zones__ .px-sz-thumb--left {
+  left: 0;
+  width: 260px;
+  height: 240px;
+  border-left: none;
+  border-bottom: none;
+  border-top-right-radius: 18px;
+}
+
+#__px_safe_zones__ .px-sz-thumb--right {
+  right: 0;
+  width: 280px;
+  height: 260px;
+  border-right: none;
+  border-bottom: none;
+  border-top-left-radius: 18px;
+}
+
+#__px_safe_zones__ .px-sz-thumb > .px-sz-label {
+  top: 6px;
+  left: 6px;
+  background: rgba(153, 27, 27, 0.92);
+  color: #fee2e2;
+}
+
+#game-canvas[data-l10n-mode="long"] {
+  outline: 2px solid rgba(245, 158, 11, 0.65);
+}
+
+#game-canvas[data-l10n-mode="rtl"] {
+  outline: 2px solid rgba(168, 85, 247, 0.7);
 }

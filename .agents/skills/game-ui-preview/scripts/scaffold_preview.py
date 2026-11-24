@@ -23,11 +23,11 @@ STARTER_HTML = """<!DOCTYPE html>
   <title>{title} — Game UI Preview</title>
   <link rel="stylesheet" href="./pixel-ui-kit.css">
 </head>
-<body data-catalog-base="{catalog_rel}" data-default-mode="{default_mode}">
+<body data-catalog-base="{catalog_rel}" data-default-mode="{default_mode}"{profile_attrs}>
   <header class="workbench-bar">
     <div class="workbench-title">
       <span>{title}</span>
-      <span class="workbench-badge">1280×720 Pixel UI Preview</span>
+      <span class="workbench-badge">{canvas_badge}</span>
     </div>
     <div class="workbench-controls">
       <div class="wb-group">
@@ -116,6 +116,7 @@ def scaffold_preview(
     catalog_dir: Path,
     force: bool,
     mode: str = "wireframe",
+    profile: str = "desktop-1280",
 ) -> Path:
     """Create previews/<slug>/ with pixel-ui-kit assets and starter index.html."""
     target_dir = out_root / slug
@@ -131,12 +132,21 @@ def scaffold_preview(
     ).as_posix().rstrip("/") + "/"
 
     default_mode = "wireframe" if mode == "wireframe" else "final"
+    if profile == "craftland":
+        profile_attrs = ' data-ui-profile="craftland" data-default-res="1500x750"'
+        canvas_badge = "Craftland Mobile UI (1500×750)"
+    else:
+        profile_attrs = ""
+        canvas_badge = "1280×720 Pixel UI Preview"
+
     if force or not index_path.exists():
         index_path.write_text(
             STARTER_HTML.format(
                 title=title,
                 catalog_rel=rel_catalog,
                 default_mode=default_mode,
+                profile_attrs=profile_attrs,
+                canvas_badge=canvas_badge,
                 wire_active=" is-active" if default_mode == "wireframe" else "",
                 final_active=" is-active" if default_mode == "final" else "",
                 behavior_active=" is-active" if default_mode == "wireframe" else "",
@@ -160,6 +170,12 @@ def main() -> int:
         default="wireframe",
         help="Default mode for the starter page (default: wireframe).",
     )
+    parser.add_argument(
+        "--profile",
+        choices=["desktop-1280", "craftland"],
+        default="desktop-1280",
+        help="Target viewport/QA profile (default: desktop-1280; use craftland for 1500x750 mobile UIs).",
+    )
     parser.add_argument("--force", action="store_true", help="Overwrite existing index.html if present.")
     args = parser.parse_args()
 
@@ -170,8 +186,9 @@ def main() -> int:
         catalog_dir=Path(args.catalog),
         force=args.force,
         mode=args.mode,
+        profile=args.profile,
     )
-    print(f"Scaffolded preview at {index_path.as_posix()} (default mode: {args.mode})")
+    print(f"Scaffolded preview at {index_path.as_posix()} (default mode: {args.mode}, profile: {args.profile})")
     return 0
 
 
