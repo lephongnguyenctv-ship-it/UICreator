@@ -40,6 +40,7 @@ STARTER_HTML = """<!DOCTYPE html>
         <span class="wb-label">View</span>
         <button class="wb-btn is-active" data-ui-state-trigger="main">Main</button>
       </div>
+      <!-- Optional contextual edge-case State group belongs here in .workbench-controls (never inside #game-canvas) -->
       <div class="wb-group">
         <span class="wb-label">Scale</span>
         <button class="wb-btn" data-wb-scale="2">2x</button>

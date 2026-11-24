@@ -1943,6 +1943,39 @@ body.clean-mode #game-canvas {
   color: var(--px-ink-dark);
 }
 
+/* High-res / non-pixel-art 1:1 9-slice (Craftland/Unity .meta 9-Grid Pattern).
+   Renders border-image on ::before with border:none so Wireframe & Interactive keep identical layout geometry. */
+.px-9slice.px-9slice--hd {
+  border: none !important;
+  background-image: none !important;
+  isolation: isolate;
+  --pixel-scale: 1;
+}
+
+body:not(.mode-wireframe) .px-9slice.px-9slice--hd::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  box-sizing: border-box;
+  border-style: solid;
+  border-width:
+    calc(var(--slice-t, 12) * 1px * var(--pixel-scale, 1))
+    calc(var(--slice-r, 12) * 1px * var(--pixel-scale, 1))
+    calc(var(--slice-b, 12) * 1px * var(--pixel-scale, 1))
+    calc(var(--slice-l, 12) * 1px * var(--pixel-scale, 1));
+  border-image-source: var(--skin-url);
+  border-image-slice: var(--slice-t, 12) var(--slice-r, 12) var(--slice-b, 12) var(--slice-l, 12) fill;
+  border-image-repeat: stretch;
+  image-rendering: auto;
+}
+
+.px-tint-multiply.px-9slice.px-9slice--hd > .px-tint-overlay {
+  inset: 0 !important;
+  border-radius: inherit;
+}
+
 .px-sprite-box {
   position: relative;
   width: calc(var(--w, 26) * 1px * var(--pixel-scale, 3));
