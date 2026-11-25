@@ -1861,6 +1861,7 @@ body.clean-mode .workbench-canvas-slot {
 #game-canvas {
   width: var(--px-canvas-w, 1280px);
   height: var(--px-canvas-h, 720px);
+  flex-shrink: 0;
   position: relative;
   overflow: hidden;
   user-select: none;
@@ -1869,6 +1870,19 @@ body.clean-mode .workbench-canvas-slot {
   background-color: #4d784e;
   image-rendering: pixelated;
   transform-origin: top center;
+}
+
+/* Prevent nearest-neighbor 1px line dropout when scaled/zoomed, and match Craftland Studio's Bilinear filtering */
+#game-canvas.is-canvas-downscaled,
+#game-canvas.is-canvas-downscaled .px-9slice,
+body[data-ui-profile="craftland"] #game-canvas,
+body[data-ui-profile="craftland"] #game-canvas img,
+body[data-ui-profile="craftland"] #game-canvas .px-9slice,
+body[data-ui-profile="craftland"] #game-canvas .px-sprite-box,
+body[data-ui-profile="craftland"] #game-canvas .px-icon,
+body[data-ui-profile="craftland"] #game-canvas .px-btn,
+body[data-ui-profile="craftland"] #game-canvas .px-btn-square {
+  image-rendering: auto;
 }
 
 .workbench-canvas-slot {

@@ -3484,8 +3484,10 @@
     const canvas = document.getElementById('game-canvas');
     if (!canvas) return 1;
     const slot = canvas.parentElement;
+    canvas.style.zoom = '';
     if (isCleanMode()) {
       canvas.style.transform = '';
+      canvas.classList.remove('is-canvas-downscaled');
       if (slot && slot.classList.contains('workbench-canvas-slot')) {
         slot.style.width = '';
         slot.style.height = '';
@@ -3493,9 +3495,13 @@
       return 1;
     }
     const preset = CANVAS_PRESETS[state.currentCanvasRes] || CANVAS_PRESETS['1280x720'];
-    const sidebarBudget = state.studioVisible ? 580 : 48;
-    const availW = Math.max(360, (global.innerWidth || 1440) - sidebarBudget);
+    const workspace = document.querySelector('.workbench-workspace');
+    const reserve = state.studioVisible ? 264 + 356 + 24 : 48;
+    const baseAvail = workspace ? workspace.clientWidth : (global.innerWidth || 1440);
+    const availW = Math.max(360, baseAvail - reserve);
     const zoom = Math.min(1, availW / preset.w);
+    const dpr = Number(global.devicePixelRatio || 1);
+    const isNonIntegerOrDownscaled = zoom < 0.995 || dpr < 0.995 || Math.abs(dpr - Math.round(dpr)) > 0.01;
     if (zoom < 0.995) {
       canvas.style.transform = `scale(${zoom.toFixed(4)})`;
       if (slot && slot.classList.contains('workbench-canvas-slot')) {
@@ -3509,6 +3515,8 @@
         slot.style.height = '';
       }
     }
+    canvas.classList.toggle('is-canvas-downscaled', isNonIntegerOrDownscaled);
+    renderTransformGizmo();
     return zoom;
   }
 
@@ -4109,29 +4117,6 @@
 
   function isCleanMode() {
     return Boolean(document.body && document.body.classList.contains('clean-mode'));
-  }
-
-  function updateCanvasFitZoom() {
-    const canvas = document.getElementById('game-canvas');
-    if (!canvas) return;
-    if (isCleanMode()) {
-      canvas.style.zoom = '';
-      return;
-    }
-    const workspace = document.querySelector('.workbench-workspace');
-    if (!workspace) {
-      canvas.style.zoom = '';
-      return;
-    }
-    const reserve = state.studioVisible ? 264 + 356 + 24 : 0;
-    const avail = Math.max(480, workspace.clientWidth - reserve);
-    if (avail < 1280) {
-      const z = Math.max(0.54, Math.min(1, avail / 1280));
-      canvas.style.zoom = z.toFixed(3);
-    } else {
-      canvas.style.zoom = '';
-    }
-    renderTransformGizmo();
   }
 
   function setStudioPanels(visible) {
