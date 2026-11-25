@@ -733,15 +733,34 @@ def apply_ui_edits_in_place(previews_root: Path, slug: str, edits_payload: dict[
     return normalized
 
 
-def _is_studio_server_running(port: int) -> bool:
+def _probe_studio_server(port: int) -> dict[str, Any] | None:
     try:
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/ping", timeout=1.2) as resp:
             if resp.status == 200:
                 data = json.loads(resp.read().decode("utf-8"))
-                return bool(isinstance(data, dict) and data.get("ok"))
+                if isinstance(data, dict) and data.get("ok"):
+                    return data
+    except (OSError, ValueError, urllib.error.URLError):
+        return None
+    return None
+
+
+def _request_studio_server_shutdown(port: int) -> bool:
+    try:
+        req = urllib.request.Request(
+            f"http://127.0.0.1:{port}/api/shutdown",
+            data=b"{}",
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=1.5) as resp:
+            return resp.status == 200
     except (OSError, ValueError, urllib.error.URLError):
         return False
-    return False
+
+
+def _norm_path_key(p: str) -> str:
+    return str(p or "").replace("\\", "/").rstrip("/").lower()
 
 
 def run_studio_server(
@@ -764,12 +783,34 @@ def run_studio_server(
     build_gallery(previews_root=previews_root, catalog_dir=resolved_catalog, project_root=resolved_root)
     hub_full_url = f"http://127.0.0.1:{port}{hub_url_path}"
 
-    if _is_studio_server_running(port):
-        print(f"Studio save server already listening on http://127.0.0.1:{port}", flush=True)
-        if open_browser:
-            print(f"Opening {hub_full_url}", flush=True)
-            webbrowser.open(hub_full_url)
-        return 0
+    existing = _probe_studio_server(port)
+    if existing is not None:
+        existing_root = _norm_path_key(existing.get("root", ""))
+        if existing_root and existing_root == _norm_path_key(str(resolved_root)):
+            print(f"Studio save server already listening on http://127.0.0.1:{port} for {resolved_root}", flush=True)
+            if open_browser:
+                print(f"Opening {hub_full_url}", flush=True)
+                webbrowser.open(hub_full_url)
+            return 0
+        # A different workspace's Studio server is occupying this port; ask it to shut down cleanly
+        print(
+            f"Port {port} is serving another workspace ({existing.get('root') or existing.get('catalog')}). Switching to {resolved_root}...",
+            flush=True,
+        )
+        if _request_studio_server_shutdown(port):
+            import time as _time
+
+            for _ in range(20):
+                if _probe_studio_server(port) is None:
+                    break
+                _time.sleep(0.1)
+        else:
+            # Older server without /api/shutdown: fall back to next available port so user never gets a 404
+            for candidate_port in range(port + 1, port + 20):
+                if _probe_studio_server(candidate_port) is None:
+                    port = candidate_port
+                    hub_full_url = f"http://127.0.0.1:{port}{hub_url_path}"
+                    break
 
     class _ReusableThreadingHTTPServer(ThreadingHTTPServer):
         allow_reuse_address = True
@@ -816,7 +857,15 @@ def run_studio_server(
                 self.end_headers()
                 return
             if req_path == "/api/ping":
-                self._send_json(200, {"ok": True, "catalog": catalog_dir.as_posix()})
+                self._send_json(
+                    200,
+                    {
+                        "ok": True,
+                        "root": resolved_root.as_posix(),
+                        "catalog": catalog_dir.as_posix(),
+                        "hub": hub_url_path,
+                    },
+                )
                 return
             if req_path == "/api/previews":
                 payload = build_gallery(
@@ -831,6 +880,10 @@ def run_studio_server(
 
         def do_POST(self) -> None:
             req_path = self.path.split("?", 1)[0]
+            if req_path == "/api/shutdown":
+                self._send_json(200, {"ok": True})
+                threading.Thread(target=self.server.shutdown, daemon=True).start()
+                return
             if req_path not in ("/api/save-slice9", "/api/save-ui-edits", "/api/export-craftland-ui"):
                 self._send_json(404, {"ok": False, "error": f"Unknown endpoint: {req_path}"})
                 return
