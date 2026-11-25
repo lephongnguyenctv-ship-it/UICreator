@@ -138,8 +138,8 @@ if defined GIT_EXE goto :git_found
 exit /b 1
 
 :git_found
-for %%I in ("%GIT_EXE%") do set "GIT_DIR=%%~dpI"
-set "PATH=%GIT_DIR%;%PATH%"
+for %%I in ("%GIT_EXE%") do set "GIT_BIN_DIR=%%~dpI"
+set "PATH=%GIT_BIN_DIR%;%PATH%"
 exit /b 0
 
 :run_py
