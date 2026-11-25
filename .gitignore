@@ -5,10 +5,9 @@ __pycache__/
 Thumbs.db
 .env
 
-# Local workspace previews, generated launcher, and game-specific assets
-# (Keep only verified built-in Craftland WorkshopIconLibrary icons tracked in assets/)
+# Local workspace previews and game-specific assets
+# (Keep launch_ui_hub.bat and verified built-in Craftland WorkshopIconLibrary icons tracked)
 previews/
-launch_ui_hub.bat
 assets/*
 !assets/WorkshopIconLibrary/
 

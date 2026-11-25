@@ -867,6 +867,32 @@ def run_studio_server(
                     },
                 )
                 return
+            if req_path == "/api/export-config":
+                try:
+                    from export_craftland_ui import discover_mcp_info, discover_ui_directories
+
+                    mcp_url, mcp_source = discover_mcp_info(resolved_root)
+                    ui_dirs = discover_ui_directories(resolved_root)
+                except Exception:
+                    mcp_url, mcp_source = None, None
+                    ui_dirs = ["Assets/HUDs/_Draft"]
+                is_craftland = (resolved_root / "main.gproj").is_file() or (
+                    (resolved_root / "Assets").is_dir() and (resolved_root / "ProjectSettings").is_dir()
+                )
+                self._send_json(
+                    200,
+                    {
+                        "ok": True,
+                        "projectRoot": resolved_root.as_posix(),
+                        "isCraftlandProject": is_craftland,
+                        "mcpDetected": bool(mcp_url),
+                        "mcpUrl": mcp_url,
+                        "mcpSource": mcp_source,
+                        "defaultUiDirectory": ui_dirs[0] if ui_dirs else "Assets/HUDs/_Draft",
+                        "existingUiDirs": ui_dirs,
+                    },
+                )
+                return
             if req_path == "/api/previews":
                 payload = build_gallery(
                     previews_root=previews_root,
@@ -911,12 +937,25 @@ def run_studio_server(
                     return
                 view_id = str(data.get("view") or "").strip() or None
                 ui_name = str(data.get("uiName") or "").strip() or None
-                ui_dir = str(data.get("uiDirectory") or "Assets/HUDs/_Draft").strip() or "Assets/HUDs/_Draft"
+                ui_dir = str(data.get("uiDirectory") or "").strip()
                 mcp_url_override = str(data.get("mcpUrl") or "").strip() or None
                 dry_run = bool(data.get("dryRun", False))
                 take_snapshot = bool(data.get("snapshot", False))
+                save_mcp_config = bool(data.get("saveMcpConfig", False))
+                if not dry_run and not ui_dir:
+                    self._send_json(
+                        200,
+                        {
+                            "ok": False,
+                            "code": "OUTPUT_DIR_REQUIRED",
+                            "error": "Please provide a target output directory (e.g. Assets/HUDs/_Draft).",
+                        },
+                    )
+                    return
+                if not ui_dir:
+                    ui_dir = "Assets/HUDs/_Draft"
                 try:
-                    from export_craftland_ui import run_export_pipeline
+                    from export_craftland_ui import McpNotDetectedError, run_export_pipeline
 
                     export_res = run_export_pipeline(
                         page_path=page_path,
@@ -927,8 +966,18 @@ def run_studio_server(
                         mcp_url_override=mcp_url_override,
                         dry_run=dry_run,
                         take_snapshot=take_snapshot,
+                        save_mcp_config=save_mcp_config,
                     )
                     self._send_json(200, {"ok": True, **export_res})
+                except McpNotDetectedError as exc:
+                    self._send_json(
+                        200,
+                        {
+                            "ok": False,
+                            "code": "MCP_NOT_DETECTED",
+                            "error": str(exc),
+                        },
+                    )
                 except Exception as exc:
                     self._send_json(200, {"ok": False, "error": str(exc)})
                 return
@@ -1130,7 +1179,12 @@ def process_directory(
     extracting fileId and 9-slice borders directly from sibling .png.meta files.
     """
     if not input_dir.exists():
-        raise FileNotFoundError(f"Input directory not found: {input_dir}")
+        existing_extras = [ext for ext in (extra_inputs or []) if ext.exists()]
+        if craftland_assets and existing_extras:
+            input_dir = existing_extras[0]
+            extra_inputs = existing_extras[1:]
+        else:
+            raise FileNotFoundError(f"Input directory not found: {input_dir}")
 
     detected_craftland_root = detect_craftland_project_root(output_dir, explicit_root=project_root)
     if craftland_assets and detected_craftland_root is None:
@@ -1416,6 +1470,32 @@ def process_directory(
     return manifest
 
 
+def _write_empty_catalog(output_dir: Path, workspace_root: Path, is_craftland_project: bool) -> dict[str, Any]:
+    """Create a valid empty manifest.json + catalog-data.js so --serve can open the Hub before sprites are sliced."""
+    output_dir = output_dir.resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "contact_sheets").mkdir(parents=True, exist_ok=True)
+    project_root_rel = Path(os.path.relpath(workspace_root.resolve(), start=output_dir)).as_posix().rstrip("/") + "/"
+    manifest: dict[str, Any] = {
+        "input_dir": "",
+        "project_root_rel": project_root_rel,
+        "craftland_project": is_craftland_project,
+        "total_sources": 0,
+        "total_slices": 0,
+        "contact_sheets": [],
+        "sources": [],
+        "slices": {},
+    }
+    (output_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    (output_dir / "catalog-data.js").write_text(
+        "// Auto-generated by slice_sprites.py for file:// preview compatibility\n"
+        f"window.SPRITE_CATALOG = {json.dumps(manifest, separators=(',', ':'))};\n",
+        encoding="utf-8",
+    )
+    build_gallery(previews_root=output_dir.parent, catalog_dir=output_dir, project_root=workspace_root)
+    return manifest
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Slice packed PNG sprite sheets or index Craftland Assets in-place.")
     parser.add_argument("--input", default="Sprite sheets", help="Directory containing source PNG sprite sheets or Assets/Sprites.")
@@ -1482,17 +1562,30 @@ def main() -> int:
 
     if args.serve:
         if not (out_dir / "manifest.json").exists():
-            process_directory(
-                input_dir=Path(args.input),
-                output_dir=out_dir,
-                alpha_threshold=args.alpha_threshold,
-                dilate=args.dilate,
-                min_size=args.min_size,
-                project=args.project,
-                craftland_assets=args.craftland_assets,
-                project_root=effective_root,
-                extra_inputs=extra_input_paths,
-            )
+            in_path = Path(args.input)
+            valid_extras = [p for p in extra_input_paths if p.exists()]
+            if in_path.exists() or valid_extras:
+                try:
+                    process_directory(
+                        input_dir=in_path if in_path.exists() else valid_extras[0],
+                        output_dir=out_dir,
+                        alpha_threshold=args.alpha_threshold,
+                        dilate=args.dilate,
+                        min_size=args.min_size,
+                        project=args.project,
+                        craftland_assets=args.craftland_assets,
+                        project_root=effective_root,
+                        extra_inputs=extra_input_paths if in_path.exists() else valid_extras[1:],
+                    )
+                except RuntimeError as exc:
+                    print(f"[INFO] Starting Preview Hub with an empty sprite catalog ({exc}).", flush=True)
+                    _write_empty_catalog(out_dir, effective_root, bool(args.craftland_assets or detected_root is not None))
+            else:
+                print(
+                    f"[INFO] No sprite directory found yet at {in_path.as_posix()}; starting Preview Hub with an empty catalog.",
+                    flush=True,
+                )
+                _write_empty_catalog(out_dir, effective_root, bool(args.craftland_assets or detected_root is not None))
         else:
             resolve_real_source_paths(effective_root, out_dir)
         return run_studio_server(effective_root, out_dir, args.port, open_browser=args.open)

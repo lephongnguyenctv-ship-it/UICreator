@@ -129,43 +129,81 @@ class CraftlandMcpClient:
         return values[0] if len(values) == 1 else values
 
 
-def discover_mcp_url(project_root: Path, override: str | None = None) -> str:
-    """Resolve Craftland Studio MCP URL from CLI flag, environment, .codex/config.toml, .cursor/mcp.json, or ~/.claude.json."""
+class McpNotDetectedError(RuntimeError):
+    """Raised when no Craftland Studio MCP server URL can be auto-detected."""
+
+
+def _extract_url_from_mcp_mapping(servers: Any) -> str | None:
+    """Extract a Craftland/Studio HTTP MCP URL from a dict of MCP server entries."""
+    if not isinstance(servers, dict):
+        return None
+
+    def _entry_url(srv: Any) -> str | None:
+        if not isinstance(srv, dict):
+            return None
+        for field in ("url", "serverUrl", "httpUrl"):
+            val = srv.get(field)
+            if isinstance(val, str) and val.strip():
+                return val.strip()
+        return None
+
+    # Prefer Craftland / Studio / SpeedyRace named servers first
+    priority_terms = ("craftland", "speedyrace", "studio")
+    for key, srv in servers.items():
+        if any(term in str(key).lower() for term in priority_terms):
+            found = _entry_url(srv)
+            if found:
+                return found
+
+    for srv in servers.values():
+        found = _entry_url(srv)
+        if found:
+            return found
+    return None
+
+
+def discover_mcp_info(project_root: Path, override: str | None = None) -> tuple[str | None, str | None]:
+    """Resolve (mcp_url, source_label) from override, env, .mcp.json, .codex, .cursor, .vscode, .craftland, or ~/.claude.json."""
     if override and override.strip():
-        return override.strip()
+        return override.strip(), "override"
 
     for env_key in ("CRAFTLAND_MCP_URL", "SPEEDYRACE_MCP_URL"):
         env_val = os.environ.get(env_key, "").strip()
         if env_val:
-            return env_val
+            return env_val, f"env:{env_key}"
+
+    json_candidates = [
+        (project_root / ".mcp.json", ".mcp.json"),
+        (project_root / ".cursor" / "mcp.json", ".cursor/mcp.json"),
+        (project_root / ".vscode" / "mcp.json", ".vscode/mcp.json"),
+        (project_root / ".craftland" / "mcp.json", ".craftland/mcp.json"),
+    ]
+    for cfg_path, label in json_candidates:
+        if not cfg_path.is_file():
+            continue
+        try:
+            data = json.loads(cfg_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not isinstance(data, dict):
+            continue
+        for top_key in ("mcpServers", "servers"):
+            found = _extract_url_from_mcp_mapping(data.get(top_key))
+            if found:
+                return found, label
+        direct_url = data.get("url") or data.get("serverUrl")
+        if isinstance(direct_url, str) and direct_url.strip():
+            return direct_url.strip(), label
 
     codex_cfg = project_root / ".codex" / "config.toml"
     if codex_cfg.is_file():
         try:
             with codex_cfg.open("rb") as f:
                 data = tomllib.load(f)
-            servers = data.get("mcp_servers", {})
-            if isinstance(servers, dict):
-                for srv_key in ("craftland_studio", "speedyrace-mcp"):
-                    srv = servers.get(srv_key)
-                    if isinstance(srv, dict) and isinstance(srv.get("url"), str) and srv["url"].strip():
-                        return srv["url"].strip()
-                for srv in servers.values():
-                    if isinstance(srv, dict) and isinstance(srv.get("url"), str) and srv["url"].strip():
-                        return srv["url"].strip()
+            found = _extract_url_from_mcp_mapping(data.get("mcp_servers"))
+            if found:
+                return found, ".codex/config.toml"
         except (OSError, tomllib.TOMLDecodeError):
-            pass
-
-    cursor_cfg = project_root / ".cursor" / "mcp.json"
-    if cursor_cfg.is_file():
-        try:
-            data = json.loads(cursor_cfg.read_text(encoding="utf-8"))
-            servers = data.get("mcpServers", {})
-            if isinstance(servers, dict):
-                for srv in servers.values():
-                    if isinstance(srv, dict) and isinstance(srv.get("url"), str) and srv["url"].strip():
-                        return srv["url"].strip()
-        except (OSError, json.JSONDecodeError):
             pass
 
     claude_cfg = Path.home() / ".claude.json"
@@ -175,18 +213,80 @@ def discover_mcp_url(project_root: Path, override: str | None = None) -> str:
             norm_root = project_root.resolve().as_posix().lower()
             for proj_path, proj_obj in (data.get("projects") or {}).items():
                 if str(proj_path).replace("\\", "/").rstrip("/").lower() == norm_root and isinstance(proj_obj, dict):
-                    servers = proj_obj.get("mcpServers") or {}
-                    if isinstance(servers, dict):
-                        for srv in servers.values():
-                            if isinstance(srv, dict) and isinstance(srv.get("url"), str) and srv["url"].strip():
-                                return srv["url"].strip()
+                    found = _extract_url_from_mcp_mapping(proj_obj.get("mcpServers"))
+                    if found:
+                        return found, "~/.claude.json"
         except (OSError, json.JSONDecodeError):
             pass
 
-    raise RuntimeError(
-        f"Could not find Craftland Studio MCP URL for project {project_root.as_posix()}. "
-        "Pass --mcp-url, set CRAFTLAND_MCP_URL, or configure .codex/config.toml."
+    return None, None
+
+
+def discover_mcp_url(project_root: Path, override: str | None = None) -> str:
+    """Resolve Craftland Studio MCP URL or raise McpNotDetectedError."""
+    url, _ = discover_mcp_info(project_root, override=override)
+    if url:
+        return url
+    raise McpNotDetectedError(
+        f"No Craftland Studio MCP server detected for project {project_root.as_posix()}. "
+        "Please provide a Craftland MCP URL (--mcp-url or CRAFTLAND_MCP_URL) and target output directory (--ui-directory)."
     )
+
+
+def discover_ui_directories(project_root: Path) -> list[str]:
+    """Find existing Craftland UI asset folders under Assets/ to suggest as output directories."""
+    suggestions: list[str] = []
+    seen: set[str] = set()
+
+    def _add(rel_dir: str) -> None:
+        norm = rel_dir.replace("\\", "/").strip("/")
+        if norm and norm.lower() not in seen:
+            seen.add(norm.lower())
+            suggestions.append(norm)
+
+    assets_dir = project_root / "Assets"
+    if assets_dir.is_dir():
+        for ui_path in sorted(assets_dir.rglob("*.ui")):
+            if ui_path.is_file():
+                try:
+                    rel = ui_path.parent.resolve().relative_to(project_root.resolve()).as_posix()
+                    _add(rel)
+                except ValueError:
+                    pass
+        for common in ("Assets/HUDs/_Draft", "Assets/HUDs", "Assets/UI/_Draft", "Assets/UI"):
+            if (project_root / common).is_dir():
+                _add(common)
+
+    _add("Assets/HUDs/_Draft")
+    return suggestions
+
+
+def save_mcp_url_to_project(project_root: Path, mcp_url: str, server_name: str = "craftland_studio") -> Path:
+    """Save or update the Craftland MCP URL inside <project_root>/.mcp.json without clobbering other servers."""
+    cfg_path = project_root / ".mcp.json"
+    data: dict[str, Any] = {}
+    if cfg_path.is_file():
+        try:
+            loaded = json.loads(cfg_path.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict):
+                data = loaded
+        except (OSError, json.JSONDecodeError):
+            data = {}
+
+    servers = data.get("mcpServers")
+    if not isinstance(servers, dict):
+        servers = {}
+        data["mcpServers"] = servers
+
+    existing_entry = servers.get(server_name)
+    if isinstance(existing_entry, dict):
+        existing_entry["url"] = mcp_url.strip()
+        existing_entry.setdefault("type", "http")
+    else:
+        servers[server_name] = {"type": "http", "url": mcp_url.strip()}
+
+    cfg_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return cfg_path
 
 
 def build_project_texture_index(project_root: Path) -> dict[str, Any]:
@@ -705,6 +805,7 @@ def run_export_pipeline(
     existing_plan_path: Path | None = None,
     dry_run: bool = False,
     take_snapshot: bool = False,
+    save_mcp_config: bool = False,
 ) -> dict[str, Any]:
     """End-to-end orchestration for CLI and Studio server POST /api/export-craftland-ui."""
     resolved_page = page_path.resolve()
@@ -717,6 +818,15 @@ def run_export_pipeline(
     target_ui_name = (ui_name or "").strip() or slug_to_pascal_draft(slug)
     if target_ui_name.lower().endswith(".ui"):
         target_ui_name = target_ui_name[:-3]
+
+    clean_ui_directory = str(ui_directory or "").replace("\\", "/").strip().strip("/")
+    if not clean_ui_directory:
+        clean_ui_directory = "Assets/HUDs/_Draft"
+
+    # Fail fast before Playwright extraction in live mode if no Craftland MCP is configured
+    mcp_url: str | None = None
+    if not dry_run:
+        mcp_url = discover_mcp_url(resolved_proj, override=mcp_url_override)
 
     if existing_plan_path and existing_plan_path.is_file():
         plan = json.loads(existing_plan_path.read_text(encoding="utf-8"))
@@ -745,7 +855,7 @@ def run_export_pipeline(
     except ValueError:
         plan_rel = out_plan.as_posix()
 
-    ui_rel_path = f"{ui_directory.rstrip('/')}/{target_ui_name}.ui"
+    ui_rel_path = f"{clean_ui_directory}/{target_ui_name}.ui"
     entity_count = len(plan.get("entities") or [])
 
     if dry_run:
@@ -760,13 +870,22 @@ def run_export_pipeline(
             "warnings": warnings,
         }
 
-    mcp_url = discover_mcp_url(resolved_proj, override=mcp_url_override)
+    assert mcp_url is not None
     client = CraftlandMcpClient(mcp_url)
     client.initialize()
+
+    saved_mcp_path: str | None = None
+    if save_mcp_config and mcp_url_override and mcp_url_override.strip():
+        try:
+            saved_path = save_mcp_url_to_project(resolved_proj, mcp_url)
+            saved_mcp_path = saved_path.relative_to(resolved_proj).as_posix()
+        except Exception:
+            saved_mcp_path = None
+
     mcp_res = apply_plan_to_craftland_mcp(
         plan=plan,
         client=client,
-        ui_directory=ui_directory,
+        ui_directory=clean_ui_directory,
         ui_name=target_ui_name,
         take_snapshot=take_snapshot,
     )
@@ -785,6 +904,7 @@ def run_export_pipeline(
     return {
         "dryRun": False,
         "mcpUrl": mcp_url,
+        "savedMcpPath": saved_mcp_path,
         "uiId": mcp_res["uiId"],
         "uiName": target_ui_name,
         "uiPath": mcp_res["uiPath"],
@@ -796,14 +916,64 @@ def run_export_pipeline(
     }
 
 
+def _prompt_for_mcp_and_output_dir(
+    project_root: Path,
+    current_ui_directory: str | None,
+) -> tuple[str, str, bool]:
+    """Interactively prompt the user for a Craftland MCP URL and target output directory."""
+    print(
+        f"\n[!] No Craftland Studio MCP configuration was detected in {project_root.as_posix()}.",
+        file=sys.stderr,
+    )
+    print(
+        "    Looked in: .mcp.json, .codex/config.toml, .cursor/mcp.json, .vscode/mcp.json, .craftland/mcp.json, ~/.claude.json",
+        file=sys.stderr,
+    )
+
+    try:
+        mcp_url = input("Enter Craftland Studio MCP URL (e.g. http://127.0.0.1:xxxx/mcp): ").strip()
+    except EOFError:
+        mcp_url = ""
+    if not mcp_url:
+        raise McpNotDetectedError("Export cancelled: no Craftland Studio MCP URL was provided.")
+
+    if current_ui_directory and current_ui_directory.strip():
+        chosen_dir = current_ui_directory.strip()
+    else:
+        suggested = discover_ui_directories(project_root)
+        default_dir = suggested[0] if suggested else "Assets/HUDs/_Draft"
+        if len(suggested) > 1:
+            print(f"    Detected UI folders: {', '.join(suggested[:6])}", file=sys.stderr)
+        try:
+            raw_dir = input(f"Enter target output directory [{default_dir}]: ").strip()
+        except EOFError:
+            raw_dir = ""
+        chosen_dir = raw_dir or default_dir
+
+    save_cfg = False
+    try:
+        ans = input("Save this MCP URL to .mcp.json for future exports? [y/N]: ").strip().lower()
+        save_cfg = ans in ("y", "yes")
+    except EOFError:
+        save_cfg = False
+
+    return mcp_url, chosen_dir, save_cfg
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Export a UICreator HTML preview view to a Craftland Studio .ui draft via MCP.")
     parser.add_argument("--page", required=True, help="Path to preview index.html (e.g. Tools/ui-previews/checkpoint-reward/index.html).")
     parser.add_argument("--view", default=None, help="Target [data-ui-view] ID to export (defaults to active view).")
     parser.add_argument("--ui-name", default=None, help="Target Craftland UI asset name (defaults to <PascalSlug>Draft).")
-    parser.add_argument("--ui-directory", default="Assets/HUDs/_Draft", help="Target Craftland directory (default: Assets/HUDs/_Draft).")
+    parser.add_argument(
+        "--ui-directory",
+        default=None,
+        help="Target Craftland output directory (prompted if no MCP is detected; default: Assets/HUDs/_Draft).",
+    )
     parser.add_argument("--project-root", default=None, help="Explicit Craftland project root (auto-detected when omitted).")
     parser.add_argument("--mcp-url", default=None, help="Override Craftland Studio MCP URL.")
+    parser.add_argument("--save-mcp", action="store_true", help="Save --mcp-url into <project_root>/.mcp.json after connecting.")
+    parser.add_argument("--non-interactive", action="store_true", help="Fail without prompting if no MCP URL is detected.")
     parser.add_argument("--width", type=int, default=1500, help="Canvas width in Craftland units (default: 1500).")
     parser.add_argument("--height", type=int, default=750, help="Canvas height in Craftland units (default: 750).")
     parser.add_argument("--plan", default=None, help="Optional output path for the extracted craftland-ui-entity-plan/v2 JSON.")
@@ -812,19 +982,52 @@ def main() -> int:
     parser.add_argument("--snapshot", action="store_true", help="Open the created .ui asset and capture a ui-snapshot via MCP.")
     args = parser.parse_args()
 
+    resolved_page = Path(args.page).resolve()
+    resolved_proj = (
+        Path(args.project_root).resolve()
+        if args.project_root
+        else (detect_craftland_project_root(resolved_page) or Path.cwd().resolve())
+    )
+    mcp_url_override = args.mcp_url
+    ui_directory = args.ui_directory
+    save_mcp = bool(args.save_mcp)
+
+    if not args.dry_run:
+        detected_url, _ = discover_mcp_info(resolved_proj, override=mcp_url_override)
+        if not detected_url:
+            if sys.stdin.isatty() and not args.non_interactive:
+                try:
+                    mcp_url_override, ui_directory, prompt_save = _prompt_for_mcp_and_output_dir(
+                        resolved_proj, ui_directory
+                    )
+                    save_mcp = save_mcp or prompt_save
+                except McpNotDetectedError as exc:
+                    print(f"[ERROR] {exc}", file=sys.stderr)
+                    return 2
+            else:
+                print(
+                    f"[ERROR] No Craftland Studio MCP server detected for project {resolved_proj.as_posix()}.\n"
+                    "Please ask the user for:\n"
+                    "  1. Craftland Studio MCP URL (--mcp-url \"http://127.0.0.1:<port>/mcp\")\n"
+                    "  2. Target output directory (--ui-directory \"Assets/HUDs/_Draft\")",
+                    file=sys.stderr,
+                )
+                return 2
+
     res = run_export_pipeline(
-        page_path=Path(args.page),
-        project_root=Path(args.project_root).resolve() if args.project_root else None,
+        page_path=resolved_page,
+        project_root=resolved_proj,
         view_id=args.view,
         ui_name=args.ui_name,
-        ui_directory=args.ui_directory,
-        mcp_url_override=args.mcp_url,
+        ui_directory=ui_directory or "Assets/HUDs/_Draft",
+        mcp_url_override=mcp_url_override,
         width=args.width,
         height=args.height,
         plan_out_path=Path(args.plan) if args.plan else None,
         existing_plan_path=Path(args.use_plan) if args.use_plan else None,
         dry_run=args.dry_run,
         take_snapshot=args.snapshot,
+        save_mcp_config=save_mcp,
     )
 
     if res["dryRun"]:
@@ -837,6 +1040,8 @@ def main() -> int:
             f"[EXPORT OK] Created & saved {res['uiPath']} (assetId: {res['uiId']}, "
             f"entities: {res['entityCount']}, plan: {res['planPath']})"
         )
+        if res.get("savedMcpPath"):
+            print(f"[INFO] Saved MCP URL to {res['savedMcpPath']}")
 
     if res["warnings"]:
         print(f"Warnings ({len(res['warnings'])}):")

@@ -175,10 +175,16 @@ What `verify_ui.mjs` tests automatically in headless Chromium (`?clean=1`) for b
 
 ## Stage 7: Export Approved Preview to Craftland Studio `.ui` Draft via MCP
 
-Once a Craftland preview (`data-ui-profile="craftland"`) passes Playwright QA and user review, compile any `[data-ui-view]` directly into a Craftland Studio `.ui` draft asset (`Assets/HUDs/_Draft/<Name>Draft.ui`):
+Once a Craftland preview (`data-ui-profile="craftland"`) passes Playwright QA and user review, compile any `[data-ui-view]` directly into a Craftland Studio `.ui` draft asset (`Assets/HUDs/_Draft/<Name>Draft.ui` or a user-selected directory):
 
-1. **Mark preview-only context layers with `data-export-ignore="true"`**: Add `data-export-ignore="true"` to reference-only context layers (e.g., `.ctx-hud-layer`, `.ctx-runner-sprite-row`) so only the target HUD/popup component tree is exported.
-2. **Offline Dry-Run Plan & Texture Validation**:
+1. **Check for Craftland MCP Configuration First (Mandatory Prompt Gate)**:
+   - Look for a Craftland Studio MCP server URL in `.mcp.json`, `.codex/config.toml`, `.cursor/mcp.json`, `.vscode/mcp.json`, `.craftland/mcp.json`, `~/.claude.json`, or `CRAFTLAND_MCP_URL`.
+   - **If no MCP server is detected**, **STOP and prompt the user for BOTH**:
+     1. Their **Craftland Studio MCP URL** (e.g. `http://127.0.0.1:<port>/mcp`), and
+     2. Their **target output directory** (e.g. `Assets/HUDs/_Draft` or another `Assets/...` folder).
+   - *(Both the browser **`Export .ui`** modal and the interactive `export_craftland_ui.py` CLI enforce this same prompt automatically and offer to save the MCP URL to `.mcp.json` for future exports.)*
+2. **Mark preview-only context layers with `data-export-ignore="true"`**: Add `data-export-ignore="true"` to reference-only context layers (e.g., `.ctx-hud-layer`, `.ctx-runner-sprite-row`) so only the target HUD/popup component tree is exported.
+3. **Offline Dry-Run Plan & Texture Validation**:
    ```powershell
    python Tools/UICreator/.agents/skills/game-ui-preview/scripts/export_craftland_ui.py `
      --page "Tools/ui-previews/<slug>/index.html" `
@@ -187,12 +193,13 @@ Once a Craftland preview (`data-ui-profile="craftland"`) passes Playwright QA an
      --dry-run
    ```
    Inspect `<slug>/verification/<viewId>.craftland-plan.json` to confirm clean hierarchy, bottom-left Y-up coordinates inside `1500×750`, and 0 unresolved texture `fileId` warnings.
-3. **Live Craftland Studio MCP Push** (or click **`Export .ui`** in the browser Workbench toolbar while `slice_sprites.py --serve` and Craftland Studio are running):
+4. **Live Craftland Studio MCP Push** (or click **`Export .ui`** in the browser Workbench toolbar while `launch_ui_hub.bat` / `slice_sprites.py --serve` and Craftland Studio are running):
    ```powershell
    python Tools/UICreator/.agents/skills/game-ui-preview/scripts/export_craftland_ui.py `
      --page "Tools/ui-previews/<slug>/index.html" `
      --view "<viewId>" `
      --ui-name "<PascalSlug>Draft" `
-     --ui-directory "Assets/HUDs/_Draft" `
+     --ui-directory "<target_output_dir>" `
+     --mcp-url "<mcp_url_if_not_auto_detected>" `
      --snapshot
    ```

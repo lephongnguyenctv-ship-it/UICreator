@@ -3572,3 +3572,148 @@ body.clean-mode #__px_safe_zones__ {
   padding-left: 18px;
   color: #fde68a;
 }
+
+.wb-export-mcp-banner {
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.45;
+  background: rgba(15, 20, 30, 0.72);
+  border: 1px solid var(--px-workbench-border);
+  color: var(--px-workbench-muted);
+  word-break: break-word;
+}
+
+.wb-export-mcp-banner.is-ok {
+  border-color: rgba(74, 222, 128, 0.45);
+  background: rgba(20, 83, 45, 0.25);
+  color: #dcfce7;
+}
+
+.wb-export-mcp-banner.is-warn {
+  border-color: rgba(251, 191, 36, 0.6);
+  background: rgba(120, 53, 15, 0.28);
+  color: #fef3c7;
+}
+
+.wb-export-req-badge {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  background: rgba(251, 191, 36, 0.2);
+  border: 1px solid rgba(251, 191, 36, 0.55);
+  color: #fde68a;
+}
+
+.wb-export-field input.is-prompt-required {
+  border-color: rgba(251, 191, 36, 0.85) !important;
+  box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.18);
+}
+
+.wb-export-check-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 400 !important;
+  color: var(--px-workbench-muted);
+  cursor: pointer;
+}
+
+.wb-export-check-row[hidden] {
+  display: none !important;
+}
+
+.wb-export-dir-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.wb-export-dir-chip {
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid var(--px-workbench-border);
+  background: rgba(15, 20, 30, 0.55);
+  color: var(--px-workbench-muted);
+  font-size: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  cursor: pointer;
+}
+
+.wb-export-dir-chip:hover {
+  border-color: var(--px-accent);
+  color: var(--px-accent);
+}
+
+.wb-export-mcp-banner {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(15, 20, 30, 0.6);
+  border: 1px solid var(--px-workbench-border);
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--px-workbench-muted);
+}
+
+.wb-export-mcp-banner.is-ok {
+  border-color: rgba(74, 222, 128, 0.45);
+  background: rgba(20, 83, 45, 0.25);
+  color: #dcfce7;
+}
+
+.wb-export-mcp-banner.is-warn {
+  border-color: rgba(251, 191, 36, 0.55);
+  background: rgba(120, 53, 15, 0.28);
+  color: #fef3c7;
+}
+
+.wb-export-dir-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.wb-export-dir-chip {
+  appearance: none;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(15, 23, 42, 0.7);
+  color: #cbd5e1;
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-size: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  cursor: pointer;
+}
+
+.wb-export-dir-chip:hover {
+  border-color: var(--px-accent);
+  color: #ffffff;
+}
+
+.wb-export-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+  font-size: 11px !important;
+  font-weight: 400 !important;
+  color: var(--px-workbench-muted) !important;
+  cursor: pointer;
+}
+
+.wb-export-field input.is-prompt-required {
+  border-color: rgba(251, 191, 36, 0.8);
+  box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.35);
+}
+
+.wb-export-field input.is-field-error {
+  border-color: rgba(248, 113, 113, 0.9);
+  box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.4);
+}

@@ -16,7 +16,8 @@ An AI-assisted workflow and interactive browser studio for turning packed 2D pix
 
 ## 2. Viewing All UIs (`launch_ui_hub.bat` & `previews/index.html`)
 
-- **One-Click Launcher (Recommended)**: Double-click **`launch_ui_hub.bat`** in the project root to start the local Studio Backend (`127.0.0.1:17890`) and automatically open the **Game UI Preview Hub** (`http://127.0.0.1:17890/previews/index.html`) in your browser.
+- **One-Click Launcher (Recommended)**: Double-click **`launch_ui_hub.bat`** right in the `UICreator` root (immediately available after cloning or adding `Tools/UICreator` as a git submodule — auto-detects Craftland submodule, generic submodule, or standalone mode) to start the local Studio Backend (`127.0.0.1:17890`) and automatically open the **Game UI Preview Hub** in your browser.
+- **Exporting `.ui` Files**: Click **`Export .ui`** in the Workbench toolbar (or run `export_craftland_ui.py`). UICreator auto-detects Craftland Studio MCP from `.mcp.json`, `.codex/config.toml`, `.cursor/mcp.json`, `.vscode/mcp.json`, `.craftland/mcp.json`, `~/.claude.json`, or `CRAFTLAND_MCP_URL`. If **no MCP is detected**, both the Export modal and CLI automatically prompt you to enter your **Craftland MCP URL** and choose a **target output directory** (with an option to save the MCP URL to `.mcp.json` for future runs).
 - **Game UI Preview Hub (`previews/index.html`)**:
   - **Multi-State UI Cards**: View all created UIs in one place with QA verification badges (`PASSED` / `FAILED`), interactive view tabs (`HUD`, `Upgrade Shop`, `Inventory`, etc.), a per-card & global `Final UI` vs `Wireframe` thumbnail toggle, and deep links to open directly in **`Interactive`**, **`Edit UI`**, or **`Wireframe`** mode.
   - **`Group by UI` vs `Expand All Screens`**: Flip between one card per UI and an expanded storyboard grid showing every screen of every UI side-by-side.
@@ -63,18 +64,27 @@ An AI-assisted workflow and interactive browser studio for turning packed 2D pix
 
 ---
 
-## 4. Using This Skill in Another Project
+## 4. Using This Project as a Submodule in Another Project
 
-Everything required — prompt instructions, Python slicer & save server, gallery hub builder, CSS/JS UI kit templates, scaffold generator, and Playwright verifier — is self-contained inside `.agents/skills/game-ui-preview/`.
+Everything required — prompt instructions, Python slicer & Studio save server, gallery hub builder, CSS/JS UI kit templates, Craftland `.ui` exporter, and one-click launcher (`launch_ui_hub.bat`) — is tracked directly inside `UICreator`:
 
-1. **Copy the Skill Folder**: Copy `.agents/skills/game-ui-preview/` into `<other-project>/.agents/skills/game-ui-preview/`.
-2. **Prerequisites**:
-   - **Python 3** with **Pillow** (`pip install pillow`)
+1. **Add as a Git Submodule** (recommended path for Craftland projects: `Tools/UICreator`):
+   ```powershell
+   git submodule add https://github.com/lephongnguyenctv-ship-it/UICreator.git Tools/UICreator
+   ```
+2. **Ready Immediately After Setup**:
+   - **`Tools/UICreator/launch_ui_hub.bat`** is included right in the repository the moment the submodule is initialized. Double-clicking it automatically detects whether it is running inside a Craftland project (`main.gproj`), another host submodule project, or standalone, indexes your sprites (if needed), starts the Studio backend on port `17890`, and opens the UI Preview Hub.
+   - **`Tools/UICreator/update_uicreator.bat`** pulls the latest `UICreator` `main` commit and re-syncs the catalog.
+3. **Exporting `.ui` Files (Auto-Detect MCP or Guided Prompt)**:
+   - When exporting via the Workbench **`Export .ui`** button or `export_craftland_ui.py`, `UICreator` auto-detects Craftland Studio MCP URLs from `.mcp.json`, `.codex/config.toml`, `.cursor/mcp.json`, `.vscode/mcp.json`, `.craftland/mcp.json`, `~/.claude.json`, or `CRAFTLAND_MCP_URL`.
+   - If **no MCP configuration is detected**, both the browser modal and the CLI automatically prompt you for a **Craftland MCP URL** and a **target output directory** (with an option to save the MCP URL to `.mcp.json` for future exports).
+4. **Prerequisites**:
+   - **Python 3** with **Pillow** (`pip install pillow`) or **`uv`**
    - **Node.js** + **Playwright Chromium** (`npx playwright install chromium` or existing Playwright cache)
-3. **What Gets Created in the Target Project**:
-   - `previews/index.html` & `launch_ui_hub.bat` — Master UI Preview Hub + one-click launcher.
-   - `previews/_catalog/` — Extracted sprites (`slices/`), `contact_sheets/`, `manifest.json`, `catalog-data.js`, `previews-data.js`, and `overrides.json` (your saved manual 9-slice tweaks).
-   - `previews/<slug>/` — Self-contained HTML preview (`index.html`, `pixel-ui-kit.css`, `pixel-ui-kit.js`) and `verification/` Playwright screenshots & JSON reports.
+5. **What Gets Created in the Target Project**:
+   - `Tools/ui-previews/index.html` (or `previews/index.html`) — Master UI Preview Hub.
+   - `Tools/ui-previews/_catalog/` — Sprite manifest (`manifest.json`, `catalog-data.js`), `contact_sheets/`, `previews-data.js`, and `overrides.json` (your saved manual 9-slice tweaks).
+   - `Tools/ui-previews/<slug>/` — Self-contained HTML preview (`index.html`, `pixel-ui-kit.css`, `pixel-ui-kit.js`) and `verification/` Playwright screenshots & JSON reports.
    - **Source PNGs** inside your sprite folder are never altered or overwritten.
 
 ---

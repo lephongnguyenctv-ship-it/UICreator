@@ -213,6 +213,34 @@
     });
   }
 
+  async function getFromStudioServer(apiPath) {
+    const endpoints = [];
+    if (global.location && /^https?:$/i.test(global.location.protocol)) {
+      endpoints.push(new URL(apiPath, global.location.origin).href);
+    }
+    const studioEndpoint = `http://127.0.0.1:${STUDIO_SERVER_PORT}${apiPath}`;
+    if (!endpoints.includes(studioEndpoint)) {
+      endpoints.push(studioEndpoint);
+    }
+    for (const endpoint of endpoints) {
+      try {
+        const res = await fetch(endpoint, { method: 'GET', cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.ok) {
+            return { ok: true, method: 'studio-server', data };
+          }
+          if (data && data.ok === false) {
+            return { ok: false, method: 'studio-server', error: data.error || 'Request failed', data };
+          }
+        }
+      } catch {
+        // Endpoint unreachable; try next candidate
+      }
+    }
+    return { ok: false, method: 'offline', data: null };
+  }
+
   async function postToStudioServer(apiPath, payload) {
     const endpoints = [];
     if (global.location && /^https?:$/i.test(global.location.protocol)) {
@@ -7384,6 +7412,122 @@
     return (base || 'Preview') + 'Draft';
   }
 
+  const craftlandExportState = {
+    checked: false,
+    serverOnline: false,
+    mcpDetected: false,
+    mcpUrl: '',
+    mcpSource: '',
+    projectRoot: '',
+    existingUiDirs: ['Assets/HUDs/_Draft'],
+  };
+
+  function _exportPrefKey(kind) {
+    const rootKey = (craftlandExportState.projectRoot || global.location.pathname || 'default').toLowerCase();
+    return `px_export_${kind}::${rootKey}`;
+  }
+
+  function _readExportPref(kind) {
+    try {
+      return global.localStorage ? global.localStorage.getItem(_exportPrefKey(kind)) || '' : '';
+    } catch {
+      return '';
+    }
+  }
+
+  function _writeExportPref(kind, value) {
+    try {
+      if (global.localStorage) {
+        if (value) global.localStorage.setItem(_exportPrefKey(kind), value);
+        else global.localStorage.removeItem(_exportPrefKey(kind));
+      }
+    } catch {
+      // Ignore storage errors
+    }
+  }
+
+  function renderCraftlandExportMcpState() {
+    const banner = document.getElementById('wb-export-mcp-banner');
+    const mcpLabel = document.getElementById('wb-export-mcp-label');
+    const mcpInput = document.getElementById('wb-export-mcp-url');
+    const dirLabel = document.getElementById('wb-export-ui-dir-label');
+    const dirInput = document.getElementById('wb-export-ui-dir');
+    const dirList = document.getElementById('wb-export-ui-dir-list');
+    const dirChips = document.getElementById('wb-export-dir-chips');
+    const saveRow = document.getElementById('wb-export-save-mcp-row');
+
+    const dirs = Array.isArray(craftlandExportState.existingUiDirs) && craftlandExportState.existingUiDirs.length
+      ? craftlandExportState.existingUiDirs
+      : ['Assets/HUDs/_Draft'];
+
+    if (dirList) {
+      dirList.innerHTML = dirs.map(d => `<option value="${escapeHtml(d)}"></option>`).join('');
+    }
+    if (dirChips) {
+      dirChips.hidden = false;
+      dirChips.innerHTML = dirs
+        .slice(0, 5)
+        .map(d => `<button type="button" class="wb-export-dir-chip" data-wb-export-dir-pick="${escapeHtml(d)}">${escapeHtml(d)}</button>`)
+        .join('');
+    }
+
+    if (!craftlandExportState.checked) {
+      if (banner) {
+        banner.className = 'wb-export-mcp-banner';
+        banner.textContent = 'Checking project Craftland MCP configuration…';
+      }
+      return;
+    }
+
+    if (!craftlandExportState.serverOnline) {
+      if (banner) {
+        banner.className = 'wb-export-mcp-banner is-warn';
+        banner.innerHTML =
+          '<strong>Studio backend offline.</strong> Double-click <code>launch_ui_hub.bat</code> in UICreator to enable live export, then provide your MCP URL &amp; output directory if needed.';
+      }
+      if (mcpLabel) mcpLabel.textContent = 'Craftland MCP URL';
+      if (dirLabel) dirLabel.textContent = 'Target Output Directory';
+      if (saveRow) saveRow.hidden = false;
+      return;
+    }
+
+    if (craftlandExportState.mcpDetected) {
+      if (banner) {
+        banner.className = 'wb-export-mcp-banner is-ok';
+        const srcTag = craftlandExportState.mcpSource ? ` (${escapeHtml(craftlandExportState.mcpSource)})` : '';
+        banner.innerHTML = `<strong>✓ MCP detected${srcTag}:</strong> <code>${escapeHtml(craftlandExportState.mcpUrl)}</code>`;
+      }
+      if (mcpLabel) mcpLabel.textContent = 'Craftland MCP URL Override (optional — auto-detected)';
+      if (mcpInput) {
+        mcpInput.placeholder = `Auto-detected: ${craftlandExportState.mcpUrl}`;
+        mcpInput.classList.remove('is-prompt-required', 'is-field-error');
+      }
+      if (dirLabel) dirLabel.textContent = 'Target Output Directory';
+      if (dirInput) {
+        dirInput.classList.remove('is-prompt-required', 'is-field-error');
+      }
+      if (saveRow) {
+        saveRow.hidden = !(mcpInput && mcpInput.value.trim());
+      }
+    } else {
+      if (banner) {
+        banner.className = 'wb-export-mcp-banner is-warn';
+        banner.innerHTML =
+          '<strong>⚠ No Craftland Studio MCP detected in this project.</strong> Please enter your Craftland MCP URL and choose an output directory below.';
+      }
+      if (mcpLabel) mcpLabel.textContent = 'Craftland MCP URL (Required)';
+      if (mcpInput) {
+        mcpInput.placeholder = 'e.g. http://127.0.0.1:18080/mcp';
+        mcpInput.classList.toggle('is-prompt-required', !mcpInput.value.trim());
+      }
+      if (dirLabel) dirLabel.textContent = 'Target Output Directory (Required)';
+      if (dirInput) {
+        dirInput.classList.toggle('is-prompt-required', !dirInput.value.trim());
+      }
+      if (saveRow) saveRow.hidden = false;
+    }
+  }
+
   function ensureCraftlandExportModal() {
     let modal = document.getElementById('wb-export-ui-modal');
     if (modal) return modal;
@@ -7399,6 +7543,7 @@
           <button type="button" class="wb-btn wb-btn-sm" data-wb-export-close>✕</button>
         </div>
         <div class="wb-export-modal-body">
+          <div id="wb-export-mcp-banner" class="wb-export-mcp-banner">Checking project Craftland MCP configuration…</div>
           <div class="wb-export-field">
             <label for="wb-export-view">Active View (<code>[data-ui-view]</code>)</label>
             <select id="wb-export-view" class="wb-select"></select>
@@ -7408,12 +7553,18 @@
             <input id="wb-export-ui-name" class="wb-slice-input" type="text" placeholder="CheckpointRewardDraft">
           </div>
           <div class="wb-export-field">
-            <label for="wb-export-ui-dir">Target Craftland Directory</label>
-            <input id="wb-export-ui-dir" class="wb-slice-input" type="text" value="Assets/HUDs/_Draft">
+            <label id="wb-export-ui-dir-label" for="wb-export-ui-dir">Target Output Directory</label>
+            <input id="wb-export-ui-dir" class="wb-slice-input" type="text" list="wb-export-ui-dir-list" placeholder="e.g. Assets/HUDs/_Draft">
+            <datalist id="wb-export-ui-dir-list"></datalist>
+            <div id="wb-export-dir-chips" class="wb-export-dir-chips" hidden></div>
           </div>
           <div class="wb-export-field">
-            <label for="wb-export-mcp-url">Craftland MCP URL Override (optional)</label>
-            <input id="wb-export-mcp-url" class="wb-slice-input" type="text" placeholder="Auto-detect from .codex/config.toml or .cursor/mcp.json">
+            <label id="wb-export-mcp-label" for="wb-export-mcp-url">Craftland MCP URL Override (optional)</label>
+            <input id="wb-export-mcp-url" class="wb-slice-input" type="text" placeholder="Auto-detect from .mcp.json, .codex/config.toml, or .cursor/mcp.json">
+            <label id="wb-export-save-mcp-row" class="wb-export-checkbox-row" hidden>
+              <input id="wb-export-save-mcp" type="checkbox">
+              <span>Save MCP URL to project <code>.mcp.json</code> for future exports</span>
+            </label>
           </div>
           <div class="wb-export-actions">
             <button type="button" class="wb-btn" data-wb-export-run="dry">Dry-Run Plan</button>
@@ -7430,19 +7581,46 @@
         modal.hidden = true;
         return;
       }
+      const dirPick = evt.target.closest('[data-wb-export-dir-pick]');
+      if (dirPick) {
+        const dirInput = document.getElementById('wb-export-ui-dir');
+        if (dirInput) {
+          dirInput.value = dirPick.getAttribute('data-wb-export-dir-pick') || '';
+          dirInput.classList.remove('is-prompt-required', 'is-field-error');
+          dirInput.focus();
+        }
+        return;
+      }
       const runBtn = evt.target.closest('[data-wb-export-run]');
       if (runBtn) {
         const isDry = runBtn.getAttribute('data-wb-export-run') === 'dry';
         triggerCraftlandUiExport(isDry);
       }
     });
+
+    modal.addEventListener('input', evt => {
+      const target = evt.target;
+      if (target && target.id === 'wb-export-mcp-url') {
+        target.classList.remove('is-field-error');
+        target.classList.toggle('is-prompt-required', !craftlandExportState.mcpDetected && !target.value.trim());
+        const saveRow = document.getElementById('wb-export-save-mcp-row');
+        if (saveRow) {
+          saveRow.hidden = craftlandExportState.mcpDetected && !target.value.trim();
+        }
+      } else if (target && target.id === 'wb-export-ui-dir') {
+        target.classList.remove('is-field-error');
+        target.classList.toggle('is-prompt-required', !craftlandExportState.mcpDetected && !target.value.trim());
+      }
+    });
     return modal;
   }
 
-  function openCraftlandExportModal() {
+  async function openCraftlandExportModal() {
     const modal = ensureCraftlandExportModal();
     const viewSelect = document.getElementById('wb-export-view');
     const nameInput = document.getElementById('wb-export-ui-name');
+    const dirInput = document.getElementById('wb-export-ui-dir');
+    const mcpInput = document.getElementById('wb-export-mcp-url');
     const statusBox = document.getElementById('wb-export-status');
 
     const views = Array.from(document.querySelectorAll('#game-canvas [data-ui-view]'));
@@ -7473,7 +7651,52 @@
       statusBox.hidden = true;
       statusBox.innerHTML = '';
     }
+
+    craftlandExportState.checked = false;
+    renderCraftlandExportMcpState();
     modal.hidden = false;
+
+    const cfgRes = await getFromStudioServer('/api/export-config');
+    craftlandExportState.checked = true;
+    if (cfgRes.ok && cfgRes.data) {
+      craftlandExportState.serverOnline = true;
+      craftlandExportState.mcpDetected = Boolean(cfgRes.data.mcpDetected);
+      craftlandExportState.mcpUrl = cfgRes.data.mcpUrl || '';
+      craftlandExportState.mcpSource = cfgRes.data.mcpSource || '';
+      craftlandExportState.projectRoot = cfgRes.data.projectRoot || '';
+      craftlandExportState.existingUiDirs =
+        Array.isArray(cfgRes.data.existingUiDirs) && cfgRes.data.existingUiDirs.length
+          ? cfgRes.data.existingUiDirs
+          : ['Assets/HUDs/_Draft'];
+    } else {
+      craftlandExportState.serverOnline = false;
+      craftlandExportState.mcpDetected = false;
+      craftlandExportState.mcpUrl = '';
+      craftlandExportState.mcpSource = '';
+    }
+
+    const savedDir = _readExportPref('ui_dir');
+    const savedMcp = _readExportPref('mcp_url');
+    if (mcpInput && !mcpInput.value.trim() && !craftlandExportState.mcpDetected && savedMcp) {
+      mcpInput.value = savedMcp;
+    }
+    if (dirInput && !dirInput.value.trim()) {
+      if (savedDir) {
+        dirInput.value = savedDir;
+      } else if (craftlandExportState.mcpDetected) {
+        dirInput.value = craftlandExportState.existingUiDirs[0] || 'Assets/HUDs/_Draft';
+      }
+      // When no MCP is detected and no directory was chosen yet, leave dirInput empty so the user is prompted to pick/enter one
+    }
+
+    renderCraftlandExportMcpState();
+    if (craftlandExportState.serverOnline && !craftlandExportState.mcpDetected) {
+      if (mcpInput && !mcpInput.value.trim()) {
+        mcpInput.focus();
+      } else if (dirInput && !dirInput.value.trim()) {
+        dirInput.focus();
+      }
+    }
   }
 
   async function triggerCraftlandUiExport(dryRun) {
@@ -7482,12 +7705,47 @@
     const nameInput = document.getElementById('wb-export-ui-name');
     const dirInput = document.getElementById('wb-export-ui-dir');
     const mcpInput = document.getElementById('wb-export-mcp-url');
+    const saveMcpCb = document.getElementById('wb-export-save-mcp');
 
     const slug = getPreviewSlugForEdits();
     const view = (viewSelect && viewSelect.value) || '';
     const uiName = (nameInput && nameInput.value.trim()) || slugToPascalDraft(slug);
-    const uiDirectory = (dirInput && dirInput.value.trim()) || 'Assets/HUDs/_Draft';
+    const rawUiDir = (dirInput && dirInput.value.trim()) || '';
     const mcpUrl = (mcpInput && mcpInput.value.trim()) || '';
+    const saveMcpConfig = Boolean(saveMcpCb && saveMcpCb.checked && mcpUrl);
+
+    if (!dryRun) {
+      if (craftlandExportState.checked && !craftlandExportState.mcpDetected && !mcpUrl) {
+        if (mcpInput) {
+          mcpInput.classList.add('is-field-error', 'is-prompt-required');
+          mcpInput.focus();
+        }
+        if (statusBox) {
+          statusBox.hidden = false;
+          statusBox.className = 'wb-export-status is-error';
+          statusBox.innerHTML =
+            '<strong>MCP URL required:</strong> No Craftland Studio MCP server was detected in this project. Please enter the Craftland MCP URL above.';
+        }
+        return;
+      }
+      if (!rawUiDir) {
+        if (dirInput) {
+          dirInput.classList.add('is-field-error', 'is-prompt-required');
+          dirInput.focus();
+        }
+        if (statusBox) {
+          statusBox.hidden = false;
+          statusBox.className = 'wb-export-status is-error';
+          statusBox.innerHTML =
+            '<strong>Output directory required:</strong> Please enter or pick a target Craftland directory (for example <code>Assets/HUDs/_Draft</code>).';
+        }
+        return;
+      }
+    }
+
+    const uiDirectory = rawUiDir || 'Assets/HUDs/_Draft';
+    if (rawUiDir) _writeExportPref('ui_dir', rawUiDir);
+    if (mcpUrl) _writeExportPref('mcp_url', mcpUrl);
 
     if (statusBox) {
       statusBox.hidden = false;
@@ -7502,13 +7760,31 @@
       slug,
       view,
       uiName,
-      uiDirectory,
+      uiDirectory: dryRun ? uiDirectory : rawUiDir,
       mcpUrl,
+      saveMcpConfig,
       dryRun: Boolean(dryRun),
     });
 
     if (!statusBox) return;
     if (!res.ok) {
+      const errCode = res.data && res.data.code;
+      if (errCode === 'MCP_NOT_DETECTED') {
+        craftlandExportState.checked = true;
+        craftlandExportState.serverOnline = true;
+        craftlandExportState.mcpDetected = false;
+        renderCraftlandExportMcpState();
+        if (mcpInput) {
+          mcpInput.classList.add('is-field-error', 'is-prompt-required');
+          mcpInput.focus();
+        }
+        if (dirInput && !dirInput.value.trim()) {
+          dirInput.classList.add('is-prompt-required');
+        }
+      } else if (errCode === 'OUTPUT_DIR_REQUIRED' && dirInput) {
+        dirInput.classList.add('is-field-error', 'is-prompt-required');
+        dirInput.focus();
+      }
       statusBox.className = 'wb-export-status is-error';
       const errMsg =
         res.error ||
@@ -7518,6 +7794,12 @@
     }
 
     const d = res.data || {};
+    if (d.savedMcpPath && mcpUrl) {
+      craftlandExportState.mcpDetected = true;
+      craftlandExportState.mcpUrl = mcpUrl;
+      craftlandExportState.mcpSource = d.savedMcpPath;
+      renderCraftlandExportMcpState();
+    }
     const warnList = Array.isArray(d.warnings) ? d.warnings : [];
     const warnHtml =
       warnList.length > 0
@@ -7538,6 +7820,7 @@
       statusBox.innerHTML = `
         <div><strong>✓ Exported to Craftland Studio!</strong> (${d.entityCount || 0} entities created &amp; saved)</div>
         <div>Asset: <code>${escapeHtml(d.uiPath || `${uiDirectory}/${uiName}.ui`)}</code> (ID: <code>${escapeHtml(d.uiId || '')}</code>)</div>
+        ${d.savedMcpPath ? `<div>Saved MCP config: <code>${escapeHtml(d.savedMcpPath)}</code></div>` : ''}
         ${d.planPath ? `<div>Plan JSON: <code>${escapeHtml(d.planPath)}</code></div>` : ''}
         ${warnHtml}
       `;
