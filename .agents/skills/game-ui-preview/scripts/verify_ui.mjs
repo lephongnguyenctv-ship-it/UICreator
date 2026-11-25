@@ -46,17 +46,27 @@ function resolveChromiumExecutable(chromium) {
     path.join(process.env.USERPROFILE || '', 'AppData', 'Local');
   const pwRoot = process.env.PLAYWRIGHT_BROWSERS_PATH || path.join(localAppData, 'ms-playwright');
   if (fs.existsSync(pwRoot)) {
-    const dirs = fs.readdirSync(pwRoot).filter(d => d.startsWith('chromium-')).sort().reverse();
+    const dirs = fs.readdirSync(pwRoot)
+      .filter(d => d.startsWith('chromium-') || d.startsWith('chromium_headless_shell-'))
+      .sort()
+      .reverse();
     for (const d of dirs) {
       for (const rel of [
         path.join('chrome-win64', 'chrome.exe'),
         path.join('chrome-win', 'chrome.exe'),
+        path.join('chrome-headless-shell-win64', 'chrome-headless-shell.exe'),
         path.join('chrome-linux', 'chrome'),
       ]) {
         const full = path.join(pwRoot, d, rel);
         if (fs.existsSync(full)) return full;
       }
     }
+  }
+  for (const sysChrome of [
+    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+  ]) {
+    if (fs.existsSync(sysChrome)) return sysChrome;
   }
   return undefined;
 }
@@ -292,9 +302,11 @@ async function auditCurrentState(page, stateName, auditOpts = {}) {
         }
       }
 
-      // 3. Check image-rendering: pixelated on sprite classes (final mode)
+      // 3. Check image-rendering: pixelated on sprite classes (final mode, pixel-art profiles only;
+      //    Craftland Studio uses Bilinear filtering by default so HD icons & 9-slice stay smooth)
       if (
         !isWireframe &&
+        !isCraftland &&
         el.matches('.px-9slice, .px-sprite-box, .px-icon, img[data-slice-id], .px-btn-square') &&
         style.imageRendering !== 'pixelated' &&
         style.imageRendering !== 'crisp-edges'
