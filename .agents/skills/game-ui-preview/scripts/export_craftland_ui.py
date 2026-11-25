@@ -23,6 +23,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import time
 import tomllib
 from typing import Any
 import urllib.error
@@ -669,7 +670,8 @@ def apply_plan_to_craftland_mcp(
     snapshot_bytes: bytes | None = None
     if take_snapshot:
         try:
-            client.call_tool("asset-open", {"assetId": ui_id})
+            client.call_tool("asset-open", {"assetId": ui_rel_path})
+            time.sleep(1.0)
             client.call_tool("asset-get", {"assetId": ui_id, "withEntities": "true"})
             raw_snap = client.rpc("tools/call", {"name": "ui-snapshot", "arguments": {}})
             if isinstance(raw_snap, dict):
