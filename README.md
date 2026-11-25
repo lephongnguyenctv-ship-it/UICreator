@@ -73,8 +73,9 @@ Everything required — prompt instructions, Python slicer & Studio save server,
    git submodule add https://github.com/lephongnguyenctv-ship-it/UICreator.git Tools/UICreator
    ```
 2. **Ready Immediately After Setup**:
-   - **`Tools/UICreator/launch_ui_hub.bat`** is included right in the repository the moment the submodule is initialized. Double-clicking it automatically detects whether it is running inside a Craftland project (`main.gproj`), another host submodule project, or standalone, indexes your sprites (if needed), starts the Studio backend on port `17890`, and opens the UI Preview Hub.
-   - **`Tools/UICreator/update_uicreator.bat`** pulls the latest `UICreator` `main` commit and re-syncs the catalog.
+   - **`Tools/UICreator/setup_uicreator.bat`** — One-click environment & submodule setup checker/installer (verifies Git, Python/Pillow or `uv`, optional Node.js/Playwright, indexes Craftland sprites, seeds starter wireframe templates, and optionally saves your Craftland MCP URL to `.mcp.json`).
+   - **`Tools/UICreator/launch_ui_hub.bat`** — Included right in the repository the moment the submodule is initialized. Double-clicking it automatically detects whether it is running inside a Craftland project (`main.gproj`), another host submodule project, or standalone, indexes your sprites (if needed), seeds starter wireframe templates if empty, starts the Studio backend on port `17890`, and opens the UI Preview Hub.
+   - **`Tools/UICreator/update_uicreator.bat`** — Pulls the latest `UICreator` `main` commit (auto-detecting system Git, Git for Windows, or GitHub Desktop's bundled Git) and re-syncs the catalog.
 3. **Exporting `.ui` Files (Auto-Detect MCP or Guided Prompt)**:
    - When exporting via the Workbench **`Export .ui`** button or `export_craftland_ui.py`, `UICreator` auto-detects Craftland Studio MCP URLs from `.mcp.json`, `.codex/config.toml`, `.cursor/mcp.json`, `.vscode/mcp.json`, `.craftland/mcp.json`, `~/.claude.json`, or `CRAFTLAND_MCP_URL`.
    - If **no MCP configuration is detected**, both the browser modal and the CLI automatically prompt you for a **Craftland MCP URL** and a **target output directory** (with an option to save the MCP URL to `.mcp.json` for future exports).
