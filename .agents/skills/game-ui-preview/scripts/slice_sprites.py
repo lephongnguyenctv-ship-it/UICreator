@@ -1100,6 +1100,14 @@ def process_directory(
     used_ids: set[str] = set()
 
     if craftland_assets:
+        ws_id_map: dict[str, str] = {}
+        ws_id_file = Path(__file__).resolve().parent / "workshop_icon_library_ids.json"
+        if ws_id_file.is_file():
+            try:
+                ws_id_map = json.loads(ws_id_file.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                ws_id_map = {}
+
         input_roots: list[Path] = [input_dir.resolve()]
         for ext in extra_inputs or []:
             ext_resolved = ext.resolve()
@@ -1134,7 +1142,7 @@ def process_directory(
                 group = "WorkshopIconLibrary"
                 base_id = f"ws_{slugify(png_path.stem)}"
                 craftland_asset_path = f"lib://fftextures/WorkshopIconLibrary/{png_path.name}"
-                file_id = hashlib.md5(craftland_asset_path.encode("utf-8")).hexdigest()
+                file_id = ws_id_map.get(craftland_asset_path)
                 meta_slice_9 = None
             else:
                 group = rel_path.parts[0] if len(rel_path.parts) > 1 else root_folder.name

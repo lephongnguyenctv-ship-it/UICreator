@@ -352,7 +352,8 @@ async function main() {
 
           if (sliceId && slicesMap[sliceId]) {
             const rec = slicesMap[sliceId];
-            let slice9 = Array.isArray(rec.slice_9) && rec.slice_9.length === 4 ? [...rec.slice_9] : null;
+            const nativeSlice9 = Array.isArray(rec.slice_9) && rec.slice_9.length === 4 ? [...rec.slice_9] : null;
+            let slice9 = nativeSlice9 ? [...nativeSlice9] : null;
             const attrS9 = el.getAttribute('data-slice-9');
             if (attrS9) {
               const parts = attrS9.split(',').map(n => parseInt(n.trim(), 10));
@@ -365,6 +366,7 @@ async function main() {
               fileId: rec.craftland_file_id || null,
               assetPath: rec.craftland_asset_path || rec.source_file || rec.file || null,
               slice9,
+              nativeSlice9,
               nativeWidth: rec.width || 0,
               nativeHeight: rec.height || 0,
               category: rec.category || 'panel',
@@ -410,7 +412,7 @@ async function main() {
           return null;
         }
 
-        function resolveFillType(el, cs, spriteInfo, cPath) {
+        function resolveFillType(el, cs, spriteInfo, cPath, elRect) {
           const imgEdit = imageEdits[cPath] || {};
           if (typeof imgEdit.fillType === 'number' && [0, 1, 2, 3, 5].includes(imgEdit.fillType)) {
             return imgEdit.fillType;
@@ -429,6 +431,17 @@ async function main() {
             el.hasAttribute('data-slice-9') ||
             (spriteInfo && spriteInfo.slice9 && el.tagName !== 'IMG' && !el.classList.contains('px-icon'))
           ) {
+            // In Craftland Studio, fillType 1 renders .png.meta 9-slice corners at 1:1 native pixel size.
+            // If the widget is thinner/smaller than the texture's native .meta border sum (e.g. a 5px progress bar),
+            // using fillType 1 inflates the widget to the full border height (24-40px); use Simple (0) instead.
+            const effS9 = (spriteInfo && (spriteInfo.nativeSlice9 || spriteInfo.slice9)) || null;
+            if (effS9 && elRect) {
+              const minH = (Number(effS9[0]) || 0) + (Number(effS9[2]) || 0);
+              const minW = (Number(effS9[1]) || 0) + (Number(effS9[3]) || 0);
+              if (elRect.height < minH || elRect.width < minW) {
+                return 0;
+              }
+            }
             return 1;
           }
           if (el.tagName === 'IMG' || el.classList.contains('px-icon') || cs.objectFit === 'contain') {
@@ -566,7 +579,8 @@ async function main() {
             el.classList.contains('px-text-outline') || el.classList.contains('px-text-outline-lg');
           const outline =
             lblEdit.outline !== undefined ? Boolean(lblEdit.outline) : Boolean(hasOutlineClass || hasCssShadow);
-          const shadow = lblEdit.shadow !== undefined ? Boolean(lblEdit.shadow) : false;
+          const shadow =
+            lblEdit.shadow !== undefined ? Boolean(lblEdit.shadow) : Boolean(hasCssShadow || hasOutlineClass);
 
           return {
             value,
@@ -694,7 +708,7 @@ async function main() {
 
           const visibleKids = Array.from(el.children).filter(c => !shouldSkipElement(c));
           const { colorHex, alphaPct } = resolveTintAndAlpha(el, cs, spriteInfo, cPath);
-          const fillType = spriteInfo ? resolveFillType(el, cs, spriteInfo, cPath) : 0;
+          const fillType = spriteInfo ? resolveFillType(el, cs, spriteInfo, cPath, elRect) : 0;
           const imgEdit = imageEdits[cPath] || {};
 
           if (isBtn) {

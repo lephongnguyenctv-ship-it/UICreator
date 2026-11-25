@@ -194,6 +194,17 @@ def build_project_texture_index(project_root: Path) -> dict[str, Any]:
     by_snake_stem: dict[str, list[dict[str, Any]]] = {}
     lib_file_ids: dict[str, str] = {}
 
+    ws_id_file = _SCRIPTS_DIR / "workshop_icon_library_ids.json"
+    if ws_id_file.is_file():
+        try:
+            loaded_ws = json.loads(ws_id_file.read_text(encoding="utf-8"))
+            if isinstance(loaded_ws, dict):
+                for k, v in loaded_ws.items():
+                    if isinstance(k, str) and isinstance(v, str):
+                        lib_file_ids[k] = v
+        except (OSError, json.JSONDecodeError):
+            pass
+
     assets_dir = project_root / "Assets"
     if assets_dir.is_dir():
         for meta_path in sorted(assets_dir.rglob("*.meta")):
@@ -274,7 +285,20 @@ def resolve_plan_textures_on_disk(plan: dict[str, Any], project_root: Path) -> l
                 fname = Path(raw_path).name
                 raw_path = f"lib://fftextures/WorkshopIconLibrary/{fname}"
             comp["assetPath"] = raw_path
-            comp["fileId"] = lib_file_ids.get(raw_path) or raw_file_id or hashlib.md5(raw_path.encode("utf-8")).hexdigest()
+            known_id = lib_file_ids.get(raw_path)
+            if known_id:
+                comp["fileId"] = known_id
+            else:
+                comp["fileId"] = None
+                warnings.append(
+                    {
+                        "type": "unverified-workshop-texture",
+                        "entity": entity_name,
+                        "sliceId": raw_slice_id,
+                        "assetPath": raw_path,
+                        "message": f'Texture "{raw_path}" on entity "{entity_name}" is not in the built-in OB51 lib://fftextures/WorkshopIconLibrary catalog; prefer a real project Assets/Sprites/ texture.',
+                    }
+                )
             return
 
         # 2. Exact relative path match under Assets/
@@ -433,14 +457,14 @@ def _resolve_mcp_texture_source(
     comp: dict[str, Any],
     cache: dict[str, Any],
 ) -> Any:
-    """Resolve texture fileId or GFileRefer for image.source / button.spriteName."""
+    """Resolve texture fileId for image.source / button.spriteName via Craftland MCP asset-get."""
     asset_path = str(comp.get("assetPath") or "").strip()
     file_id = str(comp.get("fileId") or "").strip()
     cache_key = asset_path or file_id
     if cache_key and cache_key in cache:
         return cache[cache_key]
 
-    if asset_path and not asset_path.startswith("lib://"):
+    if asset_path:
         try:
             res = client.call_tool("asset-get", {"assetId": asset_path, "withEntities": "false"})
             resolved_id = _extract_result_id(res)
@@ -451,8 +475,15 @@ def _resolve_mcp_texture_source(
             pass
 
     if file_id:
-        cache[cache_key] = file_id
-        return file_id
+        try:
+            res = client.call_tool("asset-get", {"assetId": file_id, "withEntities": "false"})
+            resolved_id = _extract_result_id(res)
+            if resolved_id:
+                cache[cache_key] = resolved_id
+                return resolved_id
+        except Exception:
+            pass
+
     return None
 
 
@@ -559,20 +590,18 @@ def apply_plan_to_craftland_mcp(
         if entity_type == "UITextEntity" and isinstance(ent.get("text"), dict):
             t = ent["text"]
             align = t.get("alignment") or {}
+            has_shadow = bool(t.get("shadow", False) or t.get("outline", False))
+            shadow_col = str(t.get("shadowColor") or t.get("outlineColor") or "#000000")
             props.update(
                 {
                     "text.value": str(t.get("value") or " "),
+                    "text.font": "Default",
                     "text.fontSize": int(round(float(t.get("fontSize", 24)))),
                     "text.color": str(t.get("color") or "#FFFFFF"),
                     "text.alignment.h": str(align.get("h") or "center"),
                     "text.alignment.v": str(align.get("v") or "middle"),
-                    "text.fontStyle.bold": bool(t.get("bold", False)),
-                    "text.fontStyle.italic": bool(t.get("italic", False)),
-                    "text.fontStyle.underline": bool(t.get("underline", False)),
-                    "text.outline": bool(t.get("outline", False)),
-                    "text.outlineColor": str(t.get("outlineColor") or "#000000"),
-                    "text.shadow": bool(t.get("shadow", False)),
-                    "text.shadowColor": str(t.get("shadowColor") or "#000000"),
+                    "text.shadow": has_shadow,
+                    "text.shadowColor": shadow_col,
                     "text.overflow": int(t.get("overflow", 0)),
                 }
             )
@@ -581,18 +610,20 @@ def apply_plan_to_craftland_mcp(
             img = ent["image"]
             props["image.color"] = str(img.get("color") or "#FFFFFF")
             props["image.fillType"] = int(img.get("fillType", 0))
-            if img.get("centerInvisible"):
-                props["image.centerInvisible"] = True
-            if int(img.get("fillType", 0)) == 3:
-                props["image.fillDir"] = int(img.get("fillDir", 0))
-                props["image.fillAmount"] = float(img.get("fillAmount", 1.0))
             rev = img.get("reverse")
-            if isinstance(rev, dict) and (rev.get("x") or rev.get("y")):
-                props["image.reverse"] = {"x": bool(rev.get("x")), "y": bool(rev.get("y"))}
+            if isinstance(rev, dict):
+                if rev.get("x"):
+                    props["image.reverse.x"] = True
+                if rev.get("y"):
+                    props["image.reverse.y"] = True
 
             src_val = _resolve_mcp_texture_source(client, img, tex_cache)
             if src_val:
                 props["image.source"] = src_val
+            else:
+                mcp_warnings.append(
+                    f'Widget "{final_name}" texture could not be resolved in Craftland Studio (path={img.get("assetPath")!r}).'
+                )
 
         elif entity_type == "UIButtonEntity" and isinstance(ent.get("button"), dict):
             btn = ent["button"]
