@@ -80,6 +80,46 @@ def read_craftland_png_meta(png_path: Path) -> tuple[str | None, list[int] | Non
     return file_id, slice_9
 
 
+def write_craftland_png_meta_slice9(png_path: Path, slice_9: list[int] | None) -> bool:
+    """Sync [top, right, bottom, left] 9-slice borders into sibling <sprite>.png.meta JSON.
+
+    Preserves fileId and all existing metadata fields. Returns True if the .meta file was updated.
+    """
+    meta_path = Path(str(png_path) + ".meta")
+    if not meta_path.is_file():
+        return False
+    try:
+        data = json.loads(meta_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    if not isinstance(data, dict):
+        return False
+
+    border_keys = ("borderLeft", "borderRight", "borderBottom", "borderTop")
+    old_vals = {k: data.get(k) for k in border_keys}
+
+    if slice_9 is None:
+        for k in border_keys:
+            data.pop(k, None)
+    else:
+        t, r, b, l = (max(0, int(v)) for v in slice_9[:4])
+        if t == 0 and r == 0 and b == 0 and l == 0:
+            for k in border_keys:
+                data.pop(k, None)
+        else:
+            data["borderLeft"] = l
+            data["borderRight"] = r
+            data["borderBottom"] = b
+            data["borderTop"] = t
+
+    new_vals = {k: data.get(k) for k in border_keys}
+    if new_vals == old_vals:
+        return False
+
+    meta_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return True
+
+
 def shorten_stem(rel_path: Path) -> str:
     """Build a concise, deterministic prefix from a relative PNG path."""
     parts = [slugify(p) for p in rel_path.with_suffix("").parts]
@@ -438,8 +478,10 @@ def apply_slice9_overrides_in_place(
     output_dir: Path,
     updates: dict[str, list[int] | None],
     project_root: Path | None = None,
+    sync_craftland_meta: bool = True,
+    meta_synced_out: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Update overrides.json, manifest.json, and catalog-data.js in place without re-slicing sheets."""
+    """Update overrides.json, manifest.json, catalog-data.js, and sibling Craftland .png.meta files in place."""
     overrides = load_overrides(output_dir)
     slice_9_map: dict[str, list[int]] = overrides["slice_9"]
 
@@ -483,7 +525,30 @@ def apply_slice9_overrides_in_place(
                             with Image.open(sprite_path) as raw_crop:
                                 rec["slice_9"] = estimate_9slice(raw_crop.convert("RGBA"), str(rec.get("category", "panel")))
                 else:
-                    rec["slice_9"] = [max(0, int(x)) for x in val[:4]]
+                    clamped = [max(0, int(x)) for x in val[:4]]
+                    rec["slice_9"] = clamped
+                    if sync_craftland_meta:
+                        candidates = [
+                            str(rec.get("craftland_asset_path") or ""),
+                            str(rec.get("file") or ""),
+                            str(rec.get("source_file") or ""),
+                        ]
+                        for cand in candidates:
+                            if not cand or cand.startswith("lib://"):
+                                continue
+                            sprite_path = resolved_proj_root / cand
+                            if not sprite_path.is_file():
+                                sprite_path = output_dir / cand
+                            if sprite_path.is_file() and Path(str(sprite_path) + ".meta").is_file():
+                                if write_craftland_png_meta_slice9(sprite_path, clamped) and meta_synced_out is not None:
+                                    meta_p = Path(str(sprite_path) + ".meta").resolve()
+                                    try:
+                                        meta_rel = meta_p.relative_to(resolved_proj_root).as_posix()
+                                    except ValueError:
+                                        meta_rel = meta_p.as_posix()
+                                    if meta_rel not in meta_synced_out:
+                                        meta_synced_out.append(meta_rel)
+                                break
 
             manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
             catalog_js_path = output_dir / "catalog-data.js"
@@ -943,6 +1008,7 @@ def run_studio_server(
                 dry_run = bool(data.get("dryRun", False))
                 take_snapshot = bool(data.get("snapshot", False))
                 save_mcp_config = bool(data.get("saveMcpConfig", False))
+                sync_slice9_meta = bool(data.get("syncSlice9Meta", True))
                 if not dry_run and not ui_dir:
                     self._send_json(
                         200,
@@ -968,6 +1034,7 @@ def run_studio_server(
                         dry_run=dry_run,
                         take_snapshot=take_snapshot,
                         save_mcp_config=save_mcp_config,
+                        sync_slice9_meta=sync_slice9_meta,
                     )
                     self._send_json(200, {"ok": True, **export_res})
                 except McpNotDetectedError as exc:
@@ -1009,7 +1076,15 @@ def run_studio_server(
             if data.get("reset_slice_id"):
                 updates[str(data["reset_slice_id"])] = None
 
-            updated_map = apply_slice9_overrides_in_place(catalog_dir, updates, project_root=resolved_root)
+            meta_synced: list[str] = []
+            sync_meta = bool(data.get("sync_meta", True))
+            updated_map = apply_slice9_overrides_in_place(
+                catalog_dir,
+                updates,
+                project_root=resolved_root,
+                sync_craftland_meta=sync_meta,
+                meta_synced_out=meta_synced,
+            )
             resolved_map: dict[str, Any] = {}
             manifest_path = catalog_dir / "manifest.json"
             if manifest_path.exists():
@@ -1022,7 +1097,10 @@ def run_studio_server(
                             resolved_map[sid] = rec["slice_9"]
                 except (OSError, json.JSONDecodeError):
                     pass
-            self._send_json(200, {"ok": True, "slice_9": updated_map, "resolved": resolved_map})
+            self._send_json(
+                200,
+                {"ok": True, "slice_9": updated_map, "resolved": resolved_map, "meta_synced": meta_synced},
+            )
 
         def log_message(self, format: str, *args: Any) -> None:
             pass
@@ -1526,7 +1604,12 @@ def main() -> int:
         nargs=2,
         action="append",
         metavar=("SLICE_ID", "T,R,B,L"),
-        help="Save a manual 9-slice override (e.g. --set-slice9 basic_pack_056 4,4,5,4) into overrides.json.",
+        help="Save a manual 9-slice override (e.g. --set-slice9 basic_pack_056 4,4,5,4) into overrides.json and Craftland .png.meta.",
+    )
+    parser.add_argument(
+        "--no-sync-meta",
+        action="store_true",
+        help="Do not sync --set-slice9 borders back to sibling Craftland <sprite>.png.meta files.",
     )
     parser.add_argument("--reslice", action="store_true", help="Force full sheet re-slice after applying --set-slice9.")
     parser.add_argument("--sync-sources", action="store_true", help="Resolve all manifest source_file paths to real existing files on disk.")
@@ -1556,9 +1639,17 @@ def main() -> int:
             if len(parts) != 4:
                 raise SystemExit(f"Invalid --set-slice9 values '{raw_vals}' for {slice_id}; expected 4 integers T,R,B,L")
             updates[slice_id] = parts
-        updated_map = apply_slice9_overrides_in_place(out_dir, updates, project_root=effective_root)
+        meta_synced: list[str] = []
+        updated_map = apply_slice9_overrides_in_place(
+            out_dir,
+            updates,
+            project_root=effective_root,
+            sync_craftland_meta=not args.no_sync_meta,
+            meta_synced_out=meta_synced,
+        )
         if not args.reslice and not args.serve and (out_dir / "manifest.json").exists():
-            print(f"Updated 9-slice overrides in place ({len(updates)} updated, {len(updated_map)} total).")
+            meta_msg = f"; synced {len(meta_synced)} Craftland .png.meta" if meta_synced else ""
+            print(f"Updated 9-slice overrides in place ({len(updates)} updated, {len(updated_map)} total{meta_msg}).")
             return 0
 
     if args.serve:

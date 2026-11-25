@@ -142,8 +142,21 @@ async function main() {
 
     await page.goto(targetUrl, { waitUntil: 'load', timeout: 30000 });
 
+    let diskUiEditsFallback = {};
+    const editsJsonPath = path.join(path.dirname(pagePath), 'ui-edits.json');
+    if (fs.existsSync(editsJsonPath)) {
+      try {
+        const parsedEdits = JSON.parse(fs.readFileSync(editsJsonPath, 'utf8'));
+        if (parsedEdits && typeof parsedEdits === 'object') {
+          diskUiEditsFallback = parsedEdits;
+        }
+      } catch {
+        // Ignore malformed optional ui-edits.json
+      }
+    }
+
     const extracted = await page.evaluate(
-      async ({ targetView, canvasW, canvasH }) => {
+      async ({ targetView, canvasW, canvasH, diskUiEditsFallback }) => {
         if (window.PixelUI) {
           if (typeof window.PixelUI.setRenderMode === 'function') {
             window.PixelUI.setRenderMode('final');
@@ -181,21 +194,29 @@ async function main() {
           null;
         const resolvedViewId = activeViewEl ? activeViewEl.getAttribute('data-ui-view') || 'main' : 'main';
 
-        // Identify preview slug for saved ui-edits
+        // Identify preview slug for saved ui-edits (merging optional ui-edits.json fallback under window.PIXELUI_EDITS)
         const pathParts = window.location.pathname.replace(/\\/g, '/').split('/').filter(Boolean);
         const slug = pathParts.length >= 2 ? pathParts[pathParts.length - 2] : 'default';
-        const diskEdits = (window.PIXELUI_EDITS && window.PIXELUI_EDITS[slug]) || {};
-        const transformEdits = diskEdits.transformEdits || {};
-        const labelEdits = diskEdits.labelEdits || {};
-        const imageEdits = diskEdits.imageEdits || {};
-        const tintEdits = diskEdits.tintEdits || {};
+        const windowEdits = (window.PIXELUI_EDITS && window.PIXELUI_EDITS[slug]) || {};
+        const mergeEditBucket = key =>
+          Object.assign(
+            {},
+            (diskUiEditsFallback && diskUiEditsFallback[key]) || {},
+            (windowEdits && windowEdits[key]) || {}
+          );
+        const transformEdits = mergeEditBucket('transformEdits');
+        const labelEdits = mergeEditBucket('labelEdits');
+        const imageEdits = mergeEditBucket('imageEdits');
+        const tintEdits = mergeEditBucket('tintEdits');
 
         const canvasRect = canvas.getBoundingClientRect();
         const warnings = [];
         const rawEntities = [];
         let priorityCounter = 0;
 
-        function isInternalOverlay(el) {
+        // Exact mirror of pixel-ui-kit.js isInternalOverlayElement() so getCanvasPath() keys
+        // always match saved ui-edits.json paths.
+        function isDomPathOverlay(el) {
           if (!el || el.nodeType !== 1) return true;
           if (
             el.id === '__verify_annotations__' ||
@@ -205,9 +226,15 @@ async function main() {
           ) {
             return true;
           }
+          if (el.classList.contains('px-tint-overlay') || el.classList.contains('px-grad-overlay')) {
+            return true;
+          }
+          return false;
+        }
+
+        function isInternalOverlay(el) {
+          if (isDomPathOverlay(el)) return true;
           if (
-            el.classList.contains('px-tint-overlay') ||
-            el.classList.contains('px-grad-overlay') ||
             el.classList.contains('world-backdrop-props') ||
             el.classList.contains('ctx-icon-only-label')
           ) {
@@ -234,13 +261,13 @@ async function main() {
         }
 
         function getCanvasPath(el) {
-          if (!el || !canvas.contains(el) || el === canvas) return '';
+          if (!el || !canvas.contains(el) || el === canvas || isDomPathOverlay(el)) return '';
           const parts = [];
           let cur = el;
           while (cur && cur !== canvas) {
             const p = cur.parentElement;
             if (!p) return '';
-            const kids = Array.from(p.children).filter(c => !isInternalOverlay(c));
+            const kids = Array.from(p.children).filter(c => !isDomPathOverlay(c));
             const idx = kids.indexOf(cur);
             if (idx < 0) return '';
             parts.unshift(String(idx));
@@ -434,7 +461,7 @@ async function main() {
             // In Craftland Studio, fillType 1 renders .png.meta 9-slice corners at 1:1 native pixel size.
             // If the widget is thinner/smaller than the texture's native .meta border sum (e.g. a 5px progress bar),
             // using fillType 1 inflates the widget to the full border height (24-40px); use Simple (0) instead.
-            const effS9 = (spriteInfo && (spriteInfo.nativeSlice9 || spriteInfo.slice9)) || null;
+            const effS9 = (spriteInfo && (spriteInfo.slice9 || spriteInfo.nativeSlice9)) || null;
             if (effS9 && elRect) {
               const minH = (Number(effS9[0]) || 0) + (Number(effS9[2]) || 0);
               const minW = (Number(effS9[1]) || 0) + (Number(effS9[3]) || 0);
@@ -484,8 +511,52 @@ async function main() {
           return { colorHex, alphaPct };
         }
 
-        function computeCraftlandTransform(elRect, parentRect, cPath, isFullBleedChild = false) {
-          const tfEdit = transformEdits[cPath] || {};
+        function numOr(val, fallback) {
+          const n = Number(val);
+          return Number.isFinite(n) ? n : fallback;
+        }
+
+        function parsePairAttr(raw) {
+          if (!raw) return null;
+          const parts = String(raw)
+            .split(',')
+            .map(s => Number(s.trim()));
+          if (parts.length === 2 && Number.isFinite(parts[0]) && Number.isFinite(parts[1])) {
+            return parts;
+          }
+          return null;
+        }
+
+        function parseRotateDeg(el, cs) {
+          const raw = (el && el.style && el.style.rotate) || (cs && cs.rotate) || '';
+          if (!raw || raw === 'none') return 0;
+          const m = String(raw).match(/(-?[\d.]+)\s*(deg|rad|turn)?/i);
+          if (!m) return 0;
+          const val = parseFloat(m[1]);
+          if (!Number.isFinite(val)) return 0;
+          const unit = (m[2] || 'deg').toLowerCase();
+          if (unit === 'rad') return Math.round(((val * 180) / Math.PI) * 100) / 100;
+          if (unit === 'turn') return Math.round(val * 360 * 100) / 100;
+          return Math.round(val * 100) / 100;
+        }
+
+        function measureUnrotatedRect(el, cs) {
+          const prevInlineRotate = el && el.style ? el.style.rotate : '';
+          const hasRotate = Boolean(
+            (prevInlineRotate && prevInlineRotate !== 'none' && prevInlineRotate !== '0deg') ||
+              (cs && cs.rotate && cs.rotate !== 'none' && cs.rotate !== '0deg')
+          );
+          if (!hasRotate) {
+            return el.getBoundingClientRect();
+          }
+          el.style.rotate = '0deg';
+          const rect = el.getBoundingClientRect();
+          el.style.rotate = prevInlineRotate;
+          return rect;
+        }
+
+        function computeCraftlandTransform(el, cs, elRect, parentRect, cPath, isFullBleedChild = false) {
+          const tfEdit = transformEdits[cPath] || null;
           const Wp = Math.max(1, parentRect.width);
           const Hp = Math.max(1, parentRect.height);
           const w = Math.max(1, elRect.width);
@@ -493,22 +564,46 @@ async function main() {
           const xBL = elRect.left - parentRect.left;
           const yBL = Hp - (elRect.top - parentRect.top) - h;
 
-          let aMin = [0, 0];
-          let aMax = [0, 0];
-          let pivot = [0, 0];
-          let rotate = 0;
+          // Match pixel-ui-kit.js Web Inspector defaults: Center/Middle (0.5, 0.5) & Pivot (0.5, 0.5)
+          let aMin = [0.5, 0.5];
+          let aMax = [0.5, 0.5];
+          let pivot = [0.5, 0.5];
+          let rotate = parseRotateDeg(el, cs);
 
-          if (isFullBleedChild) {
+          const hasExplicitTfAnchor = Boolean(
+            tfEdit &&
+              ((Array.isArray(tfEdit.anchorMin) && tfEdit.anchorMin.length === 2) ||
+                (Array.isArray(tfEdit.anchorMax) && tfEdit.anchorMax.length === 2))
+          );
+          const attrMin = parsePairAttr(el && el.getAttribute('data-anchor-min'));
+          const attrMax = parsePairAttr(el && el.getAttribute('data-anchor-max'));
+          const attrPivot = parsePairAttr(el && el.getAttribute('data-pivot'));
+
+          if (hasExplicitTfAnchor) {
+            if (Array.isArray(tfEdit.anchorMin) && tfEdit.anchorMin.length === 2) {
+              aMin = [numOr(tfEdit.anchorMin[0], 0.5), numOr(tfEdit.anchorMin[1], 0.5)];
+            }
+            if (Array.isArray(tfEdit.anchorMax) && tfEdit.anchorMax.length === 2) {
+              aMax = [numOr(tfEdit.anchorMax[0], aMin[0]), numOr(tfEdit.anchorMax[1], aMin[1])];
+            } else {
+              aMax = [aMin[0], aMin[1]];
+            }
+          } else if (attrMin || attrMax) {
+            if (attrMin) aMin = attrMin;
+            aMax = attrMax || [aMin[0], aMin[1]];
+          } else if (isFullBleedChild) {
             aMin = [0, 0];
             aMax = [1, 1];
-            pivot = [0.5, 0.5];
-          } else if (tfEdit && Array.isArray(tfEdit.anchorMin) && Array.isArray(tfEdit.anchorMax)) {
-            aMin = [Number(tfEdit.anchorMin[0]) || 0, Number(tfEdit.anchorMin[1]) || 0];
-            aMax = [Number(tfEdit.anchorMax[0]) || 0, Number(tfEdit.anchorMax[1]) || 0];
-            pivot = Array.isArray(tfEdit.pivot)
-              ? [Number(tfEdit.pivot[0]) || 0.5, Number(tfEdit.pivot[1]) || 0.5]
-              : [0.5, 0.5];
-            rotate = Number(tfEdit.rotate) || 0;
+          }
+
+          if (tfEdit && Array.isArray(tfEdit.pivot) && tfEdit.pivot.length === 2) {
+            pivot = [numOr(tfEdit.pivot[0], 0.5), numOr(tfEdit.pivot[1], 0.5)];
+          } else if (attrPivot) {
+            pivot = attrPivot;
+          }
+
+          if (tfEdit && tfEdit.rotate !== undefined) {
+            rotate = numOr(tfEdit.rotate, rotate);
           }
 
           const Wa = (aMax[0] - aMin[0]) * Wp;
@@ -638,7 +733,7 @@ async function main() {
           if (shouldSkipElement(el)) return;
 
           const cs = getComputedStyle(el);
-          const elRect = el.getBoundingClientRect();
+          const elRect = measureUnrotatedRect(el, cs);
           const cPath = getCanvasPath(el);
 
           // Check for unsupported CSS features to report as advisory warnings
@@ -684,7 +779,7 @@ async function main() {
             Math.abs(elRect.height - parentRect.height) <= 2.5 &&
             cs.position === 'absolute';
 
-          const transform = computeCraftlandTransform(elRect, parentRect, cPath, isFullBleed);
+          const transform = computeCraftlandTransform(el, cs, elRect, parentRect, cPath, isFullBleed);
 
           if (isText) {
             const textProps = extractTextProperties(el, cs, cPath);
@@ -743,6 +838,7 @@ async function main() {
                       left: btnSp.slice9[3],
                     }
                   : { top: 0, right: 0, bottom: 0, left: 0 },
+                catalogSlice9: btnSp.nativeSlice9 ? [...btnSp.nativeSlice9] : null,
                 disableCollider: Boolean(imgEdit.passthrough || el.classList.contains('px-btn-passthrough')),
               },
             });
@@ -798,6 +894,7 @@ async function main() {
                     left: spriteInfo.slice9[3],
                   }
                 : { top: 0, right: 0, bottom: 0, left: 0 },
+              catalogSlice9: spriteInfo.nativeSlice9 ? [...spriteInfo.nativeSlice9] : null,
               centerInvisible: Boolean(
                 imgEdit.centerInvisible || el.classList.contains('px-9slice-no-center')
               ),
@@ -889,7 +986,7 @@ async function main() {
           warnings,
         };
       },
-      { targetView: opts.view, canvasW: opts.width, canvasH: opts.height }
+      { targetView: opts.view, canvasW: opts.width, canvasH: opts.height, diskUiEditsFallback }
     );
 
     const keyToId = new Map();

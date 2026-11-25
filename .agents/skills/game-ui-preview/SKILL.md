@@ -18,9 +18,11 @@ Use this skill whenever the user provides PNG sprite assets (single sprites or p
 
 1. **Never guess sprite coordinates or invent filenames.** Always slice the source PNGs with `slice_sprites.py` and visually inspect the generated `contact_sheet_*.png` files with `read_file` before writing HTML.
 2. **Preserve pixel-art crispness, 9-slice ratios, and safe border spacing.** Use `.px-9slice` (plus `.px-btn` on clickable buttons) and `.px-sprite-box` / `.px-icon` via `data-slice-id="..."` so `pixel-ui-kit.js` hydrates real paths, native dimensions, and 9-slice insets from `catalog-data.js`. Always size `.px-9slice` frames/slots large enough so child icons and labels stay strictly inside the inner box (`outer_size - (slice_1 + slice_2) * scale`) rather than overlapping sliced borders (use `data-border-overlap-ok="true"` only for intentional badges/tags).
-3. **Treat auto 9-slice as a heuristic, not 100% ground truth.** Switch to **`Edit UI`** mode (`[data-wb-mode="edit"]`) in the Workbench to inspect widgets or pick any sprite directly from the bottom **`Resources`** tab to open its **9-Slice Editor** + **Live Stretch Preview** in the Right tab. You can tune 9-slice insets and click **`Save 9-Slice`** to persist them to `previews/_catalog/overrides.json`, `manifest.json`, and `catalog-data.js` (via `slice_sprites.py --serve` or `--set-slice9 <id> T,R,B,L`), edit widget text directly (via the Right Widget Inspector or by double-clicking text on the canvas), and swap widget sprites via **`Browse Sprites…`** / Slice ID input (saved per-UI to `previews/<slug>/ui-edits.js` and `ui-edits.json`).
+3. **Treat auto 9-slice as a heuristic, not 100% ground truth.** Switch to **`Edit UI`** mode (`[data-wb-mode="edit"]`) in the Workbench to inspect widgets or pick any sprite directly from the bottom **`Resources`** tab to open its **9-Slice Editor** + **Live Stretch Preview** in the Right tab. You can tune 9-slice insets and click **`Save 9-Slice`** to persist them to `previews/_catalog/overrides.json`, `manifest.json`, and `catalog-data.js` — and automatically sync `borderTop/Right/Bottom/Left` back to Craftland `<sprite>.png.meta` when a sibling `.png.meta` exists (via `slice_sprites.py --serve` or `--set-slice9 <id> T,R,B,L`), edit widget text directly (via the Right Widget Inspector or by double-clicking text on the canvas), and swap widget sprites via **`Browse Sprites…`** / Slice ID input (saved per-UI to `previews/<slug>/ui-edits.js` and `ui-edits.json`).
 4. **Never skip Playwright + Visual Self-Verification.** A preview is only done when `verify_ui.mjs` exits `0` (`status: "PASSED"`) **and** you have inspected every `*-clean.png` screenshot via `read_file`.
-5. **Preserve the shared `.workbench-bar` template and respect wireframe-only requests.** Every preview must keep all preview controls (`Mode` → `View` → optional `State` → `Scale`) inside `<header class="workbench-bar">` using `.wb-group` + `.wb-label` + `.wb-btn` — **never** place custom `State`, `View`, or preset toolbars inside `#game-canvas` (keep `#game-canvas` strictly in-game UI). When the user asks for a **wireframe**, stop cleanly at Stage 2.5 (structural wireframe + grouped behavior spec) and wait for approval before implementing Stage 3 sprite hydration or interactive logic.
+5. **Preserve the shared `.workbench-bar` template and enforce BOTH human-in-the-loop gates.** Every preview must keep all preview controls (`Mode` → `View` → optional `State` → `Scale`) inside `<header class="workbench-bar">` using `.wb-group` + `.wb-label` + `.wb-btn` — **never** place custom `State`, `View`, or preset toolbars inside `#game-canvas` (keep `#game-canvas` strictly in-game UI).
+   - **Gate A (Stage 2.5 Wireframe Gate)**: When building a new UI or wireframe, stop cleanly at Stage 2.5 (structural wireframe + grouped behavior spec) and wait for approval before Stage 3 sprite hydration.
+   - **Gate B (Stage 6 Final Preview Gate — MANDATORY before Stage 7 `.ui` Export)**: After Stage 5 passes, start the Studio Save Server, present the finished HTML preview + verified screenshots, and **STOP for the user's explicit go-ahead before running Stage 7 (`export_craftland_ui.py`)**. Never auto-convert to `.ui` immediately after Stage 5 unless the user explicitly asked to skip final HTML preview review.
 6. **Apply Craftland Mobile Standards for Free Fire Craftland UIs.** When designing or auditing a Free Fire Craftland UI, follow [references/craftland-mobile-standards.md](./references/craftland-mobile-standards.md), scaffold with `--profile craftland` (default `1500×750` 2:1 canvas with live 4-resolution switching across `1500×750`, `1334×750`, `1625×750`, and `1280×960`), run a quick **Reuse Check** against existing `assets/` before requesting new art, and verify across Craftland viewports (`verify_ui.mjs --profile craftland --mode both`, or `--res all` for all 4 resolutions).
 
 ---
@@ -91,7 +93,7 @@ python .agents/skills/game-ui-preview/scripts/scaffold_preview.py --slug "<slug>
 node .agents/skills/game-ui-preview/scripts/verify_ui.mjs --page "previews/<slug>/index.html" --out "previews/<slug>/verification" --mode wireframe
 ```
 
-4. Read the generated `*-wireframe-clean.png` screenshots with `read_file` to confirm the wireframe layout is clean, then give the user the clickable preview link (`previews/<slug>/index.html`, and/or the active localhost preview URL) plus the wireframe screenshots and wait for approval or layout adjustments before Stage 3. Once approved, run Stages 3–5 autonomously without interrupting the user.
+4. Read the generated `*-wireframe-clean.png` screenshots with `read_file` to confirm the wireframe layout is clean, then give the user the clickable preview link (`previews/<slug>/index.html`, and/or the active localhost preview URL) plus the wireframe screenshots and wait for approval or layout adjustments before Stage 3. Once approved, run Stages 3–6 autonomously without interrupting the user, then **STOP at Stage 6** for final HTML review before Stage 7 (`.ui` export).
 
 ---
 
@@ -159,23 +161,28 @@ What `verify_ui.mjs` tests automatically in headless Chromium (`?clean=1`) for b
 
 ---
 
-## Stage 6: Start Studio Save Server & User Review Loop
+## Stage 6: Start Studio Save Server & Mandatory User Review Gate
 
-1. **Ensure the self-contained Studio Save Server is running** (`IsDaemon: true`) before presenting the preview so the user's **`Save 9-Slice`** edits write directly to `previews/_catalog/overrides.json`, `manifest.json`, and `catalog-data.js` (and the master UI Hub is accessible):
+1. **Ensure the self-contained Studio Save Server is running** (`IsDaemon: true`) before presenting the preview so the user's **`Save 9-Slice`** edits write directly to `previews/_catalog/overrides.json`, `manifest.json`, `catalog-data.js`, and Craftland `<sprite>.png.meta` (and the master UI Hub is accessible):
    ```powershell
    python .agents/skills/game-ui-preview/scripts/slice_sprites.py --output "previews/_catalog" --serve --port 17890
    ```
    *(Skip launching a duplicate if `GET http://127.0.0.1:17890/api/ping` is already responding for the current workspace. Users on Windows can also double-click `launch_ui_hub.bat` to start the backend and open the Hub automatically.)*
 2. Present the **Game UI Preview Hub** (`previews/index.html` / `http://127.0.0.1:17890/previews/index.html` — which aggregates all created UIs and includes the top-bar UI switcher across previews), the specific clickable preview link (`previews/<slug>/index.html` and `http://127.0.0.1:17890/previews/<slug>/index.html`), the verified `*-clean.png` screenshots, and a brief summary of what was verified. (`verify_ui.mjs` and `scaffold_preview.py` automatically update `previews/index.html` and `previews/_catalog/previews-data.js` via `build_gallery.py`.)
-3. When the user reviews the UI and requests layout, asset, or behavior changes:
+3. **STOP & Wait for Explicit User Go-Ahead Before Stage 7 (`.ui` Export)**:
+   - **Do NOT proceed to Stage 7 automatically.** Pause here so the user can inspect the finished HTML preview in the browser (`Interactive` and `Edit UI` modes), test responsive Craftland resolutions / L10n stress modes, or tweak Transform anchors, text, sprites, and 9-slice borders directly.
+   - Ask the user whether the final preview looks ready to convert to a Craftland `.ui` file or if they want adjustments first.
+4. When the user reviews the UI and requests layout, asset, or behavior changes:
    - Apply the requested updates to `previews/<slug>/index.html` (and CSS/JS if needed).
-   - **Always re-run Stage 4 (`verify_ui.mjs`) and Stage 5 (read updated `*-clean.png` screenshots)** before presenting the revised preview back to the user.
+   - **Always re-run Stage 4 (`verify_ui.mjs`) and Stage 5 (read updated `*-clean.png` screenshots)** before presenting the revised preview back to the user and again waiting for explicit go-ahead before Stage 7.
 
 ---
 
 ## Stage 7: Export Approved Preview to Craftland Studio `.ui` Draft via MCP
 
-Once a Craftland preview (`data-ui-profile="craftland"`) passes Playwright QA and user review, compile any `[data-ui-view]` directly into a Craftland Studio `.ui` draft asset (`Assets/HUDs/_Draft/<Name>Draft.ui` or a user-selected directory):
+> **Prerequisite Gate (MANDATORY):** Only run Stage 7 **after** the user has reviewed the finished Stage 6 HTML preview and explicitly given the go-ahead to convert it to a Craftland Studio `.ui` file (unless the user explicitly instructed skipping final HTML review).
+
+Once the user approves the Craftland preview (`data-ui-profile="craftland"`), compile any `[data-ui-view]` directly into a Craftland Studio `.ui` draft asset (`Assets/HUDs/_Draft/<Name>Draft.ui` or a user-selected directory). The exporter automatically preserves Web Inspector Transform anchors/pivots/rotations (defaulting unedited widgets to Center/Middle `(0.5, 0.5)` matching the Workbench Inspector, and full-bleed layers to Stretch `[0,0]..[1,1]`) and syncs web 9-slice borders back to Craftland `<sprite>.png.meta` (`borderTop/Right/Bottom/Left`; pass `--no-sync-slice9-meta` to opt out):
 
 1. **Check for Craftland MCP Configuration First (Mandatory Prompt Gate)**:
    - Look for a Craftland Studio MCP server URL in `.mcp.json`, `.codex/config.toml`, `.cursor/mcp.json`, `.vscode/mcp.json`, `.craftland/mcp.json`, `~/.claude.json`, or `CRAFTLAND_MCP_URL`.

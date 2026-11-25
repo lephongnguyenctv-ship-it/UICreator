@@ -463,6 +463,166 @@ def resolve_plan_textures_on_disk(plan: dict[str, Any], project_root: Path) -> l
     return warnings
 
 
+def _read_png_meta_slice9(meta_path: Path) -> list[int] | None:
+    try:
+        data = json.loads(meta_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    b_top = max(0, int(data.get("borderTop", 0) or 0))
+    b_right = max(0, int(data.get("borderRight", 0) or 0))
+    b_bottom = max(0, int(data.get("borderBottom", 0) or 0))
+    b_left = max(0, int(data.get("borderLeft", 0) or 0))
+    return [b_top, b_right, b_bottom, b_left] if (b_top or b_right or b_bottom or b_left) else None
+
+
+def _write_png_meta_slice9(meta_path: Path, slice_9: list[int]) -> bool:
+    """Write [top, right, bottom, left] 9-slice borders to a Craftland <sprite>.png.meta JSON file."""
+    try:
+        data = json.loads(meta_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    if not isinstance(data, dict):
+        return False
+
+    t, r, b, l = (max(0, int(v)) for v in slice_9[:4])
+    border_keys = ("borderLeft", "borderRight", "borderBottom", "borderTop")
+    old_vals = {k: data.get(k) for k in border_keys}
+    if t == 0 and r == 0 and b == 0 and l == 0:
+        for k in border_keys:
+            data.pop(k, None)
+    else:
+        data["borderLeft"] = l
+        data["borderRight"] = r
+        data["borderBottom"] = b
+        data["borderTop"] = t
+
+    if {k: data.get(k) for k in border_keys} == old_vals:
+        return False
+    meta_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return True
+
+
+def sync_plan_slice9_to_craftland_meta(
+    plan: dict[str, Any],
+    project_root: Path,
+    dry_run: bool = False,
+) -> list[dict[str, Any]]:
+    """Copy web 9-slice borders from sliced plan entities back to Craftland <sprite>.png.meta files.
+
+    Craftland Studio stores texture 9-slice insets in sibling .png.meta files (borderTop/Right/Bottom/Left)
+    rather than per-widget slicedBorder fields in .ui files. Prefers sprite-level catalogSlice9
+    (from the Workbench 9-Slice Editor / overrides.json) over per-element data-slice-9 overrides.
+    """
+    desired_by_asset: dict[str, dict[str, Any]] = {}
+    warned_conflicts: set[tuple[str, tuple[int, int, int, int]]] = set()
+    warnings: list[dict[str, Any]] = list(plan.get("warnings") or [])
+
+    for ent in plan.get("entities") or []:
+        if not isinstance(ent, dict):
+            continue
+        ename = str(ent.get("name") or ent.get("id") or "Widget")
+        for comp_key in ("image", "button"):
+            comp = ent.get(comp_key)
+            if not isinstance(comp, dict):
+                continue
+            if int(comp.get("fillType", 0)) != 1:
+                continue
+
+            cat_s9 = comp.get("catalogSlice9")
+            s9: list[int] | None = None
+            from_catalog = False
+            if isinstance(cat_s9, list) and len(cat_s9) == 4:
+                vals = [max(0, int(round(float(v or 0)))) for v in cat_s9]
+                if any(vals):
+                    s9 = vals
+                    from_catalog = True
+
+            if s9 is None:
+                sb = comp.get("slicedBorder")
+                if isinstance(sb, dict):
+                    vals = [
+                        max(0, int(round(float(sb.get("top", 0) or 0)))),
+                        max(0, int(round(float(sb.get("right", 0) or 0)))),
+                        max(0, int(round(float(sb.get("bottom", 0) or 0)))),
+                        max(0, int(round(float(sb.get("left", 0) or 0)))),
+                    ]
+                    if any(vals):
+                        s9 = vals
+
+            if s9 is None:
+                continue
+
+            asset_path = str(comp.get("assetPath") or "").replace("\\", "/").strip()
+            if not asset_path or asset_path.startswith("lib://"):
+                continue
+
+            key = asset_path.lower()
+            if key not in desired_by_asset:
+                desired_by_asset[key] = {
+                    "assetPath": asset_path,
+                    "slice9": s9,
+                    "fromCatalog": from_catalog,
+                    "entity": ename,
+                }
+            elif from_catalog and not desired_by_asset[key]["fromCatalog"]:
+                desired_by_asset[key]["slice9"] = s9
+                desired_by_asset[key]["fromCatalog"] = True
+            elif desired_by_asset[key]["slice9"] != s9:
+                conflict_key = (key, tuple(s9))
+                if conflict_key not in warned_conflicts:
+                    warned_conflicts.add(conflict_key)
+                    warnings.append(
+                        {
+                            "type": "conflicting-9slice-override",
+                            "entity": ename,
+                            "assetPath": asset_path,
+                            "message": (
+                                f'Multiple widgets use "{asset_path}" with different web 9-slice borders '
+                                f'({desired_by_asset[key]["slice9"]} vs {s9}); Craftland stores one 9-slice per PNG .meta '
+                                f'so {desired_by_asset[key]["slice9"]} will be synced.'
+                            ),
+                        }
+                    )
+
+    synced: list[dict[str, Any]] = []
+    resolved_root = project_root.resolve()
+    for info in desired_by_asset.values():
+        asset_path = info["assetPath"]
+        s9 = info["slice9"]
+        png_path = (resolved_root / asset_path).resolve()
+        meta_path = Path(str(png_path) + ".meta")
+        if not meta_path.is_file():
+            continue
+
+        prev = _read_png_meta_slice9(meta_path)
+        if prev == s9:
+            continue
+
+        try:
+            meta_rel = meta_path.relative_to(resolved_root).as_posix()
+        except ValueError:
+            meta_rel = meta_path.as_posix()
+
+        applied = False
+        if not dry_run:
+            applied = _write_png_meta_slice9(meta_path, s9)
+
+        synced.append(
+            {
+                "assetPath": asset_path,
+                "metaPath": meta_rel,
+                "previous": prev,
+                "slice9": s9,
+                "applied": applied,
+            }
+        )
+
+    plan["warnings"] = warnings
+    return synced
+
+
 def _find_node_exe() -> str:
     """Resolve node executable from PATH or standard Windows install locations."""
     import shutil
@@ -822,6 +982,7 @@ def run_export_pipeline(
     dry_run: bool = False,
     take_snapshot: bool = False,
     save_mcp_config: bool = False,
+    sync_slice9_meta: bool = True,
 ) -> dict[str, Any]:
     """End-to-end orchestration for CLI and Studio server POST /api/export-craftland-ui."""
     resolved_page = page_path.resolve()
@@ -863,6 +1024,12 @@ def run_export_pipeline(
         )
 
     warnings = resolve_plan_textures_on_disk(plan, resolved_proj)
+    synced_meta_slice9 = (
+        sync_plan_slice9_to_craftland_meta(plan, resolved_proj, dry_run=dry_run)
+        if sync_slice9_meta
+        else []
+    )
+    warnings = list(plan.get("warnings") or warnings)
     out_plan.parent.mkdir(parents=True, exist_ok=True)
     out_plan.write_text(json.dumps(plan, indent=2) + "\n", encoding="utf-8")
 
@@ -884,6 +1051,7 @@ def run_export_pipeline(
             "entityCount": entity_count,
             "planPath": plan_rel,
             "warnings": warnings,
+            "syncedMetaSlice9": synced_meta_slice9,
         }
 
     assert mcp_url is not None
@@ -929,6 +1097,7 @@ def run_export_pipeline(
         "planPath": plan_rel,
         "warnings": all_warnings,
         "snapshotPath": snapshot_rel,
+        "syncedMetaSlice9": synced_meta_slice9,
     }
 
 
@@ -996,6 +1165,11 @@ def main() -> int:
     parser.add_argument("--use-plan", default=None, help="Skip Playwright extraction and use an existing plan JSON file.")
     parser.add_argument("--dry-run", action="store_true", help="Extract plan and verify texture fileIds offline without connecting to Craftland MCP.")
     parser.add_argument("--snapshot", action="store_true", help="Open the created .ui asset and capture a ui-snapshot via MCP.")
+    parser.add_argument(
+        "--no-sync-slice9-meta",
+        action="store_true",
+        help="Skip syncing web 9-slice borders back to Craftland <sprite>.png.meta files during export.",
+    )
     args = parser.parse_args()
 
     resolved_page = Path(args.page).resolve()
@@ -1044,13 +1218,19 @@ def main() -> int:
         dry_run=args.dry_run,
         take_snapshot=args.snapshot,
         save_mcp_config=save_mcp,
+        sync_slice9_meta=not args.no_sync_slice9_meta,
     )
 
+    synced_meta = res.get("syncedMetaSlice9") or []
     if res["dryRun"]:
         print(
             f"[DRY-RUN OK] View '{res['view']}' -> {res['entityCount']} Craftland entities "
             f"(target: {res['uiPath']}, plan: {res['planPath']})"
         )
+        if synced_meta:
+            print(f"[9-SLICE META] {len(synced_meta)} texture .png.meta file(s) will be synced on live export:")
+            for item in synced_meta:
+                print(f"  - {item['metaPath']}: {item['previous']} -> {item['slice9']}")
     else:
         print(
             f"[EXPORT OK] Created & saved {res['uiPath']} (assetId: {res['uiId']}, "
@@ -1058,6 +1238,10 @@ def main() -> int:
         )
         if res.get("savedMcpPath"):
             print(f"[INFO] Saved MCP URL to {res['savedMcpPath']}")
+        if synced_meta:
+            print(f"[9-SLICE META] Synced {len(synced_meta)} texture .png.meta file(s):")
+            for item in synced_meta:
+                print(f"  - {item['metaPath']}: {item['previous']} -> {item['slice9']}")
 
     if res["warnings"]:
         print(f"Warnings ({len(res['warnings'])}):")

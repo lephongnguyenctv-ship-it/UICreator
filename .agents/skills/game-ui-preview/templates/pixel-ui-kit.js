@@ -1048,9 +1048,16 @@
       return existing;
     }
 
-    const anchorMin = [0.5, 0.5];
-    const anchorMax = [0.5, 0.5];
-    const pivot = [0.5, 0.5];
+    const parsePairAttr = raw => {
+      if (!raw) return null;
+      const parts = String(raw)
+        .split(',')
+        .map(s => Number(s.trim()));
+      return parts.length === 2 && Number.isFinite(parts[0]) && Number.isFinite(parts[1]) ? parts : null;
+    };
+    const anchorMin = parsePairAttr(el.getAttribute('data-anchor-min')) || [0.5, 0.5];
+    const anchorMax = parsePairAttr(el.getAttribute('data-anchor-max')) || [anchorMin[0], anchorMin[1]];
+    const pivot = parsePairAttr(el.getAttribute('data-pivot')) || [0.5, 0.5];
     const measured = measureElementTransformBox(el, anchorMin, anchorMax, pivot, 0);
     const tf = {
       posX: measured ? measured.posX : 0,
@@ -6389,9 +6396,13 @@
             saveBtn.disabled = false;
             const fbAfter = document.getElementById('wb-s9-feedback');
             if (fbAfter) {
+              const metaSynced =
+                result && result.data && Array.isArray(result.data.meta_synced) ? result.data.meta_synced : [];
               fbAfter.textContent =
                 result.method === 'studio-server' || result.method === 'file-system-api'
-                  ? '✓ Saved permanently for future uses!'
+                  ? metaSynced.length > 0
+                    ? '✓ Saved to catalog & Craftland .png.meta!'
+                    : '✓ Saved permanently for future uses!'
                   : '✓ Saved in browser storage (start slice_sprites.py --serve to write to disk)';
             }
           });
@@ -7808,12 +7819,19 @@
             .join('')}</ul></div>`
         : '';
 
+    const syncedMetaList = Array.isArray(d.syncedMetaSlice9) ? d.syncedMetaSlice9 : [];
+    const metaSyncHtml =
+      syncedMetaList.length > 0
+        ? `<div>9-Slice <code>.png.meta</code> ${d.dryRun ? 'pending sync' : 'synced'}: <strong>${syncedMetaList.length}</strong> texture(s)</div>`
+        : '';
+
     statusBox.className = 'wb-export-status is-ok';
     if (d.dryRun) {
       statusBox.innerHTML = `
         <div><strong>✓ Dry-Run Plan Generated</strong> (${d.entityCount || 0} Craftland entities)</div>
         <div>Target: <code>${escapeHtml(d.uiPath || `${uiDirectory}/${uiName}.ui`)}</code></div>
         ${d.planPath ? `<div>Plan JSON: <code>${escapeHtml(d.planPath)}</code></div>` : ''}
+        ${metaSyncHtml}
         ${warnHtml}
       `;
     } else {
@@ -7822,6 +7840,7 @@
         <div>Asset: <code>${escapeHtml(d.uiPath || `${uiDirectory}/${uiName}.ui`)}</code> (ID: <code>${escapeHtml(d.uiId || '')}</code>)</div>
         ${d.savedMcpPath ? `<div>Saved MCP config: <code>${escapeHtml(d.savedMcpPath)}</code></div>` : ''}
         ${d.planPath ? `<div>Plan JSON: <code>${escapeHtml(d.planPath)}</code></div>` : ''}
+        ${metaSyncHtml}
         ${warnHtml}
       `;
     }

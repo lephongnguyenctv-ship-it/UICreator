@@ -10,7 +10,8 @@ An AI-assisted workflow and interactive browser studio for turning packed 2D pix
 2. **Automatic Sprite Slicing & Contact Sheets**: The pipeline slices packed PNG sheets into `previews/_catalog/slices/*.png` and generates labeled visual contact sheets (`previews/_catalog/contact_sheets/`) so the AI inspects real pixels instead of guessing sprite names or coordinates. *(Your original source PNGs are never modified.)*
 3. **HTML Wireframe & Behavior Review (`Wireframe` Mode)**: Before building finished art, the agent generates an interactive **structural wireframe** on the same `previews/<slug>/index.html` page alongside a grouped **Behavior Spec** drawer below the canvas for your approval.
 4. **Final Sprite UI & Automated Playwright QA**: Once approved, the agent upgrades the same preview to full pixel-art sprites and verifies every state in headless Chromium (`verify_ui.mjs --mode both`) for console errors, broken images, crisp `image-rendering: pixelated`, layout overflows, overlaps, and children intruding on `.px-9slice` borders.
-5. **Interactive Review & Live 9-Slice Tuning**: Review the live UI in **`Interactive`** mode, inspect or tweak borders visually in **`Edit UI`** mode, and request any layout adjustments until complete.
+5. **Interactive Review & Live 9-Slice Tuning (Mandatory Sign-Off Gate)**: Review the finished HTML UI in **`Interactive`** mode, inspect or tweak transforms/borders visually in **`Edit UI`** mode (`Save 9-Slice` syncs both the web catalog and Craftland `<sprite>.png.meta`), and give explicit approval before exporting to a Craftland `.ui` file.
+6. **Craftland Studio `.ui` Export**: Once approved, click **`Export .ui`** (or run `export_craftland_ui.py`) to push the UI hierarchy, matching Transform anchors/pivots, and synced 9-slice `.png.meta` borders directly into Craftland Studio via MCP.
 
 ---
 
