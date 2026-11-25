@@ -121,11 +121,11 @@ function Find-PyRunner {
 function Invoke-PyWithPillow {
     param([hashtable]$Runner, [string[]]$ScriptArgs)
     if ($Runner.Kind -eq 'uv') {
-        & $Runner.Bin run --with pillow @ScriptArgs
+        & $Runner.Bin run --with pillow @ScriptArgs | Out-Host
     } elseif ($Runner.Kind -eq 'py3') {
-        & $Runner.Bin -3 @ScriptArgs
+        & $Runner.Bin -3 @ScriptArgs | Out-Host
     } else {
-        & $Runner.Bin @ScriptArgs
+        & $Runner.Bin @ScriptArgs | Out-Host
     }
     return $LASTEXITCODE
 }

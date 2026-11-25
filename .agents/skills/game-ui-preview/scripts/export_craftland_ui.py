@@ -463,6 +463,22 @@ def resolve_plan_textures_on_disk(plan: dict[str, Any], project_root: Path) -> l
     return warnings
 
 
+def _find_node_exe() -> str:
+    """Resolve node executable from PATH or standard Windows install locations."""
+    import shutil
+
+    found = shutil.which("node")
+    if found:
+        return found
+    for cand in (
+        Path(r"C:\Program Files\nodejs\node.exe"),
+        Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "nodejs" / "node.exe",
+    ):
+        if cand.is_file():
+            return str(cand)
+    return "node"
+
+
 def extract_plan_with_playwright(
     page_path: Path,
     view_id: str | None,
@@ -476,7 +492,7 @@ def extract_plan_with_playwright(
         raise FileNotFoundError(f"Extractor script not found: {extractor_script}")
 
     cmd = [
-        "node",
+        _find_node_exe(),
         str(extractor_script),
         "--page",
         str(page_path),

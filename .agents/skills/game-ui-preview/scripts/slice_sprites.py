@@ -122,7 +122,8 @@ def is_white_mask(crop_im: Image.Image) -> bool:
     rgba = crop_im.convert("RGBA")
     opaque = 0
     near_white = 0
-    for r, g, b, a in rgba.getdata():
+    pixels = rgba.get_flattened_data() if hasattr(rgba, "get_flattened_data") else rgba.getdata()
+    for r, g, b, a in pixels:
         if a > 20:
             opaque += 1
             if r >= 215 and g >= 215 and b >= 215:
