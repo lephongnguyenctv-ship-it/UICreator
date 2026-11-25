@@ -101,8 +101,11 @@
     const f = String(filePath || '');
     if (!f) return '';
     if (/^(https?:|data:|\/|\.\.\/)/.test(f)) return f;
-    if (f.startsWith('assets/') || f.startsWith('Sprite sheets/')) {
-      return getCatalogBase() + '../../' + f;
+    const catalog = getCatalog();
+    const rawProjRel = catalog && typeof catalog.project_root_rel === 'string' ? catalog.project_root_rel.trim() : '';
+    const projRel = rawProjRel ? (rawProjRel.endsWith('/') ? rawProjRel : rawProjRel + '/') : '../../';
+    if (/^(Assets|assets|Tools|Sprite sheets)\//i.test(f)) {
+      return getCatalogBase() + projRel + f;
     }
     return getCatalogBase() + f;
   }
@@ -230,6 +233,9 @@
           const data = await res.json();
           if (data && data.ok) {
             return { ok: true, method: 'studio-server', resolved: data.resolved || {}, data };
+          }
+          if (data && data.ok === false) {
+            return { ok: false, method: 'studio-server', error: data.error || 'Export failed', data };
           }
         }
       } catch {
@@ -4420,12 +4426,18 @@
       }
     }
 
-    // Inject mobile HUD Designer Tools (Craftland Canvas Resolution, Safe Zones, Focus Zone, L10n Stress, Custom Backdrop, HUD Budget)
+    // Inject mobile HUD Designer Tools (Craftland Canvas Resolution, Safe Zones, Focus Zone, L10n Stress, Custom Backdrop, HUD Budget, Export .ui)
     const controlsBar = document.querySelector('.workbench-controls');
     if (controlsBar && !controlsBar.querySelector('[data-wb-focus-zone]')) {
       const resOptionsHtml = Object.entries(CANVAS_PRESETS)
         .map(([k, p]) => `<option value="${k}">${p.label}</option>`)
         .join('');
+      const isCraftlandUi =
+        (document.body && document.body.getAttribute('data-ui-profile') === 'craftland') ||
+        Boolean(getCatalog() && getCatalog().craftland_project);
+      const exportBtnHtml = isCraftlandUi
+        ? `<button type="button" class="wb-btn wb-btn--primary" data-wb-export-ui title="Compile active preview view into a Craftland Studio .ui draft via MCP">Export .ui</button>`
+        : '';
       const hudGroup = document.createElement('div');
       hudGroup.className = 'wb-group';
       hudGroup.innerHTML = `
@@ -4442,8 +4454,14 @@
         <button type="button" class="wb-btn" data-wb-backdrop-clear style="display:none;" title="Clear custom preview backdrop">×</button>
         <input type="file" id="wb-backdrop-file-input" accept="image/*" style="display:none;">
         <span id="wb-hud-budget" class="wb-budget-badge is-ok" title="Live advisory gameplay HUD coverage">HUD: --</span>
+        ${exportBtnHtml}
       `;
       controlsBar.appendChild(hudGroup);
+
+      const exportBtn = hudGroup.querySelector('[data-wb-export-ui]');
+      if (exportBtn) {
+        exportBtn.addEventListener('click', () => openCraftlandExportModal());
+      }
 
       const resSelect = hudGroup.querySelector('[data-wb-canvas-res]');
       const safeZonesBtn = hudGroup.querySelector('[data-wb-safe-zones]');
@@ -7355,6 +7373,175 @@
     };
     document.addEventListener('mouseup', releasePressed);
     document.addEventListener('mouseleave', releasePressed);
+  }
+
+  function slugToPascalDraft(slug) {
+    const base = String(slug || 'Preview')
+      .split(/[-_\s]+/)
+      .filter(Boolean)
+      .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+      .join('');
+    return (base || 'Preview') + 'Draft';
+  }
+
+  function ensureCraftlandExportModal() {
+    let modal = document.getElementById('wb-export-ui-modal');
+    if (modal) return modal;
+
+    modal = document.createElement('div');
+    modal.id = 'wb-export-ui-modal';
+    modal.className = 'wb-export-modal-backdrop';
+    modal.hidden = true;
+    modal.innerHTML = `
+      <div class="wb-export-modal" role="dialog" aria-modal="true" aria-labelledby="wb-export-modal-title">
+        <div class="wb-export-modal-head">
+          <span id="wb-export-modal-title" class="wb-export-modal-title">Export View to Craftland Studio (.ui Draft)</span>
+          <button type="button" class="wb-btn wb-btn-sm" data-wb-export-close>✕</button>
+        </div>
+        <div class="wb-export-modal-body">
+          <div class="wb-export-field">
+            <label for="wb-export-view">Active View (<code>[data-ui-view]</code>)</label>
+            <select id="wb-export-view" class="wb-select"></select>
+          </div>
+          <div class="wb-export-field">
+            <label for="wb-export-ui-name">Target Draft UI Name</label>
+            <input id="wb-export-ui-name" class="wb-slice-input" type="text" placeholder="CheckpointRewardDraft">
+          </div>
+          <div class="wb-export-field">
+            <label for="wb-export-ui-dir">Target Craftland Directory</label>
+            <input id="wb-export-ui-dir" class="wb-slice-input" type="text" value="Assets/HUDs/_Draft">
+          </div>
+          <div class="wb-export-field">
+            <label for="wb-export-mcp-url">Craftland MCP URL Override (optional)</label>
+            <input id="wb-export-mcp-url" class="wb-slice-input" type="text" placeholder="Auto-detect from .codex/config.toml or .cursor/mcp.json">
+          </div>
+          <div class="wb-export-actions">
+            <button type="button" class="wb-btn" data-wb-export-run="dry">Dry-Run Plan</button>
+            <button type="button" class="wb-btn wb-btn--primary" data-wb-export-run="live">Export to Craftland (.ui)</button>
+          </div>
+          <div id="wb-export-status" class="wb-export-status" hidden></div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    modal.addEventListener('click', evt => {
+      if (evt.target === modal || evt.target.closest('[data-wb-export-close]')) {
+        modal.hidden = true;
+        return;
+      }
+      const runBtn = evt.target.closest('[data-wb-export-run]');
+      if (runBtn) {
+        const isDry = runBtn.getAttribute('data-wb-export-run') === 'dry';
+        triggerCraftlandUiExport(isDry);
+      }
+    });
+    return modal;
+  }
+
+  function openCraftlandExportModal() {
+    const modal = ensureCraftlandExportModal();
+    const viewSelect = document.getElementById('wb-export-view');
+    const nameInput = document.getElementById('wb-export-ui-name');
+    const statusBox = document.getElementById('wb-export-status');
+
+    const views = Array.from(document.querySelectorAll('#game-canvas [data-ui-view]'));
+    const activeViewEl =
+      document.querySelector('#game-canvas [data-ui-view].is-active') ||
+      views.find(v => !v.hidden) ||
+      views[0];
+    const activeViewId = activeViewEl ? activeViewEl.getAttribute('data-ui-view') : 'main';
+
+    if (viewSelect) {
+      if (views.length === 0) {
+        viewSelect.innerHTML = `<option value="main">main</option>`;
+      } else {
+        viewSelect.innerHTML = views
+          .map(v => {
+            const vid = v.getAttribute('data-ui-view') || 'main';
+            return `<option value="${escapeHtml(vid)}"${vid === activeViewId ? ' selected' : ''}>${escapeHtml(vid)}</option>`;
+          })
+          .join('');
+      }
+    }
+
+    const slug = getPreviewSlugForEdits();
+    if (nameInput && !nameInput.value.trim()) {
+      nameInput.value = slugToPascalDraft(slug);
+    }
+    if (statusBox) {
+      statusBox.hidden = true;
+      statusBox.innerHTML = '';
+    }
+    modal.hidden = false;
+  }
+
+  async function triggerCraftlandUiExport(dryRun) {
+    const statusBox = document.getElementById('wb-export-status');
+    const viewSelect = document.getElementById('wb-export-view');
+    const nameInput = document.getElementById('wb-export-ui-name');
+    const dirInput = document.getElementById('wb-export-ui-dir');
+    const mcpInput = document.getElementById('wb-export-mcp-url');
+
+    const slug = getPreviewSlugForEdits();
+    const view = (viewSelect && viewSelect.value) || '';
+    const uiName = (nameInput && nameInput.value.trim()) || slugToPascalDraft(slug);
+    const uiDirectory = (dirInput && dirInput.value.trim()) || 'Assets/HUDs/_Draft';
+    const mcpUrl = (mcpInput && mcpInput.value.trim()) || '';
+
+    if (statusBox) {
+      statusBox.hidden = false;
+      statusBox.className = 'wb-export-status';
+      statusBox.textContent = dryRun
+        ? 'Extracting 1500×750 DOM layout plan via Playwright (dry-run)…'
+        : 'Extracting 1500×750 DOM layout plan and pushing entities to Craftland Studio MCP…';
+    }
+
+    await persistUiEditsToDisk();
+    const res = await postToStudioServer('/api/export-craftland-ui', {
+      slug,
+      view,
+      uiName,
+      uiDirectory,
+      mcpUrl,
+      dryRun: Boolean(dryRun),
+    });
+
+    if (!statusBox) return;
+    if (!res.ok) {
+      statusBox.className = 'wb-export-status is-error';
+      const errMsg =
+        res.error ||
+        'Studio backend server on port 17890 is not running. Start launch_ui_hub.bat or slice_sprites.py --serve.';
+      statusBox.innerHTML = `<strong>Export failed:</strong> ${escapeHtml(errMsg)}`;
+      return;
+    }
+
+    const d = res.data || {};
+    const warnList = Array.isArray(d.warnings) ? d.warnings : [];
+    const warnHtml =
+      warnList.length > 0
+        ? `<div class="wb-export-warns"><strong>Warnings (${warnList.length}):</strong><ul>${warnList
+            .map(w => `<li>${escapeHtml(typeof w === 'string' ? w : w.message || JSON.stringify(w))}</li>`)
+            .join('')}</ul></div>`
+        : '';
+
+    statusBox.className = 'wb-export-status is-ok';
+    if (d.dryRun) {
+      statusBox.innerHTML = `
+        <div><strong>✓ Dry-Run Plan Generated</strong> (${d.entityCount || 0} Craftland entities)</div>
+        <div>Target: <code>${escapeHtml(d.uiPath || `${uiDirectory}/${uiName}.ui`)}</code></div>
+        ${d.planPath ? `<div>Plan JSON: <code>${escapeHtml(d.planPath)}</code></div>` : ''}
+        ${warnHtml}
+      `;
+    } else {
+      statusBox.innerHTML = `
+        <div><strong>✓ Exported to Craftland Studio!</strong> (${d.entityCount || 0} entities created &amp; saved)</div>
+        <div>Asset: <code>${escapeHtml(d.uiPath || `${uiDirectory}/${uiName}.ui`)}</code> (ID: <code>${escapeHtml(d.uiId || '')}</code>)</div>
+        ${d.planPath ? `<div>Plan JSON: <code>${escapeHtml(d.planPath)}</code></div>` : ''}
+        ${warnHtml}
+      `;
+    }
   }
 
   function init() {

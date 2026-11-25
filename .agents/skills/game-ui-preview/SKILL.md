@@ -48,6 +48,16 @@ Outputs created in `previews/_catalog/`:
 - `catalog-data.js` — `window.SPRITE_CATALOG` script for zero-CORS `file://` preview loading.
 - `contact_sheets/contact_sheet_*.png` — Checkerboard contact sheets showing each sprite scaled up with its `[slice_id]` and `WxH` dimensions.
 - **Importing from Craftland Studio / Unity projects**: Always check each copied texture's sidecar `.meta` file for `borderTop`, `borderRight`, `borderBottom`, and `borderLeft` (the texture's **9-Grid Pattern**). `.ui` widget JSON often leaves `slicedBorder` at `0,0,0,0` when inheriting texture-level `.meta` borders — record those exact `.meta` insets into `slice_9` in `manifest.json` / `catalog-data.js` instead of guessing or treating the sprite as plain stretch.
+- **Craftland Submodule Mode (Zero Duplicated PNGs)**: When `UICreator` is added as a git submodule at `Tools/UICreator` inside a Craftland Studio repository, pass `--craftland-assets` to index `Assets/Sprites` in-place without slicing or copying any PNGs:
+  ```powershell
+  python Tools/UICreator/.agents/skills/game-ui-preview/scripts/slice_sprites.py `
+    --craftland-assets `
+    --project-root . `
+    --input Assets/Sprites `
+    --extra-input Tools/UICreator/assets/WorkshopIconLibrary `
+    --output Tools/ui-previews/_catalog
+  ```
+  This reads every `<sprite>.png.meta` `fileId` (`craftland_file_id`) and 9-slice border (`slice_9`) directly from `Assets/Sprites/` and sets `project_root_rel` so previews under `Tools/ui-previews/<slug>/index.html` load textures directly from `Assets/`.
 
 ---
 
@@ -160,3 +170,29 @@ What `verify_ui.mjs` tests automatically in headless Chromium (`?clean=1`) for b
 3. When the user reviews the UI and requests layout, asset, or behavior changes:
    - Apply the requested updates to `previews/<slug>/index.html` (and CSS/JS if needed).
    - **Always re-run Stage 4 (`verify_ui.mjs`) and Stage 5 (read updated `*-clean.png` screenshots)** before presenting the revised preview back to the user.
+
+---
+
+## Stage 7: Export Approved Preview to Craftland Studio `.ui` Draft via MCP
+
+Once a Craftland preview (`data-ui-profile="craftland"`) passes Playwright QA and user review, compile any `[data-ui-view]` directly into a Craftland Studio `.ui` draft asset (`Assets/HUDs/_Draft/<Name>Draft.ui`):
+
+1. **Mark preview-only context layers with `data-export-ignore="true"`**: Add `data-export-ignore="true"` to reference-only context layers (e.g., `.ctx-hud-layer`, `.ctx-runner-sprite-row`) so only the target HUD/popup component tree is exported.
+2. **Offline Dry-Run Plan & Texture Validation**:
+   ```powershell
+   python Tools/UICreator/.agents/skills/game-ui-preview/scripts/export_craftland_ui.py `
+     --page "Tools/ui-previews/<slug>/index.html" `
+     --view "<viewId>" `
+     --ui-name "<PascalSlug>Draft" `
+     --dry-run
+   ```
+   Inspect `<slug>/verification/<viewId>.craftland-plan.json` to confirm clean hierarchy, bottom-left Y-up coordinates inside `1500×750`, and 0 unresolved texture `fileId` warnings.
+3. **Live Craftland Studio MCP Push** (or click **`Export .ui`** in the browser Workbench toolbar while `slice_sprites.py --serve` and Craftland Studio are running):
+   ```powershell
+   python Tools/UICreator/.agents/skills/game-ui-preview/scripts/export_craftland_ui.py `
+     --page "Tools/ui-previews/<slug>/index.html" `
+     --view "<viewId>" `
+     --ui-name "<PascalSlug>Draft" `
+     --ui-directory "Assets/HUDs/_Draft" `
+     --snapshot
+   ```

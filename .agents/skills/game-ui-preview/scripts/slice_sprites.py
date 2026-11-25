@@ -6,9 +6,11 @@ from __future__ import annotations
 import argparse
 from collections import deque
 from dataclasses import dataclass
+import hashlib
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import json
 import math
+import os
 from pathlib import Path
 import re
 import sys
@@ -24,7 +26,7 @@ _SCRIPTS_DIR = str(Path(__file__).resolve().parent)
 if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
 
-from build_gallery import build_gallery
+from build_gallery import build_gallery, detect_craftland_project_root
 
 
 @dataclass
@@ -41,12 +43,41 @@ class SliceRecord:
     category: str
     slice_9: list[int] | None
     is_white_mask_candidate: bool
+    craftland_file_id: str | None = None
+    craftland_asset_path: str | None = None
 
 
 def slugify(text: str) -> str:
     """Convert a path stem into a lowercase underscore-safe identifier."""
     cleaned = re.sub(r"[^a-zA-Z0-9]+", "_", text.strip().lower()).strip("_")
     return cleaned or "sprite"
+
+
+def camel_to_snake_slug(text: str) -> str:
+    """Convert CamelCase / mixed identifiers (e.g. SquareRounded128) into snake_case."""
+    step1 = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", text.strip())
+    step2 = re.sub(r"([a-zA-Z])([0-9]+)", r"\1_\2", step1)
+    return slugify(step2)
+
+
+def read_craftland_png_meta(png_path: Path) -> tuple[str | None, list[int] | None]:
+    """Read sibling <sprite>.png.meta JSON and return (fileId, slice_9_or_None)."""
+    meta_path = Path(str(png_path) + ".meta")
+    if not meta_path.is_file():
+        return None, None
+    try:
+        data = json.loads(meta_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None, None
+    if not isinstance(data, dict):
+        return None, None
+    file_id = str(data.get("fileId") or "").strip() or None
+    b_top = max(0, int(data.get("borderTop", 0) or 0))
+    b_right = max(0, int(data.get("borderRight", 0) or 0))
+    b_bottom = max(0, int(data.get("borderBottom", 0) or 0))
+    b_left = max(0, int(data.get("borderLeft", 0) or 0))
+    slice_9 = [b_top, b_right, b_bottom, b_left] if (b_top or b_right or b_bottom or b_left) else None
+    return file_id, slice_9
 
 
 def shorten_stem(rel_path: Path) -> str:
@@ -402,7 +433,11 @@ def save_overrides(output_dir: Path, overrides: dict[str, Any]) -> Path:
     return ov_path
 
 
-def apply_slice9_overrides_in_place(output_dir: Path, updates: dict[str, list[int] | None]) -> dict[str, Any]:
+def apply_slice9_overrides_in_place(
+    output_dir: Path,
+    updates: dict[str, list[int] | None],
+    project_root: Path | None = None,
+) -> dict[str, Any]:
     """Update overrides.json, manifest.json, and catalog-data.js in place without re-slicing sheets."""
     overrides = load_overrides(output_dir)
     slice_9_map: dict[str, list[int]] = overrides["slice_9"]
@@ -423,16 +458,29 @@ def apply_slice9_overrides_in_place(output_dir: Path, updates: dict[str, list[in
             manifest = None
 
         if isinstance(manifest, dict) and isinstance(manifest.get("slices"), dict):
+            resolved_proj_root = (
+                project_root.resolve()
+                if project_root
+                else (detect_craftland_project_root(output_dir) or Path.cwd().resolve())
+            )
+            is_craftland = bool(manifest.get("craftland_project"))
             slices_dict = manifest["slices"]
             for slice_id, val in updates.items():
                 rec = slices_dict.get(slice_id)
                 if not isinstance(rec, dict):
                     continue
                 if val is None:
-                    sprite_path = output_dir / str(rec.get("file", ""))
-                    if sprite_path.exists():
-                        with Image.open(sprite_path) as raw_crop:
-                            rec["slice_9"] = estimate_9slice(raw_crop.convert("RGBA"), str(rec.get("category", "panel")))
+                    rel_file = str(rec.get("file", ""))
+                    sprite_path = output_dir / rel_file
+                    if not sprite_path.is_file():
+                        sprite_path = resolved_proj_root / rel_file
+                    if sprite_path.is_file():
+                        _, meta_s9 = read_craftland_png_meta(sprite_path)
+                        if meta_s9 is not None or (is_craftland and Path(str(sprite_path) + ".meta").is_file()):
+                            rec["slice_9"] = meta_s9
+                        else:
+                            with Image.open(sprite_path) as raw_crop:
+                                rec["slice_9"] = estimate_9slice(raw_crop.convert("RGBA"), str(rec.get("category", "panel")))
                 else:
                     rec["slice_9"] = [max(0, int(x)) for x in val[:4]]
 
@@ -713,7 +761,7 @@ def run_studio_server(
     except ValueError:
         hub_url_path = "/previews/index.html"
 
-    build_gallery(previews_root=previews_root, catalog_dir=resolved_catalog)
+    build_gallery(previews_root=previews_root, catalog_dir=resolved_catalog, project_root=resolved_root)
     hub_full_url = f"http://127.0.0.1:{port}{hub_url_path}"
 
     if _is_studio_server_running(port):
@@ -771,14 +819,19 @@ def run_studio_server(
                 self._send_json(200, {"ok": True, "catalog": catalog_dir.as_posix()})
                 return
             if req_path == "/api/previews":
-                payload = build_gallery(previews_root=previews_root, catalog_dir=resolved_catalog, sync_kit=False)
+                payload = build_gallery(
+                    previews_root=previews_root,
+                    catalog_dir=resolved_catalog,
+                    sync_kit=False,
+                    project_root=resolved_root,
+                )
                 self._send_json(200, {"ok": True, **payload})
                 return
             super().do_GET()
 
         def do_POST(self) -> None:
             req_path = self.path.split("?", 1)[0]
-            if req_path not in ("/api/save-slice9", "/api/save-ui-edits"):
+            if req_path not in ("/api/save-slice9", "/api/save-ui-edits", "/api/export-craftland-ui"):
                 self._send_json(404, {"ok": False, "error": f"Unknown endpoint: {req_path}"})
                 return
 
@@ -792,6 +845,39 @@ def run_studio_server(
 
             if not isinstance(data, dict):
                 self._send_json(400, {"ok": False, "error": "Expected JSON object"})
+                return
+
+            if req_path == "/api/export-craftland-ui":
+                slug = str(data.get("slug") or "").strip()
+                if not slug or "/" in slug or "\\" in slug or slug.startswith("."):
+                    self._send_json(400, {"ok": False, "error": f"Invalid preview slug: {slug!r}"})
+                    return
+                page_path = (previews_root / slug / "index.html").resolve()
+                if not page_path.is_file():
+                    self._send_json(404, {"ok": False, "error": f"Preview page not found: {page_path.as_posix()}"})
+                    return
+                view_id = str(data.get("view") or "").strip() or None
+                ui_name = str(data.get("uiName") or "").strip() or None
+                ui_dir = str(data.get("uiDirectory") or "Assets/HUDs/_Draft").strip() or "Assets/HUDs/_Draft"
+                mcp_url_override = str(data.get("mcpUrl") or "").strip() or None
+                dry_run = bool(data.get("dryRun", False))
+                take_snapshot = bool(data.get("snapshot", False))
+                try:
+                    from export_craftland_ui import run_export_pipeline
+
+                    export_res = run_export_pipeline(
+                        page_path=page_path,
+                        project_root=resolved_root,
+                        view_id=view_id,
+                        ui_name=ui_name,
+                        ui_directory=ui_dir,
+                        mcp_url_override=mcp_url_override,
+                        dry_run=dry_run,
+                        take_snapshot=take_snapshot,
+                    )
+                    self._send_json(200, {"ok": True, **export_res})
+                except Exception as exc:
+                    self._send_json(200, {"ok": False, "error": str(exc)})
                 return
 
             if req_path == "/api/save-ui-edits":
@@ -820,7 +906,7 @@ def run_studio_server(
             if data.get("reset_slice_id"):
                 updates[str(data["reset_slice_id"])] = None
 
-            updated_map = apply_slice9_overrides_in_place(catalog_dir, updates)
+            updated_map = apply_slice9_overrides_in_place(catalog_dir, updates, project_root=resolved_root)
             resolved_map: dict[str, Any] = {}
             manifest_path = catalog_dir / "manifest.json"
             if manifest_path.exists():
@@ -980,132 +1066,251 @@ def process_directory(
     dilate: int,
     min_size: int,
     project: str = "basic-pack",
+    craftland_assets: bool = False,
+    project_root: Path | None = None,
+    extra_inputs: list[Path] | None = None,
 ) -> dict[str, Any]:
-    """Slice all PNGs in input_dir and write manifest, JS catalog, and contact sheets.
+    """Slice or index all PNGs in input_dir (plus optional extra_inputs) and write manifest, JS catalog, and contact sheets.
 
-    Cropped slices from packed sheets are saved under assets/<project>/slices/ (never duplicated
-    inside previews/). Standalone 1-sprite PNGs are referenced directly by their real path.
+    In default mode, cropped slices from packed sheets are saved under assets/<project>/slices/.
+    In --craftland-assets mode, textures are indexed 1:1 in-place from Assets/ with zero copies,
+    extracting fileId and 9-slice borders directly from sibling .png.meta files.
     """
     if not input_dir.exists():
         raise FileNotFoundError(f"Input directory not found: {input_dir}")
 
-    workspace_root = Path.cwd().resolve()
-    safe_project = re.sub(r"[^a-zA-Z0-9_-]+", "-", project.strip()).strip("-") or "basic-pack"
-    slices_dir = workspace_root / "assets" / safe_project / "slices"
+    detected_craftland_root = detect_craftland_project_root(output_dir, explicit_root=project_root)
+    if craftland_assets and detected_craftland_root is None:
+        detected_craftland_root = detect_craftland_project_root(input_dir, explicit_root=project_root)
+    workspace_root = (project_root or detected_craftland_root or Path.cwd()).resolve()
+    is_craftland_project = bool(craftland_assets or detected_craftland_root is not None)
+
+    output_dir = output_dir.resolve()
     contact_dir = output_dir / "contact_sheets"
-    slices_dir.mkdir(parents=True, exist_ok=True)
     contact_dir.mkdir(parents=True, exist_ok=True)
 
     overrides = load_overrides(output_dir)
     slice9_overrides: dict[str, Any] = overrides.get("slice_9", {})
 
-    # Clean stale outputs so catalog matches current input folder
-    for stale in slices_dir.glob("*.png"):
-        stale.unlink()
     for stale in contact_dir.glob("*.png"):
         stale.unlink()
-
-    png_files = sorted(input_dir.rglob("*.png"), key=lambda p: p.as_posix().lower())
-    if not png_files:
-        raise RuntimeError(f"No PNG files found under {input_dir}")
 
     records: list[SliceRecord] = []
     sources_meta: list[dict[str, Any]] = []
     used_ids: set[str] = set()
 
-    workspace_root = Path.cwd().resolve()
-    for png_path in png_files:
-        rel_path = png_path.relative_to(input_dir)
-        try:
-            real_source_file = png_path.resolve().relative_to(workspace_root).as_posix()
-        except ValueError:
-            real_source_file = png_path.resolve().as_posix()
-        group = rel_path.parts[0] if len(rel_path.parts) > 1 else "root"
-        stem = shorten_stem(rel_path)
+    if craftland_assets:
+        input_roots: list[Path] = [input_dir.resolve()]
+        for ext in extra_inputs or []:
+            ext_resolved = ext.resolve()
+            if ext_resolved.exists() and ext_resolved not in input_roots:
+                input_roots.append(ext_resolved)
 
-        with Image.open(png_path) as raw_im:
-            im = raw_im.convert("RGBA")
-            w, h = im.size
-            lower_name = rel_path.as_posix().lower()
-            if "emote" in lower_name and w % 32 == 0 and h % 32 == 0:
-                sheet_dilate = 0
-                boxes = detect_grid_cells(im, cell_size=32, alpha_threshold=alpha_threshold, min_size=min_size)
+        all_entries: list[tuple[Path, Path]] = []
+        for root_folder in input_roots:
+            for p in sorted(root_folder.rglob("*"), key=lambda x: x.as_posix().lower()):
+                if p.is_file() and p.suffix.lower() == ".png":
+                    all_entries.append((root_folder, p))
+
+        if not all_entries:
+            raise RuntimeError(f"No PNG files found under {[r.as_posix() for r in input_roots]}")
+
+        # Count stem frequencies to disambiguate colliding filenames cleanly by folder name
+        stem_counts: dict[str, int] = {}
+        for root_folder, png_path in all_entries:
+            is_ws = "workshopiconlibrary" in root_folder.as_posix().lower() or "workshopiconlibrary" in png_path.as_posix().lower()
+            s_key = f"ws_{slugify(png_path.stem)}" if is_ws else camel_to_snake_slug(png_path.stem)
+            stem_counts[s_key] = stem_counts.get(s_key, 0) + 1
+
+        for root_folder, png_path in all_entries:
+            rel_path = png_path.relative_to(root_folder)
+            try:
+                real_source_file = png_path.resolve().relative_to(workspace_root).as_posix()
+            except ValueError:
+                real_source_file = png_path.resolve().as_posix()
+
+            is_ws = "workshopiconlibrary" in root_folder.as_posix().lower() or "workshopiconlibrary" in png_path.as_posix().lower()
+            if is_ws:
+                group = "WorkshopIconLibrary"
+                base_id = f"ws_{slugify(png_path.stem)}"
+                craftland_asset_path = f"lib://fftextures/WorkshopIconLibrary/{png_path.name}"
+                file_id = hashlib.md5(craftland_asset_path.encode("utf-8")).hexdigest()
+                meta_slice_9 = None
             else:
-                # Large packed sheets (e.g. Basic Pack 896x240) pack items tightly; avoid merging neighbors
-                sheet_dilate = 0 if (w >= 400 and dilate > 0 and "basic pack" in lower_name) else dilate
-                boxes = detect_islands(im, alpha_threshold=alpha_threshold, dilate=sheet_dilate, min_size=min_size)
-                # Zero-gap button strips (e.g. 32x128 16x16 grid) collapse into 1 strip; split on 16px grid
-                if (
-                    len(boxes) == 1
-                    and "button" in lower_name
-                    and w % 16 == 0
-                    and h % 16 == 0
-                    and (w > 32 or h > 32)
-                ):
-                    boxes = detect_grid_cells(im, cell_size=16, alpha_threshold=alpha_threshold, min_size=min_size)
+                group = rel_path.parts[0] if len(rel_path.parts) > 1 else root_folder.name
+                base_id = camel_to_snake_slug(png_path.stem)
+                if stem_counts.get(base_id, 0) > 1 and len(rel_path.parts) > 1:
+                    parent_slug = camel_to_snake_slug(rel_path.parent.name)
+                    base_id = f"{parent_slug}_{base_id}"
+                craftland_asset_path = real_source_file
+                file_id, meta_slice_9 = read_craftland_png_meta(png_path)
 
-            sheet_slice_ids: list[str] = []
-            for idx, (x0, y0, x1, y1) in enumerate(boxes, start=1):
-                crop = im.crop((x0, y0, x1, y1))
-                cw, ch = crop.size
-                base_id = f"{stem}_{idx:03d}"
-                slice_id = base_id
-                collision = 2
-                while slice_id in used_ids:
-                    slice_id = f"{base_id}_{collision}"
-                    collision += 1
-                used_ids.add(slice_id)
+            slice_id = base_id
+            collision = 2
+            while slice_id in used_ids:
+                slice_id = f"{base_id}_{collision}"
+                collision += 1
+            used_ids.add(slice_id)
 
-                if len(boxes) == 1 and x0 == 0 and y0 == 0 and x1 == w and y1 == h:
-                    # Standalone 1-sprite PNG: reference directly without duplicating
-                    slice_rel = real_source_file
-                else:
-                    slice_dest = slices_dir / f"{slice_id}.png"
-                    crop.save(slice_dest)
-                    try:
-                        slice_rel = slice_dest.resolve().relative_to(workspace_root).as_posix()
-                    except ValueError:
-                        slice_rel = slice_dest.resolve().as_posix()
-
-                cat = classify_slice(rel_path, cw, ch)
+            with Image.open(png_path) as raw_im:
+                im = raw_im.convert("RGBA")
+                w, h = im.size
+                cat = classify_slice(rel_path, w, h)
                 manual_9 = slice9_overrides.get(slice_id)
                 if isinstance(manual_9, list) and len(manual_9) == 4:
                     slice_9 = [int(v) for v in manual_9]
+                elif meta_slice_9 is not None:
+                    slice_9 = meta_slice_9
+                    if cat == "icon" and w >= 16 and h >= 16:
+                        cat = "panel"
+                elif Path(str(png_path) + ".meta").is_file():
+                    slice_9 = None
                 else:
-                    slice_9 = estimate_9slice(crop, cat)
-                white_mask = is_white_mask(crop)
+                    slice_9 = estimate_9slice(im, cat)
+                white_mask = is_white_mask(im)
 
-                records.append(
-                    SliceRecord(
-                        slice_id=slice_id,
-                        file=slice_rel,
-                        source_file=real_source_file,
-                        group=group,
-                        bbox=[x0, y0, cw, ch],
-                        width=cw,
-                        height=ch,
-                        category=cat,
-                        slice_9=slice_9,
-                        is_white_mask_candidate=white_mask,
-                    )
+            records.append(
+                SliceRecord(
+                    slice_id=slice_id,
+                    file=real_source_file,
+                    source_file=real_source_file,
+                    group=group,
+                    bbox=[0, 0, w, h],
+                    width=w,
+                    height=h,
+                    category=cat,
+                    slice_9=slice_9,
+                    is_white_mask_candidate=white_mask,
+                    craftland_file_id=file_id,
+                    craftland_asset_path=craftland_asset_path,
                 )
-                sheet_slice_ids.append(slice_id)
-
+            )
             sources_meta.append(
                 {
                     "source_file": real_source_file,
                     "width": w,
                     "height": h,
-                    "dilate_used": sheet_dilate,
-                    "slice_count": len(sheet_slice_ids),
-                    "slice_ids": sheet_slice_ids,
+                    "dilate_used": 0,
+                    "slice_count": 1,
+                    "slice_ids": [slice_id],
+                    "craftland_file_id": file_id,
+                    "craftland_asset_path": craftland_asset_path,
                 }
             )
+    else:
+        safe_project = re.sub(r"[^a-zA-Z0-9_-]+", "-", project.strip()).strip("-") or "basic-pack"
+        slices_dir = workspace_root / "assets" / safe_project / "slices"
+        slices_dir.mkdir(parents=True, exist_ok=True)
+        for stale in slices_dir.glob("*.png"):
+            stale.unlink()
 
-    contact_sheets = render_contact_sheets(records, output_dir, contact_dir)
+        png_files = sorted(input_dir.rglob("*.png"), key=lambda p: p.as_posix().lower())
+        if not png_files:
+            raise RuntimeError(f"No PNG files found under {input_dir}")
 
-    manifest = {
-        "input_dir": input_dir.as_posix(),
+        for png_path in png_files:
+            rel_path = png_path.relative_to(input_dir)
+            try:
+                real_source_file = png_path.resolve().relative_to(workspace_root).as_posix()
+            except ValueError:
+                real_source_file = png_path.resolve().as_posix()
+            group = rel_path.parts[0] if len(rel_path.parts) > 1 else "root"
+            stem = shorten_stem(rel_path)
+            file_id, meta_slice_9 = read_craftland_png_meta(png_path)
+
+            with Image.open(png_path) as raw_im:
+                im = raw_im.convert("RGBA")
+                w, h = im.size
+                lower_name = rel_path.as_posix().lower()
+                if "emote" in lower_name and w % 32 == 0 and h % 32 == 0:
+                    sheet_dilate = 0
+                    boxes = detect_grid_cells(im, cell_size=32, alpha_threshold=alpha_threshold, min_size=min_size)
+                else:
+                    sheet_dilate = 0 if (w >= 400 and dilate > 0 and "basic pack" in lower_name) else dilate
+                    boxes = detect_islands(im, alpha_threshold=alpha_threshold, dilate=sheet_dilate, min_size=min_size)
+                    if (
+                        len(boxes) == 1
+                        and "button" in lower_name
+                        and w % 16 == 0
+                        and h % 16 == 0
+                        and (w > 32 or h > 32)
+                    ):
+                        boxes = detect_grid_cells(im, cell_size=16, alpha_threshold=alpha_threshold, min_size=min_size)
+
+                sheet_slice_ids: list[str] = []
+                for idx, (x0, y0, x1, y1) in enumerate(boxes, start=1):
+                    crop = im.crop((x0, y0, x1, y1))
+                    cw, ch = crop.size
+                    base_id = f"{stem}_{idx:03d}"
+                    slice_id = base_id
+                    collision = 2
+                    while slice_id in used_ids:
+                        slice_id = f"{base_id}_{collision}"
+                        collision += 1
+                    used_ids.add(slice_id)
+
+                    if len(boxes) == 1 and x0 == 0 and y0 == 0 and x1 == w and y1 == h:
+                        slice_rel = real_source_file
+                    else:
+                        slice_dest = slices_dir / f"{slice_id}.png"
+                        crop.save(slice_dest)
+                        try:
+                            slice_rel = slice_dest.resolve().relative_to(workspace_root).as_posix()
+                        except ValueError:
+                            slice_rel = slice_dest.resolve().as_posix()
+
+                    cat = classify_slice(rel_path, cw, ch)
+                    manual_9 = slice9_overrides.get(slice_id)
+                    if isinstance(manual_9, list) and len(manual_9) == 4:
+                        slice_9 = [int(v) for v in manual_9]
+                    elif len(boxes) == 1 and meta_slice_9 is not None:
+                        slice_9 = meta_slice_9
+                    else:
+                        slice_9 = estimate_9slice(crop, cat)
+                    white_mask = is_white_mask(crop)
+
+                    records.append(
+                        SliceRecord(
+                            slice_id=slice_id,
+                            file=slice_rel,
+                            source_file=real_source_file,
+                            group=group,
+                            bbox=[x0, y0, cw, ch],
+                            width=cw,
+                            height=ch,
+                            category=cat,
+                            slice_9=slice_9,
+                            is_white_mask_candidate=white_mask,
+                            craftland_file_id=file_id if len(boxes) == 1 else None,
+                            craftland_asset_path=real_source_file if len(boxes) == 1 else None,
+                        )
+                    )
+                    sheet_slice_ids.append(slice_id)
+
+                sources_meta.append(
+                    {
+                        "source_file": real_source_file,
+                        "width": w,
+                        "height": h,
+                        "dilate_used": sheet_dilate,
+                        "slice_count": len(sheet_slice_ids),
+                        "slice_ids": sheet_slice_ids,
+                    }
+                )
+
+    contact_sheets = render_contact_sheets(records, workspace_root, contact_dir)
+
+    try:
+        input_rel_posix = input_dir.resolve().relative_to(workspace_root).as_posix()
+    except ValueError:
+        input_rel_posix = input_dir.as_posix()
+
+    project_root_rel = Path(os.path.relpath(workspace_root, start=output_dir)).as_posix().rstrip("/") + "/"
+
+    manifest: dict[str, Any] = {
+        "input_dir": input_rel_posix,
+        "project_root_rel": project_root_rel,
+        "craftland_project": is_craftland_project,
         "total_sources": len(sources_meta),
         "total_slices": len(records),
         "contact_sheets": contact_sheets,
@@ -1122,6 +1327,16 @@ def process_directory(
                 "category": r.category,
                 "slice_9": r.slice_9,
                 "is_white_mask_candidate": r.is_white_mask_candidate,
+                **(
+                    {"craftland_file_id": r.craftland_file_id}
+                    if r.craftland_file_id is not None
+                    else {}
+                ),
+                **(
+                    {"craftland_asset_path": r.craftland_asset_path}
+                    if r.craftland_asset_path is not None
+                    else {}
+                ),
             }
             for r in records
         },
@@ -1136,15 +1351,31 @@ def process_directory(
         f"window.SPRITE_CATALOG = {json.dumps(manifest, separators=(',', ':'))};\n",
         encoding="utf-8",
     )
-    build_gallery(previews_root=output_dir.resolve().parent, catalog_dir=output_dir)
+    build_gallery(previews_root=output_dir.resolve().parent, catalog_dir=output_dir, project_root=workspace_root)
     return manifest
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Slice packed PNG sprite sheets into isolated sprites + contact sheets.")
-    parser.add_argument("--input", default="Sprite sheets", help="Directory containing source PNG sprite sheets.")
+    parser = argparse.ArgumentParser(description="Slice packed PNG sprite sheets or index Craftland Assets in-place.")
+    parser.add_argument("--input", default="Sprite sheets", help="Directory containing source PNG sprite sheets or Assets/Sprites.")
+    parser.add_argument(
+        "--extra-input",
+        action="append",
+        default=[],
+        help="Additional sprite directories to index alongside --input (e.g. WorkshopIconLibrary).",
+    )
     parser.add_argument("--output", default="previews/_catalog", help="Output catalog metadata directory.")
     parser.add_argument("--project", default="basic-pack", help="Project folder under assets/<project>/slices/ for packed-sheet slices.")
+    parser.add_argument(
+        "--craftland-assets",
+        action="store_true",
+        help="Index individual Craftland PNG textures in-place without slicing or copying, reading sibling .png.meta fileId & 9-slice.",
+    )
+    parser.add_argument(
+        "--project-root",
+        default=None,
+        help="Explicit Craftland project root directory (auto-detected from main.gproj / Assets when omitted).",
+    )
     parser.add_argument("--alpha-threshold", type=int, default=10, help="Minimum alpha (0-255) considered opaque.")
     parser.add_argument("--dilate", type=int, default=1, help="Pixel dilation radius for grouping multi-part icons.")
     parser.add_argument("--min-size", type=int, default=4, help="Minimum slice width/height in pixels.")
@@ -1163,8 +1394,15 @@ def main() -> int:
     args = parser.parse_args()
 
     out_dir = Path(args.output)
+    explicit_proj_root = Path(args.project_root).resolve() if args.project_root else None
+    detected_root = detect_craftland_project_root(out_dir, explicit_root=explicit_proj_root)
+    if args.craftland_assets and detected_root is None:
+        detected_root = detect_craftland_project_root(Path(args.input), explicit_root=explicit_proj_root)
+    effective_root = explicit_proj_root or detected_root or Path.cwd().resolve()
+    extra_input_paths = [Path(p) for p in (args.extra_input or [])]
+
     if args.sync_sources:
-        changed = resolve_real_source_paths(Path.cwd(), out_dir)
+        changed = resolve_real_source_paths(effective_root, out_dir)
         print(f"Resolved real source paths in {out_dir.as_posix()} ({changed} entries updated).")
         if not args.serve and not args.reslice and not args.set_slice9:
             return 0
@@ -1176,7 +1414,7 @@ def main() -> int:
             if len(parts) != 4:
                 raise SystemExit(f"Invalid --set-slice9 values '{raw_vals}' for {slice_id}; expected 4 integers T,R,B,L")
             updates[slice_id] = parts
-        updated_map = apply_slice9_overrides_in_place(out_dir, updates)
+        updated_map = apply_slice9_overrides_in_place(out_dir, updates, project_root=effective_root)
         if not args.reslice and not args.serve and (out_dir / "manifest.json").exists():
             print(f"Updated 9-slice overrides in place ({len(updates)} updated, {len(updated_map)} total).")
             return 0
@@ -1190,10 +1428,13 @@ def main() -> int:
                 dilate=args.dilate,
                 min_size=args.min_size,
                 project=args.project,
+                craftland_assets=args.craftland_assets,
+                project_root=effective_root,
+                extra_inputs=extra_input_paths,
             )
         else:
-            resolve_real_source_paths(Path.cwd(), out_dir)
-        return run_studio_server(Path.cwd(), out_dir, args.port, open_browser=args.open)
+            resolve_real_source_paths(effective_root, out_dir)
+        return run_studio_server(effective_root, out_dir, args.port, open_browser=args.open)
 
     manifest = process_directory(
         input_dir=Path(args.input),
@@ -1202,9 +1443,13 @@ def main() -> int:
         dilate=args.dilate,
         min_size=args.min_size,
         project=args.project,
+        craftland_assets=args.craftland_assets,
+        project_root=effective_root,
+        extra_inputs=extra_input_paths,
     )
+    mode_verb = "Indexed" if args.craftland_assets else "Sliced"
     print(
-        f"Sliced {manifest['total_slices']} sprites from {manifest['total_sources']} PNG sheets "
+        f"{mode_verb} {manifest['total_slices']} sprites from {manifest['total_sources']} PNG sources "
         f"into {Path(args.output).as_posix()} ({len(manifest['contact_sheets'])} contact sheets)."
     )
     return 0

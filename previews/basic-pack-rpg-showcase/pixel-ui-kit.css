@@ -3465,3 +3465,110 @@ body.clean-mode #__px_safe_zones__ {
 #game-canvas[data-l10n-mode="rtl"] {
   outline: 2px solid rgba(168, 85, 247, 0.7);
 }
+
+/* ==========================================================================
+   Craftland Studio .ui MCP Export Modal
+   ========================================================================== */
+
+.wb-export-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(9, 12, 18, 0.78);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3200;
+  padding: 16px;
+}
+
+.wb-export-modal-backdrop[hidden] {
+  display: none !important;
+}
+
+.wb-export-modal {
+  width: 100%;
+  max-width: 480px;
+  background: var(--px-workbench-surface);
+  border: 1px solid var(--px-workbench-border);
+  border-radius: 10px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.wb-export-modal-head {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--px-workbench-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: rgba(15, 20, 30, 0.55);
+}
+
+.wb-export-modal-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--px-accent);
+}
+
+.wb-export-modal-body {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.wb-export-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wb-export-field label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--px-workbench-muted);
+}
+
+.wb-export-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.wb-export-status {
+  margin-top: 4px;
+  padding: 10px;
+  border-radius: 6px;
+  background: rgba(15, 20, 30, 0.65);
+  border: 1px solid var(--px-workbench-border);
+  font-size: 11px;
+  line-height: 1.45;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.wb-export-status.is-ok {
+  border-color: rgba(74, 222, 128, 0.45);
+  color: #dcfce7;
+}
+
+.wb-export-status.is-error {
+  border-color: rgba(248, 113, 113, 0.55);
+  background: rgba(127, 29, 29, 0.25);
+  color: #fecaca;
+}
+
+.wb-export-warns ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  color: #fde68a;
+}

@@ -7,26 +7,27 @@ import argparse
 from datetime import datetime, timezone
 from html.parser import HTMLParser
 import json
+import os
 from pathlib import Path
 import re
 import shutil
 from typing import Any
 
 
-ROOT_BAT_CONTENT = """@echo off
+ROOT_BAT_TEMPLATE = """@echo off
 setlocal
 cd /d "%~dp0"
 title Game UI Preview Hub ^& Studio Backend (Port 17890)
 echo ============================================================================
 echo   Game UI Preview Hub ^& Studio Backend Server
-echo   URL: http://127.0.0.1:17890/previews/index.html
+echo   URL: http://127.0.0.1:17890/{hub_url_rel}
 echo ============================================================================
 echo.
 echo Syncing UI Gallery and starting local backend server on port 17890...
 echo (Keep this window open while editing 9-slice borders. Press Ctrl+C to stop.)
 echo.
-set "SCRIPT=.agents\\skills\\game-ui-preview\\scripts\\slice_sprites.py"
-set "ARGS=--output previews\\_catalog --serve --port 17890 --open"
+set "SCRIPT={script_rel}"
+set "ARGS={script_args}"
 
 where uv >nul 2>&1
 if not errorlevel 1 (
@@ -64,6 +65,60 @@ if errorlevel 1 (
   exit /b 1
 )
 """
+
+
+def detect_craftland_project_root(start_dir: Path, explicit_root: Path | None = None) -> Path | None:
+    """Walk up from start_dir to locate a Craftland Studio project root (main.gproj or Assets + ProjectSettings)."""
+    if explicit_root is not None:
+        resolved = explicit_root.resolve()
+        if (resolved / "main.gproj").is_file() or ((resolved / "Assets").is_dir() and (resolved / "ProjectSettings").is_dir()):
+            return resolved
+        return resolved
+
+    cur = start_dir.resolve()
+    if cur.is_file():
+        cur = cur.parent
+    for candidate in (cur, *cur.parents):
+        if (candidate / "main.gproj").is_file() or (
+            (candidate / "Assets").is_dir() and (candidate / "ProjectSettings").is_dir()
+        ):
+            return candidate
+    return None
+
+
+def _render_launch_bat(bat_dir: Path, previews_root: Path, catalog_dir: Path, project_root: Path | None = None) -> str:
+    resolved_bat_dir = bat_dir.resolve()
+    resolved_previews = previews_root.resolve()
+    resolved_catalog = catalog_dir.resolve()
+    resolved_proj = (project_root or resolved_bat_dir).resolve()
+
+    slice_script = (Path(__file__).resolve().parent / "slice_sprites.py").resolve()
+    script_rel = os.path.relpath(slice_script, start=resolved_bat_dir).replace("/", "\\")
+    cat_rel = os.path.relpath(resolved_catalog, start=resolved_bat_dir).replace("/", "\\")
+    proj_rel = os.path.relpath(resolved_proj, start=resolved_bat_dir).replace("/", "\\")
+
+    try:
+        hub_url_rel = (resolved_previews / "index.html").relative_to(resolved_proj).as_posix()
+    except ValueError:
+        hub_url_rel = "previews/index.html"
+
+    is_craftland = (resolved_proj / "main.gproj").is_file() or (
+        (resolved_proj / "Assets").is_dir() and (resolved_proj / "ProjectSettings").is_dir()
+    )
+    if is_craftland:
+        args_parts = []
+        if proj_rel != ".":
+            args_parts.append(f'--project-root "{proj_rel}"')
+        args_parts.append(f"--output {cat_rel} --serve --port 17890 --open")
+        script_args = " ".join(args_parts)
+    else:
+        script_args = f"--output {cat_rel} --serve --port 17890 --open"
+
+    return ROOT_BAT_TEMPLATE.format(
+        hub_url_rel=hub_url_rel,
+        script_rel=script_rel,
+        script_args=script_args,
+    )
 
 
 class _PreviewHTMLParser(HTMLParser):
@@ -235,11 +290,13 @@ def build_gallery(
     previews_root: Path = Path("previews"),
     catalog_dir: Path = Path("previews/_catalog"),
     sync_kit: bool = True,
+    project_root: Path | None = None,
 ) -> dict[str, Any]:
     """Generate previews/_catalog/previews-data.js, previews/index.html, and sync kit templates."""
     previews_root.mkdir(parents=True, exist_ok=True)
     catalog_dir.mkdir(parents=True, exist_ok=True)
 
+    detected_proj = detect_craftland_project_root(previews_root, explicit_root=project_root)
     payload = scan_previews(previews_root)
 
     previews_js_path = catalog_dir / "previews-data.js"
@@ -270,10 +327,16 @@ def build_gallery(
                     encoding="utf-8",
                 )
 
-    root_dir = previews_root.resolve().parent
-    bat_path = root_dir / "launch_ui_hub.bat"
-    if not bat_path.exists():
-        bat_path.write_text(ROOT_BAT_CONTENT, encoding="utf-8")
+    bat_parent = previews_root.resolve().parent
+    bat_path = bat_parent / "launch_ui_hub.bat"
+    bat_content = _render_launch_bat(
+        bat_dir=bat_parent,
+        previews_root=previews_root,
+        catalog_dir=catalog_dir,
+        project_root=detected_proj or bat_parent,
+    )
+    if not bat_path.exists() or detected_proj is not None:
+        bat_path.write_text(bat_content, encoding="utf-8")
 
     return payload
 
@@ -282,6 +345,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Build the Game UI Preview Hub and previews-data.js index.")
     parser.add_argument("--previews-root", default="previews", help="Root folder containing UI previews.")
     parser.add_argument("--catalog", default="previews/_catalog", help="Shared sprite & preview catalog directory.")
+    parser.add_argument(
+        "--project-root",
+        default=None,
+        help="Optional Craftland project root directory (auto-detected when omitted).",
+    )
     parser.add_argument(
         "--no-sync-kit",
         action="store_true",
@@ -293,6 +361,7 @@ def main() -> int:
         previews_root=Path(args.previews_root),
         catalog_dir=Path(args.catalog),
         sync_kit=not args.no_sync_kit,
+        project_root=Path(args.project_root).resolve() if args.project_root else None,
     )
     print(f"Built UI Preview Hub at {Path(args.previews_root).as_posix()}/index.html ({payload['total_previews']} UIs).")
     return 0

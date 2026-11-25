@@ -12,7 +12,7 @@ _SCRIPTS_DIR = str(Path(__file__).resolve().parent)
 if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
 
-from build_gallery import build_gallery
+from build_gallery import build_gallery, detect_craftland_project_root
 
 
 STARTER_HTML = """<!DOCTYPE html>
@@ -154,7 +154,8 @@ def scaffold_preview(
             ),
             encoding="utf-8",
         )
-    build_gallery(previews_root=out_root, catalog_dir=catalog_dir)
+    detected_root = detect_craftland_project_root(out_root)
+    build_gallery(previews_root=out_root, catalog_dir=catalog_dir, project_root=detected_root)
     return index_path
 
 
