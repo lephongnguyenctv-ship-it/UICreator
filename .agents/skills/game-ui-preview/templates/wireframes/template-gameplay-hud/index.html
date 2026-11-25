@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gameplay HUD — Wireframe Template</title>
+  <link rel="stylesheet" href="./pixel-ui-kit.css">
+  <style>
+    .wf-hud-screen {
+      position: absolute;
+      inset: 0;
+      padding: 20px 24px 18px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      pointer-events: none;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+
+    .wf-hud-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 20px;
+      width: 100%;
+    }
+
+    .wf-top-left {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: auto;
+    }
+
+    .wf-player-card {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      min-width: 340px;
+    }
+
+    .wf-avatar {
+      width: 66px;
+      height: 66px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 23px;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+
+    .wf-vitals {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .wf-player-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 24px;
+      font-weight: 700;
+    }
+
+    .wf-bar-track {
+      height: 22px;
+      border-radius: 6px;
+      padding: 2px;
+      display: flex;
+      align-items: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .wf-bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      background: rgba(96, 165, 250, 0.45);
+      width: 78%;
+      transition: width 180ms ease;
+    }
+
+    .wf-bar-fill--xp {
+      background: rgba(167, 139, 250, 0.45);
+      width: 54%;
+    }
+
+    .wf-bar-text {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .wf-currency-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .wf-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 24px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      min-height: 48px;
+    }
+
+    .wf-icon-mini {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+
+    .wf-top-center {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      pointer-events: auto;
+    }
+
+    .wf-objective-pill {
+      padding: 10px 26px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      font-size: 26px;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .wf-sub-objective {
+      padding: 6px 18px;
+      border-radius: 8px;
+      font-size: 23px;
+      font-weight: 600;
+    }
+
+    .wf-top-right {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 10px;
+      pointer-events: auto;
+    }
+
+    .wf-action-strip {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .wf-icon-btn {
+      min-width: 64px;
+      min-height: 64px;
+      padding: 0 14px;
+      border-radius: 10px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 23px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .wf-minimap {
+      width: 176px;
+      height: 112px;
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      font-size: 23px;
+      font-weight: 700;
+    }
+
+    .wf-buff-popover {
+      width: 300px;
+      padding: 14px;
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 2px;
+    }
+
+    .wf-buff-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-size: 23px;
+      font-weight: 600;
+    }
+
+    .wf-hud-bottom {
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      width: 100%;
+      padding-bottom: 4px;
+    }
+
+    .wf-hotbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      border-radius: 12px;
+      pointer-events: auto;
+    }
+
+    .wf-hotbar-slot {
+      width: 82px;
+      height: 82px;
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      font-size: 23px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .wf-hotbar-slot.is-selected {
+      outline: 3px solid #f59e0b;
+      outline-offset: -3px;
+    }
+
+    .wf-slot-key {
+      font-size: 16px;
+      opacity: 0.75;
+    }
+
+    /* State variations */
+    [data-hud-state="low"] .wf-bar-fill--hp {
+      width: 18%;
+      background: rgba(248, 113, 113, 0.72);
+    }
+
+    [data-hud-state="low"] .wf-alert-chip {
+      display: inline-flex;
+    }
+
+    .wf-alert-chip {
+      display: none;
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 23px;
+      font-weight: 800;
+      color: #fecaca !important;
+      border-color: #f87171 !important;
+    }
+  </style>
+</head>
+<body data-catalog-base="../_catalog/" data-default-mode="wireframe" data-ui-profile="craftland" data-default-res="1500x750">
+  <header class="workbench-bar">
+    <div class="workbench-title">
+      <span>Gameplay HUD (Template)</span>
+      <span class="workbench-badge">Wireframe Template · 1500×750</span>
+    </div>
+    <div class="workbench-controls">
+      <div class="wb-group">
+        <span class="wb-label">Mode</span>
+        <button class="wb-btn is-active" data-wb-mode="wireframe">Wireframe</button>
+        <button class="wb-btn" data-wb-mode="edit">Edit UI</button>
+        <button class="wb-btn" data-wb-mode="final">Interactive</button>
+      </div>
+      <div class="wb-group">
+        <span class="wb-label">View</span>
+        <button class="wb-btn is-active" data-ui-state-trigger="combat">Combat HUD</button>
+        <button class="wb-btn" data-ui-state-trigger="buffs-popover">Buffs Popover</button>
+      </div>
+      <div class="wb-group">
+        <span class="wb-label">State</span>
+        <button class="wb-btn is-active" data-tpl-state="normal">Normal</button>
+        <button class="wb-btn" data-tpl-state="low">Low HP</button>
+        <button class="wb-btn" data-tpl-state="max">Max Values</button>
+      </div>
+      <div class="wb-group">
+        <span class="wb-label">Scale</span>
+        <button class="wb-btn" data-wb-scale="2">2x</button>
+        <button class="wb-btn is-active" data-wb-scale="3">3x</button>
+        <button class="wb-btn" data-wb-scale="4">4x</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="workbench-stage">
+    <div id="game-canvas" class="px-canvas scene-cozy-meadow" data-hud-state="normal">
+      <!-- VIEW 1: Active Gameplay HUD -->
+      <div class="wf-hud-screen is-active" data-ui-view="combat">
+        <div class="wf-hud-top">
+          <div class="wf-top-left">
+            <div class="px-wire-box wf-player-card">
+              <div class="px-wire-box wf-avatar">AVT</div>
+              <div class="wf-vitals">
+                <div class="wf-player-row">
+                  <span data-bind="player-name">Player</span>
+                  <span data-bind="player-lv">Lv. 12</span>
+                </div>
+                <div class="px-wire-box wf-bar-track">
+                  <div class="wf-bar-fill wf-bar-fill--hp"></div>
+                  <span class="wf-bar-text" data-bind="hp-text">780 / 1000 HP</span>
+                </div>
+                <div class="px-wire-box wf-bar-track">
+                  <div class="wf-bar-fill wf-bar-fill--xp"></div>
+                  <span class="wf-bar-text" data-bind="xp-text">XP 54%</span>
+                </div>
+              </div>
+            </div>
+            <div class="wf-currency-row">
+              <div class="px-wire-box wf-pill">
+                <span class="px-wire-box wf-icon-mini">G</span>
+                <span data-bind="gold-val">12,450</span>
+              </div>
+              <div class="px-wire-box wf-pill">
+                <span class="px-wire-box wf-icon-mini">D</span>
+                <span data-bind="gem-val">320</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="wf-top-center">
+            <div class="px-wire-box wf-objective-pill">
+              <span data-bind="wave-val">WAVE 4 / 10</span>
+              <span data-bind="timer-val">02:45</span>
+            </div>
+            <div class="px-wire-box wf-sub-objective" data-bind="obj-val">Defeat 12 / 20 Enemies</div>
+            <div class="px-wire-box wf-alert-chip">LOW HEALTH WARNING</div>
+          </div>
+
+          <div class="wf-top-right">
+            <div class="wf-action-strip">
+              <button type="button" class="px-wire-box wf-icon-btn" data-ui-state-trigger="buffs-popover">Buffs ×3</button>
+              <button type="button" class="px-wire-box wf-icon-btn">Bag</button>
+              <button type="button" class="px-wire-box wf-icon-btn">⚙</button>
+            </div>
+            <div class="px-wire-box wf-minimap">
+              <span>MINIMAP</span>
+              <span class="wf-slot-key">Radar / Zone</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="wf-hud-bottom">
+          <div class="px-wire-box wf-hotbar">
+            <button type="button" class="px-wire-box wf-hotbar-slot is-selected">
+              <span>Slot 1</span>
+              <span class="wf-slot-key">Primary</span>
+            </button>
+            <button type="button" class="px-wire-box wf-hotbar-slot">
+              <span>Slot 2</span>
+              <span class="wf-slot-key">Skill</span>
+            </button>
+            <button type="button" class="px-wire-box wf-hotbar-slot">
+              <span>Slot 3</span>
+              <span class="wf-slot-key">Skill</span>
+            </button>
+            <button type="button" class="px-wire-box wf-hotbar-slot">
+              <span>Slot 4</span>
+              <span class="wf-slot-key">Item</span>
+            </button>
+            <button type="button" class="px-wire-box wf-hotbar-slot">
+              <span>Slot 5</span>
+              <span class="wf-slot-key">Ult</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW 2: Gameplay HUD + Progressive Disclosure Buffs Popover -->
+      <div class="wf-hud-screen" data-ui-view="buffs-popover" hidden>
+        <div class="wf-hud-top">
+          <div class="wf-top-left">
+            <div class="px-wire-box wf-player-card">
+              <div class="px-wire-box wf-avatar">AVT</div>
+              <div class="wf-vitals">
+                <div class="wf-player-row">
+                  <span>Player</span>
+                  <span>Lv. 12</span>
+                </div>
+                <div class="px-wire-box wf-bar-track">
+                  <div class="wf-bar-fill wf-bar-fill--hp"></div>
+                  <span class="wf-bar-text">780 / 1000 HP</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="wf-top-center">
+            <div class="px-wire-box wf-objective-pill">
+              <span>WAVE 4 / 10</span>
+              <span>02:45</span>
+            </div>
+          </div>
+
+          <div class="wf-top-right">
+            <div class="wf-action-strip">
+              <button type="button" class="px-wire-box wf-icon-btn" data-ui-state-trigger="combat">Buffs ×3 ✕</button>
+              <button type="button" class="px-wire-box wf-icon-btn">Bag</button>
+              <button type="button" class="px-wire-box wf-icon-btn">⚙</button>
+            </div>
+            <div class="px-wire-box wf-buff-popover">
+              <div class="px-wire-box wf-buff-row">
+                <span>2× Gold Boost</span>
+                <span>08:12</span>
+              </div>
+              <div class="px-wire-box wf-buff-row">
+                <span>Friend Bonus +15%</span>
+                <span>Active</span>
+              </div>
+              <div class="px-wire-box wf-buff-row">
+                <span>Speed Aura +10%</span>
+                <span>01:40</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="wf-hud-bottom">
+          <div class="px-wire-box wf-hotbar">
+            <button type="button" class="px-wire-box wf-hotbar-slot is-selected"><span>Slot 1</span></button>
+            <button type="button" class="px-wire-box wf-hotbar-slot"><span>Slot 2</span></button>
+            <button type="button" class="px-wire-box wf-hotbar-slot"><span>Slot 3</span></button>
+            <button type="button" class="px-wire-box wf-hotbar-slot"><span>Slot 4</span></button>
+            <button type="button" class="px-wire-box wf-hotbar-slot"><span>Slot 5</span></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <section id="wb-behavior-drawer" class="workbench-drawer is-open" aria-label="Element Behavior Specification">
+      <h3>Element Behavior Specification (Grouped by Interaction Role)</h3>
+      <table class="behavior-table">
+        <thead>
+          <tr>
+            <th>Element / Group</th>
+            <th>View</th>
+            <th>Count</th>
+            <th>Behavior Description</th>
+          </tr>
+        </thead>
+        <tbody id="wb-behavior-body">
+          <tr>
+            <td><strong>Player Vitals &amp; Currency Cluster</strong> <span class="behavior-group-tag">Group</span></td>
+            <td><span class="behavior-view-badge">combat</span></td>
+            <td>1</td>
+            <td>Top-left anchor displaying avatar, level, HP/XP fill bars, and primary/premium currencies with tabular numbers. Flashes warning banner below 25% HP.</td>
+          </tr>
+          <tr>
+            <td><strong>Objective &amp; Match Timer Pill</strong></td>
+            <td><span class="behavior-view-badge">combat</span></td>
+            <td>1</td>
+            <td>Top-center anchor keeping Center 40% gameplay focus zone unobstructed. Updates wave count, countdown, and current goal progress live.</td>
+          </tr>
+          <tr>
+            <td><strong>Top-Right Action Rail &amp; Buff Popover</strong> <span class="behavior-group-tag">Group</span></td>
+            <td><span class="behavior-view-badge">combat</span></td>
+            <td>3</td>
+            <td>Tap <code>Buffs ×3</code> to toggle passive boost popover (progressive disclosure). Bag and Settings buttons open respective overlays.</td>
+          </tr>
+          <tr>
+            <td><strong>Bottom-Center Hotbar Slots (1–5)</strong> <span class="behavior-group-tag">Group</span></td>
+            <td><span class="behavior-view-badge">combat</span></td>
+            <td>5</td>
+            <td>Centered away from Free Fire native bottom-left/bottom-right touch zones. Tap selects active slot or triggers cooldown ability.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="wb-manifest-drawer" class="workbench-drawer" aria-label="Sprite Asset Manifest">
+      <h3>Sprite Asset Manifest (Auto-scanned from #game-canvas)</h3>
+      <table class="manifest-table">
+        <thead>
+          <tr>
+            <th>Preview</th>
+            <th>Slice ID</th>
+            <th>Role</th>
+            <th>Source PNG</th>
+            <th>Native Size</th>
+            <th>9-Slice</th>
+          </tr>
+        </thead>
+        <tbody id="wb-manifest-body"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="../_catalog/catalog-data.js"></script>
+  <script src="../_catalog/previews-data.js"></script>
+  <script src="./ui-edits.js"></script>
+  <script src="./pixel-ui-kit.js"></script>
+  <script>
+    (function () {
+      const canvas = document.getElementById('game-canvas');
+      const stateBtns = document.querySelectorAll('[data-tpl-state]');
+      const presets = {
+        normal: {
+          'player-lv': 'Lv. 12',
+          'hp-text': '780 / 1000 HP',
+          'xp-text': 'XP 54%',
+          'gold-val': '12,450',
+          'gem-val': '320',
+          'wave-val': 'WAVE 4 / 10',
+          'timer-val': '02:45',
+          'obj-val': 'Defeat 12 / 20 Enemies',
+        },
+        low: {
+          'player-lv': 'Lv. 12',
+          'hp-text': '180 / 1000 HP',
+          'xp-text': 'XP 54%',
+          'gold-val': '12,450',
+          'gem-val': '320',
+          'wave-val': 'BOSS WAVE',
+          'timer-val': '00:18',
+          'obj-val': 'Survive Final Ambush!',
+        },
+        max: {
+          'player-lv': 'Lv. 999',
+          'hp-text': '999,999 / 999,999',
+          'xp-text': 'MAX LEVEL',
+          'gold-val': '999.9M',
+          'gem-val': '888.8K',
+          'wave-val': 'WAVE 99 / 99',
+          'timer-val': '59:59',
+          'obj-val': 'Defeat 999 / 999 Enemies',
+        },
+      };
+
+      stateBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          const key = btn.getAttribute('data-tpl-state') || 'normal';
+          stateBtns.forEach(b => b.classList.toggle('is-active', b === btn));
+          if (canvas) canvas.setAttribute('data-hud-state', key);
+          const data = presets[key] || presets.normal;
+          Object.entries(data).forEach(([k, val]) => {
+            document.querySelectorAll(`[data-bind="${k}"]`).forEach(el => {
+              el.textContent = val;
+            });
+          });
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

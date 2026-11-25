@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reward &amp; Dialog Popup — Wireframe Template</title>
+  <link rel="stylesheet" href="./pixel-ui-kit.css">
+  <style>
+    .wf-backdrop {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 110px;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+
+    .wf-reward-modal {
+      width: 920px;
+      max-height: 620px;
+      border-radius: 16px;
+      padding: 24px 30px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+      text-align: center;
+    }
+
+    .wf-banner {
+      padding: 10px 36px;
+      border-radius: 10px;
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+    }
+
+    .wf-subtitle {
+      font-size: 24px;
+      opacity: 0.9;
+      margin: 0;
+    }
+
+    .wf-hero-reward {
+      width: 100%;
+      padding: 16px 20px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+    }
+
+    .wf-hero-icon {
+      width: 112px;
+      height: 112px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+
+    .wf-hero-copy {
+      text-align: left;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .wf-hero-name {
+      font-size: 30px;
+      font-weight: 800;
+    }
+
+    .wf-hero-qty {
+      font-size: 24px;
+      opacity: 0.85;
+    }
+
+    .wf-loot-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      width: 100%;
+    }
+
+    .wf-loot-slot {
+      padding: 14px 10px;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      font-size: 23px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .wf-cta-primary {
+      min-width: 340px;
+      min-height: 76px;
+      padding: 0 28px;
+      border-radius: 12px;
+      font-size: 26px;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    /* Dialog View */
+    .wf-dialog-modal {
+      width: 720px;
+      padding: 28px 32px;
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      text-align: center;
+    }
+
+    .wf-dialog-title {
+      font-size: 32px;
+      font-weight: 800;
+      margin: 0;
+    }
+
+    .wf-dialog-body {
+      font-size: 24px;
+      line-height: 1.45;
+      margin: 0;
+    }
+
+    .wf-callout {
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 23px;
+      font-weight: 600;
+    }
+
+    .wf-dialog-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 4px;
+    }
+
+    .wf-cta-secondary {
+      min-height: 72px;
+      border-radius: 12px;
+      font-size: 24px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    [data-reward-state="single"] .wf-loot-strip {
+      display: none;
+    }
+
+    [data-reward-state="claimed"] .wf-cta-primary {
+      opacity: 0.6;
+    }
+  </style>
+</head>
+<body data-catalog-base="../_catalog/" data-default-mode="wireframe" data-ui-profile="craftland" data-default-res="1500x750">
+  <header class="workbench-bar">
+    <div class="workbench-title">
+      <span>Reward &amp; Dialog Popup (Template)</span>
+      <span class="workbench-badge">Wireframe Template · 1500×750</span>
+    </div>
+    <div class="workbench-controls">
+      <div class="wb-group">
+        <span class="wb-label">Mode</span>
+        <button class="wb-btn is-active" data-wb-mode="wireframe">Wireframe</button>
+        <button class="wb-btn" data-wb-mode="edit">Edit UI</button>
+        <button class="wb-btn" data-wb-mode="final">Interactive</button>
+      </div>
+      <div class="wb-group">
+        <span class="wb-label">View</span>
+        <button class="wb-btn is-active" data-ui-state-trigger="reward">Milestone Reward</button>
+        <button class="wb-btn" data-ui-state-trigger="confirm-dialog">Confirm Dialog</button>
+      </div>
+      <div class="wb-group">
+        <span class="wb-label">State</span>
+        <button class="wb-btn is-active" data-tpl-state="multi">Multi-Drop (4×)</button>
+        <button class="wb-btn" data-tpl-state="single">Single Hero</button>
+        <button class="wb-btn" data-tpl-state="claimed">Claimed</button>
+      </div>
+      <div class="wb-group">
+        <span class="wb-label">Scale</span>
+        <button class="wb-btn" data-wb-scale="2">2x</button>
+        <button class="wb-btn is-active" data-wb-scale="3">3x</button>
+        <button class="wb-btn" data-wb-scale="4">4x</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="workbench-stage">
+    <div id="game-canvas" class="px-canvas scene-cozy-meadow" data-reward-state="multi">
+      <!-- VIEW 1: Milestone / Victory Reward -->
+      <div class="wf-backdrop is-active" data-ui-view="reward">
+        <div class="px-wire-box wf-reward-modal">
+          <div class="px-wire-box wf-banner">STAGE CLEAR REWARDS</div>
+          <p class="wf-subtitle">Checkpoint 5 Completed · First-Clear Bonus</p>
+
+          <div class="px-wire-box wf-hero-reward">
+            <div class="px-wire-box wf-hero-icon">HERO</div>
+            <div class="wf-hero-copy">
+              <div class="wf-hero-name">Golden Supply Crate</div>
+              <div class="wf-hero-qty">Guaranteed Epic Blueprint ×1</div>
+            </div>
+          </div>
+
+          <div class="wf-loot-strip">
+            <div class="px-wire-box wf-loot-slot"><span>Gold</span><span>+2,500</span></div>
+            <div class="px-wire-box wf-loot-slot"><span>Gems</span><span>+50</span></div>
+            <div class="px-wire-box wf-loot-slot"><span>XP</span><span>+1,200</span></div>
+            <div class="px-wire-box wf-loot-slot"><span>Tokens</span><span>×10</span></div>
+          </div>
+
+          <button type="button" class="px-wire-box wf-cta-primary" data-bind="claim-cta">CLAIM REWARDS</button>
+        </div>
+      </div>
+
+      <!-- VIEW 2: Universal Confirmation Dialog -->
+      <div class="wf-backdrop" data-ui-view="confirm-dialog" hidden>
+        <div class="px-wire-box wf-dialog-modal">
+          <h2 class="wf-dialog-title">LEAVE CURRENT MATCH?</h2>
+          <p class="wf-dialog-body">Returning to the lobby now will forfeit unbanked wave rewards from this run.</p>
+          <div class="px-wire-box wf-callout">Unbanked Progress: Wave 4 · 1,240 Gold</div>
+          <div class="wf-dialog-actions">
+            <button type="button" class="px-wire-box wf-cta-secondary" data-ui-state-trigger="reward">Stay in Match</button>
+            <button type="button" class="px-wire-box wf-cta-primary" style="min-width: 0;" data-ui-state-trigger="reward">Leave Match</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <section id="wb-behavior-drawer" class="workbench-drawer is-open" aria-label="Element Behavior Specification">
+      <h3>Element Behavior Specification (Grouped by Interaction Role)</h3>
+      <table class="behavior-table">
+        <thead>
+          <tr>
+            <th>Element / Group</th>
+            <th>View</th>
+            <th>Count</th>
+            <th>Behavior Description</th>
+          </tr>
+        </thead>
+        <tbody id="wb-behavior-body">
+          <tr>
+            <td><strong>Hero Reward Showcase</strong></td>
+            <td><span class="behavior-view-badge">reward</span></td>
+            <td>1</td>
+            <td>Highlights the single headline prize (rarity frame, icon, quantity) to maintain clear visual hierarchy.</td>
+          </tr>
+          <tr>
+            <td><strong>Bonus Loot Strip (4 Slots)</strong> <span class="behavior-group-tag">Group</span></td>
+            <td><span class="behavior-view-badge">reward</span></td>
+            <td>4</td>
+            <td>Displays secondary currency and material drops. Collapses cleanly in Single Hero reward drops.</td>
+          </tr>
+          <tr>
+            <td><strong>Primary Claim CTA</strong></td>
+            <td><span class="behavior-view-badge">reward</span></td>
+            <td>1</td>
+            <td>Grants all listed items, updates HUD counters, and dismisses the modal (or switches to <code>CLAIMED</code> state).</td>
+          </tr>
+          <tr>
+            <td><strong>Dialog Decision Buttons</strong> <span class="behavior-group-tag">Group</span></td>
+            <td><span class="behavior-view-badge">confirm-dialog</span></td>
+            <td>2</td>
+            <td>Clear primary vs secondary hierarchy to prevent accidental destructive exits on mobile touch screens.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="wb-manifest-drawer" class="workbench-drawer" aria-label="Sprite Asset Manifest">
+      <h3>Sprite Asset Manifest (Auto-scanned from #game-canvas)</h3>
+      <table class="manifest-table">
+        <thead>
+          <tr>
+            <th>Preview</th>
+            <th>Slice ID</th>
+            <th>Role</th>
+            <th>Source PNG</th>
+            <th>Native Size</th>
+            <th>9-Slice</th>
+          </tr>
+        </thead>
+        <tbody id="wb-manifest-body"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="../_catalog/catalog-data.js"></script>
+  <script src="../_catalog/previews-data.js"></script>
+  <script src="./ui-edits.js"></script>
+  <script src="./pixel-ui-kit.js"></script>
+  <script>
+    (function () {
+      const canvas = document.getElementById('game-canvas');
+      const stateBtns = document.querySelectorAll('[data-tpl-state]');
+      const ctaLabels = {
+        multi: 'CLAIM REWARDS',
+        single: 'CLAIM HERO CRATE',
+        claimed: '✓ REWARDS CLAIMED',
+      };
+
+      stateBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          const key = btn.getAttribute('data-tpl-state') || 'multi';
+          stateBtns.forEach(b => b.classList.toggle('is-active', b === btn));
+          if (canvas) canvas.setAttribute('data-reward-state', key);
+          document.querySelectorAll('[data-bind="claim-cta"]').forEach(el => {
+            el.textContent = ctaLabels[key] || ctaLabels.multi;
+          });
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

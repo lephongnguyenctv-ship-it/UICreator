@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shop &amp; Upgrades — Wireframe Template</title>
+  <link rel="stylesheet" href="./pixel-ui-kit.css">
+  <style>
+    .wf-backdrop {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 110px;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+
+    .wf-modal {
+      width: 1180px;
+      max-height: 630px;
+      border-radius: 14px;
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .wf-modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .wf-title-block {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .wf-title {
+      font-size: 32px;
+      font-weight: 800;
+      margin: 0;
+    }
+
+    .wf-tabs {
+      display: flex;
+      gap: 10px;
+    }
+
+    .wf-tab {
+      min-height: 58px;
+      padding: 0 20px;
+      border-radius: 10px;
+      font-size: 23px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      cursor: pointer;
+    }
+
+    .wf-tab.is-active {
+      outline: 3px solid #f59e0b;
+      outline-offset: -3px;
+    }
+
+    .wf-header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .wf-currency {
+      min-height: 54px;
+      padding: 0 16px;
+      border-radius: 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 24px;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .wf-close-btn {
+      width: 60px;
+      height: 60px;
+      border-radius: 10px;
+      font-size: 26px;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .wf-shop-body {
+      display: grid;
+      grid-template-columns: 1.55fr 1fr;
+      gap: 18px;
+      min-height: 0;
+    }
+
+    .wf-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+    }
+
+    .wf-item-card {
+      padding: 12px;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+    }
+
+    .wf-item-card.is-selected {
+      outline: 3px solid #f59e0b;
+      outline-offset: -3px;
+    }
+
+    .wf-item-icon {
+      width: 96px;
+      height: 96px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 23px;
+      font-weight: 700;
+    }
+
+    .wf-item-name {
+      font-size: 23px;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .wf-item-price {
+      padding: 4px 12px;
+      border-radius: 6px;
+      font-size: 23px;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .wf-detail-pane {
+      padding: 18px;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    .wf-detail-hero {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .wf-detail-icon {
+      width: 112px;
+      height: 112px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+
+    .wf-detail-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .wf-detail-name {
+      font-size: 28px;
+      font-weight: 800;
+    }
+
+    .wf-detail-tag {
+      font-size: 23px;
+      opacity: 0.85;
+    }
+
+    .wf-stat-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .wf-stat-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 23px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .wf-cta-primary {
+      width: 100%;
+      min-height: 74px;
+      border-radius: 12px;
+      font-size: 26px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    /* Confirm view */
+    .wf-confirm-modal {
+      width: 680px;
+      padding: 26px 28px;
+      border-radius: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      text-align: center;
+    }
+
+    .wf-confirm-desc {
+      font-size: 24px;
+      line-height: 1.4;
+      margin: 0;
+    }
+
+    .wf-confirm-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .wf-cta-secondary {
+      min-height: 70px;
+      border-radius: 12px;
+      font-size: 24px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    [data-shop-state="locked"] .wf-cta-primary,
+    [data-shop-state="soldout"] .wf-cta-primary {
+      opacity: 0.6;
+    }
+  </style>
+</head>
+<body data-catalog-base="../_catalog/" data-default-mode="wireframe" data-ui-profile="craftland" data-default-res="1500x750">
+  <header class="workbench-bar">
+    <div class="workbench-title">
+      <span>Shop &amp; Upgrades (Template)</span>
+      <span class="workbench-badge">Wireframe Template · 1500×750</span>
+    </div>
+    <div class="workbench-controls">
+      <div class="wb-group">
+        <span class="wb-label">Mode</span>
+        <button class="wb-btn is-active" data-wb-mode="wireframe">Wireframe</button>
+        <button class="wb-btn" data-wb-mode="edit">Edit UI</button>
+        <button class="wb-btn" data-wb-mode="final">Interactive</button>
+      </div>
+      <div class="wb-group">
+        <span class="wb-label">View</span>
+        <button class="wb-btn is-active" data-ui-state-trigger="shop">Store Grid</button>
+        <button class="wb-btn" data-ui-state-trigger="confirm">Confirm Modal</button>
+      </div>
+      <div class="wb-group">
+        <span class="wb-label">State</span>
+        <button class="wb-btn is-active" data-tpl-state="ready">In Stock</button>
+        <button class="wb-btn" data-tpl-state="locked">Cannot Afford</button>
+        <button class="wb-btn" data-tpl-state="soldout">Sold Out</button>
+      </div>
+      <div class="wb-group">
+        <span class="wb-label">Scale</span>
+        <button class="wb-btn" data-wb-scale="2">2x</button>
+        <button class="wb-btn is-active" data-wb-scale="3">3x</button>
+        <button class="wb-btn" data-wb-scale="4">4x</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="workbench-stage">
+    <div id="game-canvas" class="px-canvas scene-cozy-meadow" data-shop-state="ready">
+      <!-- VIEW 1: Store Grid -->
+      <div class="wf-backdrop is-active" data-ui-view="shop">
+        <div class="px-wire-box wf-modal">
+          <div class="wf-modal-header">
+            <div class="wf-title-block">
+              <h1 class="wf-title">UPGRADE SHOP</h1>
+              <div class="wf-tabs">
+                <button type="button" class="px-wire-box wf-tab is-active">Gear</button>
+                <button type="button" class="px-wire-box wf-tab">Boosts</button>
+                <button type="button" class="px-wire-box wf-tab">Bundles</button>
+              </div>
+            </div>
+            <div class="wf-header-right">
+              <div class="px-wire-box wf-currency">
+                <span>G</span>
+                <span data-bind="balance">4,200</span>
+              </div>
+              <button type="button" class="px-wire-box wf-close-btn">✕</button>
+            </div>
+          </div>
+
+          <div class="wf-shop-body">
+            <div class="wf-grid">
+              <div class="px-wire-box wf-item-card is-selected">
+                <div class="px-wire-box wf-item-icon">ICON</div>
+                <div class="wf-item-name">Turbo Boots</div>
+                <div class="px-wire-box wf-item-price">1,500 G</div>
+              </div>
+              <div class="px-wire-box wf-item-card">
+                <div class="px-wire-box wf-item-icon">ICON</div>
+                <div class="wf-item-name">Shield Core</div>
+                <div class="px-wire-box wf-item-price">2,200 G</div>
+              </div>
+              <div class="px-wire-box wf-item-card">
+                <div class="px-wire-box wf-item-icon">ICON</div>
+                <div class="wf-item-name">Magnet Pack</div>
+                <div class="px-wire-box wf-item-price">3,000 G</div>
+              </div>
+              <div class="px-wire-box wf-item-card">
+                <div class="px-wire-box wf-item-icon">ICON</div>
+                <div class="wf-item-name">Crit Lens</div>
+                <div class="px-wire-box wf-item-price">4,500 G</div>
+              </div>
+              <div class="px-wire-box wf-item-card">
+                <div class="px-wire-box wf-item-icon">ICON</div>
+                <div class="wf-item-name">Nano Medkit</div>
+                <div class="px-wire-box wf-item-price">900 G</div>
+              </div>
+              <div class="px-wire-box wf-item-card">
+                <div class="px-wire-box wf-item-icon">ICON</div>
+                <div class="wf-item-name">Vault Key</div>
+                <div class="px-wire-box wf-item-price">5,000 G</div>
+              </div>
+            </div>
+
+            <div class="px-wire-box wf-detail-pane">
+              <div class="wf-detail-hero">
+                <div class="px-wire-box wf-detail-icon">HERO</div>
+                <div class="wf-detail-meta">
+                  <div class="wf-detail-name">Turbo Boots</div>
+                  <div class="wf-detail-tag">Tier 2 · Lv. 2 → Lv. 3</div>
+                </div>
+              </div>
+
+              <div class="wf-stat-list">
+                <div class="px-wire-box wf-stat-row">
+                  <span>Move Speed</span>
+                  <span>+15% → +24%</span>
+                </div>
+                <div class="px-wire-box wf-stat-row">
+                  <span>Dash Cooldown</span>
+                  <span>4.0s → 3.2s</span>
+                </div>
+                <div class="px-wire-box wf-stat-row">
+                  <span>Stock</span>
+                  <span data-bind="stock-val">3 Remaining</span>
+                </div>
+              </div>
+
+              <button type="button" class="px-wire-box wf-cta-primary" data-ui-state-trigger="confirm" data-bind="cta-label">
+                BUY FOR 1,500 G
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW 2: Confirm Purchase Modal -->
+      <div class="wf-backdrop" data-ui-view="confirm" hidden>
+        <div class="px-wire-box wf-confirm-modal">
+          <h2 class="wf-title">CONFIRM PURCHASE</h2>
+          <p class="wf-confirm-desc">Upgrade <strong>Turbo Boots</strong> to Level 3 for <strong>1,500 G</strong>?</p>
+          <div class="px-wire-box wf-stat-row">
+            <span>Balance After Purchase</span>
+            <span>2,700 G</span>
+          </div>
+          <div class="wf-confirm-actions">
+            <button type="button" class="px-wire-box wf-cta-secondary" data-ui-state-trigger="shop">Cancel</button>
+            <button type="button" class="px-wire-box wf-cta-primary" data-ui-state-trigger="shop">Confirm Buy</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <section id="wb-behavior-drawer" class="workbench-drawer is-open" aria-label="Element Behavior Specification">
+      <h3>Element Behavior Specification (Grouped by Interaction Role)</h3>
+      <table class="behavior-table">
+        <thead>
+          <tr>
+            <th>Element / Group</th>
+            <th>View</th>
+            <th>Count</th>
+            <th>Behavior Description</th>
+          </tr>
+        </thead>
+        <tbody id="wb-behavior-body">
+          <tr>
+            <td><strong>Category Tabs (Gear / Boosts / Bundles)</strong> <span class="behavior-group-tag">Group</span></td>
+            <td><span class="behavior-view-badge">shop</span></td>
+            <td>3</td>
+            <td>Filters the 3×2 store grid by category and highlights the first item in the new tab.</td>
+          </tr>
+          <tr>
+            <td><strong>Store Item Cards (3×2 Grid)</strong> <span class="behavior-group-tag">Group</span></td>
+            <td><span class="behavior-view-badge">shop</span></td>
+            <td>6</td>
+            <td>Selecting any card updates the right-side detail inspector with item stats, stock count, and upgrade delta.</td>
+          </tr>
+          <tr>
+            <td><strong>Primary Purchase CTA</strong></td>
+            <td><span class="behavior-view-badge">shop</span></td>
+            <td>1</td>
+            <td>Single primary action per modal. Opens <code>confirm</code> view when affordable, or displays disabled <code>Need Gold</code> / <code>Sold Out</code> state.</td>
+          </tr>
+          <tr>
+            <td><strong>Confirmation Actions (Cancel / Confirm)</strong> <span class="behavior-group-tag">Group</span></td>
+            <td><span class="behavior-view-badge">confirm</span></td>
+            <td>2</td>
+            <td>Cancel closes dialog with no charge; Confirm deducts currency, increments item level, and returns to store.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="wb-manifest-drawer" class="workbench-drawer" aria-label="Sprite Asset Manifest">
+      <h3>Sprite Asset Manifest (Auto-scanned from #game-canvas)</h3>
+      <table class="manifest-table">
+        <thead>
+          <tr>
+            <th>Preview</th>
+            <th>Slice ID</th>
+            <th>Role</th>
+            <th>Source PNG</th>
+            <th>Native Size</th>
+            <th>9-Slice</th>
+          </tr>
+        </thead>
+        <tbody id="wb-manifest-body"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="../_catalog/catalog-data.js"></script>
+  <script src="../_catalog/previews-data.js"></script>
+  <script src="./ui-edits.js"></script>
+  <script src="./pixel-ui-kit.js"></script>
+  <script>
+    (function () {
+      const canvas = document.getElementById('game-canvas');
+      const stateBtns = document.querySelectorAll('[data-tpl-state]');
+      const presets = {
+        ready: { balance: '4,200', 'stock-val': '3 Remaining', 'cta-label': 'BUY FOR 1,500 G' },
+        locked: { balance: '450', 'stock-val': '3 Remaining', 'cta-label': 'NEED 1,050 MORE G' },
+        soldout: { balance: '4,200', 'stock-val': '0 / 3 (MAXED)', 'cta-label': 'SOLD OUT' },
+      };
+
+      stateBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          const key = btn.getAttribute('data-tpl-state') || 'ready';
+          stateBtns.forEach(b => b.classList.toggle('is-active', b === btn));
+          if (canvas) canvas.setAttribute('data-shop-state', key);
+          const data = presets[key] || presets.ready;
+          Object.entries(data).forEach(([k, val]) => {
+            document.querySelectorAll(`[data-bind="${k}"]`).forEach(el => {
+              el.textContent = val;
+            });
+          });
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

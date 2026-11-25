@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inventory &amp; Loadout — Wireframe Template</title>
+  <link rel="stylesheet" href="./pixel-ui-kit.css">
+  <style>
+    .wf-backdrop {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 110px;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+
+    .wf-modal {
+      width: 1180px;
+      max-height: 630px;
+      border-radius: 14px;
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .wf-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    .wf-title-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .wf-title {
+      font-size: 32px;
+      font-weight: 800;
+      margin: 0;
+    }
+
+    .wf-filter-bar {
+      display: flex;
+      gap: 10px;
+    }
+
+    .wf-tab {
+      min-height: 58px;
+      padding: 0 18px;
+      border-radius: 10px;
+      font-size: 23px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      cursor: pointer;
+    }
+
+    .wf-tab.is-active {
+      outline: 3px solid #f59e0b;
+      outline-offset: -3px;
+    }
+
+    .wf-capacity {
+      min-height: 54px;
+      padding: 0 16px;
+      border-radius: 10px;
+      font-size: 23px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .wf-close-btn {
+      width: 60px;
+      height: 60px;
+      border-radius: 10px;
+      font-size: 26px;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .wf-inv-body {
+      display: grid;
+      grid-template-columns: 1.45fr 1fr;
+      gap: 18px;
+    }
+
+    .wf-slot-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+
+    .wf-inv-slot {
+      height: 132px;
+      border-radius: 12px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-size: 23px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .wf-inv-slot.is-selected {
+      outline: 3px solid #f59e0b;
+      outline-offset: -3px;
+    }
+
+    .wf-slot-qty {
+      font-size: 18px;
+      opacity: 0.85;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .wf-inspector {
+      padding: 18px;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    .wf-inspector-head {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .wf-preview-box {
+      width: 104px;
+      height: 104px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 23px;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+
+    .wf-item-heading {
+      font-size: 28px;
+      font-weight: 800;
+    }
+
+    .wf-item-rarity {
+      font-size: 23px;
+      opacity: 0.85;
+    }
+
+    .wf-stat-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .wf-stat-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 23px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .wf-btn-row {
+      display: grid;
+      grid-template-columns: 1.5fr 1fr;
+      gap: 12px;
+    }
+
+    .wf-cta-primary {
+      min-height: 70px;
+      border-radius: 12px;
+      font-size: 24px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .wf-cta-secondary {
+      min-height: 70px;
+      border-radius: 12px;
+      font-size: 23px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .wf-empty-card {
+      width: 720px;
+      padding: 36px 32px;
+      border-radius: 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      text-align: center;
+    }
+
+    .wf-empty-icon {
+      width: 112px;
+      height: 112px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      font-weight: 800;
+    }
+
+    .wf-empty-msg {
+      font-size: 24px;
+      margin: 0;
+      opacity: 0.9;
+    }
+  </style>
+</head>
+<body data-catalog-base="../_catalog/" data-default-mode="wireframe" data-ui-profile="craftland" data-default-res="1500x750">
+  <header class="workbench-bar">
+    <div class="workbench-title">
+      <span>Inventory &amp; Loadout (Template)</span>
+      <span class="workbench-badge">Wireframe Template · 1500×750</span>
+    </div>
+    <div class="workbench-controls">
+      <div class="wb-group">
+        <span class="wb-label">Mode</span>
+        <button class="wb-btn is-active" data-wb-mode="wireframe">Wireframe</button>
+        <button class="wb-btn" data-wb-mode="edit">Edit UI</button>
+        <button class="wb-btn" data-wb-mode="final">Interactive</button>
+      </div>
+      <div class="wb-group">
+        <span class="wb-label">View</span>
+        <button class="wb-btn is-active" data-ui-state-trigger="inventory">Bag &amp; Loadout</button>
+        <button class="wb-btn" data-ui-state-trigger="empty">Empty Bag</button>
+      </div>
+      <div class="wb-group">
+        <span class="wb-label">State</span>
+        <button class="wb-btn is-active" data-tpl-state="unequipped">Unequipped</button>
+        <button class="wb-btn" data-tpl-state="equipped">Equipped</button>
+        <button class="wb-btn" data-tpl-state="full">Bag Full</button>
+      </div>
+      <div class="wb-group">
+        <span class="wb-label">Scale</span>
+        <button class="wb-btn" data-wb-scale="2">2x</button>
+        <button class="wb-btn is-active" data-wb-scale="3">3x</button>
+        <button class="wb-btn" data-wb-scale="4">4x</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="workbench-stage">
+    <div id="game-canvas" class="px-canvas scene-cozy-meadow">
+      <!-- VIEW 1: Bag & Equipment Grid -->
+      <div class="wf-backdrop is-active" data-ui-view="inventory">
+        <div class="px-wire-box wf-modal">
+          <div class="wf-header">
+            <div class="wf-title-row">
+              <h1 class="wf-title">INVENTORY</h1>
+              <div class="wf-filter-bar">
+                <button type="button" class="px-wire-box wf-tab is-active">All</button>
+                <button type="button" class="px-wire-box wf-tab">Weapons</button>
+                <button type="button" class="px-wire-box wf-tab">Armor</button>
+                <button type="button" class="px-wire-box wf-tab">Items</button>
+              </div>
+            </div>
+            <div class="wf-title-row">
+              <div class="px-wire-box wf-capacity" data-bind="cap">12 / 32 Slots</div>
+              <button type="button" class="px-wire-box wf-close-btn">✕</button>
+            </div>
+          </div>
+
+          <div class="wf-inv-body">
+            <div class="wf-slot-grid">
+              <div class="px-wire-box wf-inv-slot is-selected"><span>Blade</span><span class="wf-slot-qty" data-bind="slot1-tag">Lv. 5</span></div>
+              <div class="px-wire-box wf-inv-slot"><span>Rifle</span><span class="wf-slot-qty">Lv. 4</span></div>
+              <div class="px-wire-box wf-inv-slot"><span>Helm</span><span class="wf-slot-qty">Lv. 3</span></div>
+              <div class="px-wire-box wf-inv-slot"><span>Vest</span><span class="wf-slot-qty">Lv. 3</span></div>
+              <div class="px-wire-box wf-inv-slot"><span>Potion</span><span class="wf-slot-qty">×12</span></div>
+              <div class="px-wire-box wf-inv-slot"><span>Grenade</span><span class="wf-slot-qty">×5</span></div>
+              <div class="px-wire-box wf-inv-slot"><span>Core</span><span class="wf-slot-qty">×3</span></div>
+              <div class="px-wire-box wf-inv-slot"><span>Shard</span><span class="wf-slot-qty">×48</span></div>
+              <div class="px-wire-box wf-inv-slot"><span>Key</span><span class="wf-slot-qty">×2</span></div>
+              <div class="px-wire-box wf-inv-slot"><span>Empty</span><span class="wf-slot-qty">—</span></div>
+              <div class="px-wire-box wf-inv-slot"><span>Empty</span><span class="wf-slot-qty">—</span></div>
+              <div class="px-wire-box wf-inv-slot"><span>Empty</span><span class="wf-slot-qty">—</span></div>
+            </div>
+
+            <div class="px-wire-box wf-inspector">
+              <div class="wf-inspector-head">
+                <div class="px-wire-box wf-preview-box">ICON</div>
+                <div>
+                  <div class="wf-item-heading">Plasma Blade</div>
+                  <div class="wf-item-rarity" data-bind="status-tag">Epic · Weapon Slot</div>
+                </div>
+              </div>
+
+              <div class="wf-stat-stack">
+                <div class="px-wire-box wf-stat-row">
+                  <span>Attack Power</span>
+                  <span>240 (+35)</span>
+                </div>
+                <div class="px-wire-box wf-stat-row">
+                  <span>Crit Chance</span>
+                  <span>18% (+4%)</span>
+                </div>
+                <div class="px-wire-box wf-stat-row">
+                  <span>Sell Value</span>
+                  <span>650 G</span>
+                </div>
+              </div>
+
+              <div class="wf-btn-row">
+                <button type="button" class="px-wire-box wf-cta-primary" data-bind="equip-cta">EQUIP ITEM</button>
+                <button type="button" class="px-wire-box wf-cta-secondary">Sell</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW 2: Empty Bag State -->
+      <div class="wf-backdrop" data-ui-view="empty" hidden>
+        <div class="px-wire-box wf-empty-card">
+          <div class="px-wire-box wf-empty-icon">EMPTY</div>
+          <h2 class="wf-title">NO ITEMS IN THIS CATEGORY</h2>
+          <p class="wf-empty-msg">Collect loot during matches or visit the store to unlock new equipment.</p>
+          <button type="button" class="px-wire-box wf-cta-primary" style="width: 320px;" data-ui-state-trigger="inventory">
+            Back to All Items
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <section id="wb-behavior-drawer" class="workbench-drawer is-open" aria-label="Element Behavior Specification">
+      <h3>Element Behavior Specification (Grouped by Interaction Role)</h3>
+      <table class="behavior-table">
+        <thead>
+          <tr>
+            <th>Element / Group</th>
+            <th>View</th>
+            <th>Count</th>
+            <th>Behavior Description</th>
+          </tr>
+        </thead>
+        <tbody id="wb-behavior-body">
+          <tr>
+            <td><strong>Filter Tabs (All / Weapons / Armor / Items)</strong> <span class="behavior-group-tag">Group</span></td>
+            <td><span class="behavior-view-badge">inventory</span></td>
+            <td>4</td>
+            <td>Filters displayed grid slots by category. Switches to <code>empty</code> view when category has zero items.</td>
+          </tr>
+          <tr>
+            <td><strong>Inventory Grid Slots (4×3)</strong> <span class="behavior-group-tag">Group</span></td>
+            <td><span class="behavior-view-badge">inventory</span></td>
+            <td>12</td>
+            <td>Tap any populated slot to inspect stats, level, and stack count in the right-side detail panel.</td>
+          </tr>
+          <tr>
+            <td><strong>Equip / Unequip &amp; Sell Actions</strong> <span class="behavior-group-tag">Group</span></td>
+            <td><span class="behavior-view-badge">inventory</span></td>
+            <td>2</td>
+            <td>Primary CTA equips/unequips the selected item; secondary Sell button prompts confirmation for rare items.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="wb-manifest-drawer" class="workbench-drawer" aria-label="Sprite Asset Manifest">
+      <h3>Sprite Asset Manifest (Auto-scanned from #game-canvas)</h3>
+      <table class="manifest-table">
+        <thead>
+          <tr>
+            <th>Preview</th>
+            <th>Slice ID</th>
+            <th>Role</th>
+            <th>Source PNG</th>
+            <th>Native Size</th>
+            <th>9-Slice</th>
+          </tr>
+        </thead>
+        <tbody id="wb-manifest-body"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="../_catalog/catalog-data.js"></script>
+  <script src="../_catalog/previews-data.js"></script>
+  <script src="./ui-edits.js"></script>
+  <script src="./pixel-ui-kit.js"></script>
+  <script>
+    (function () {
+      const stateBtns = document.querySelectorAll('[data-tpl-state]');
+      const presets = {
+        unequipped: { cap: '12 / 32 Slots', 'slot1-tag': 'Lv. 5', 'status-tag': 'Epic · Weapon Slot', 'equip-cta': 'EQUIP ITEM' },
+        equipped: { cap: '12 / 32 Slots', 'slot1-tag': '★ EQUIPPED', 'status-tag': 'Epic · Currently Equipped', 'equip-cta': 'UNEQUIP' },
+        full: { cap: '32 / 32 FULL', 'slot1-tag': 'Lv. 5', 'status-tag': 'Bag Full — Sell or Upgrade', 'equip-cta': 'EQUIP ITEM' },
+      };
+
+      stateBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          const key = btn.getAttribute('data-tpl-state') || 'unequipped';
+          stateBtns.forEach(b => b.classList.toggle('is-active', b === btn));
+          const data = presets[key] || presets.unequipped;
+          Object.entries(data).forEach(([k, val]) => {
+            document.querySelectorAll(`[data-bind="${k}"]`).forEach(el => {
+              el.textContent = val;
+            });
+          });
+        });
+      });
+    })();
+  </script>
+</body>
+</html>
