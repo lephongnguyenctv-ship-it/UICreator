@@ -29,6 +29,11 @@ echo.
 set "SCRIPT={script_rel}"
 set "ARGS={script_args}"
 
+if not exist "%SCRIPT%" (
+  echo UICreator submodule not initialized yet. Running git submodule update --init...
+  git submodule update --init --recursive
+)
+
 where uv >nul 2>&1
 if not errorlevel 1 (
   uv run --with pillow "%SCRIPT%" %ARGS%
