@@ -332,16 +332,17 @@ def build_gallery(
                     encoding="utf-8",
                 )
 
-    bat_parent = previews_root.resolve().parent
-    bat_path = bat_parent / "launch_ui_hub.bat"
-    bat_content = _render_launch_bat(
-        bat_dir=bat_parent,
-        previews_root=previews_root,
-        catalog_dir=catalog_dir,
-        project_root=detected_proj or bat_parent,
-    )
-    if not bat_path.exists() or detected_proj is not None:
-        bat_path.write_text(bat_content, encoding="utf-8")
+    if detected_proj is None:
+        bat_parent = previews_root.resolve().parent
+        bat_path = bat_parent / "launch_ui_hub.bat"
+        if not bat_path.exists():
+            bat_content = _render_launch_bat(
+                bat_dir=bat_parent,
+                previews_root=previews_root,
+                catalog_dir=catalog_dir,
+                project_root=bat_parent,
+            )
+            bat_path.write_text(bat_content, encoding="utf-8")
 
     return payload
 
