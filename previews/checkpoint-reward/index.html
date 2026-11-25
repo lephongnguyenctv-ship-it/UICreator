@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SpeedyRace — Checkpoint Reward HUD — Game UI Preview</title>
+  <link rel="stylesheet" href="./pixel-ui-kit.css">
+  <style>
+    /* ======================================================================
+       SpeedyRace — Checkpoint Reward HUD (Non-Blocking Upper-Center Toast)
+       100% Real Craftland/SpeedyRace Sprites — Zero CSS-only Visual Decorations
+       Every visual element on #game-canvas exists in the UI Hierarchy Tree.
+       ====================================================================== */
+
+    /* Match Craftland Studio's condensed Default (GFF) font metrics */
+    #game-canvas {
+      font-family: "Bahnschrift Condensed", "Bahnschrift", "DIN Condensed", "Arial Narrow", sans-serif;
+      font-stretch: condensed;
+    }
+
+    /* Gameplay runner sprite (real SpeedyRace sprite, hidden in Wireframe mode) */
+    .ctx-runner-sprite-row {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 46%;
+      display: flex;
+      justify-content: center;
+      pointer-events: none;
+      z-index: 4;
+    }
+
+    .cp-canvas-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+      z-index: 20;
+    }
+
+    /* ----------------------------------------------------------------------
+       Contextual Underlying Menu.ui + Currency.ui + Boost.ui + PlayerLevel.ui
+       (All real sprites, all listed cleanly in UI Hierarchy under Context HUD)
+       ---------------------------------------------------------------------- */
+    .ctx-hud-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    body.mode-wireframe .ctx-hud-layer {
+      opacity: 0.52;
+    }
+
+    body:not(.mode-wireframe) .ctx-hud-layer {
+      opacity: 0.9;
+    }
+
+    .ctx-top-row {
+      position: absolute;
+      top: 16px;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: center;
+      pointer-events: none;
+    }
+
+    .ctx-top-cluster {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .ctx-badge-slot {
+      min-width: 64px;
+      height: 60px;
+      padding: 8px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      font-size: 23px;
+      line-height: 1;
+      text-align: center;
+      color: #f8fafc;
+      position: relative;
+    }
+
+    .ctx-gem-pill {
+      width: 184px;
+      height: 54px;
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 24px;
+      line-height: 1.1;
+      color: #ffffff;
+    }
+
+    .ctx-mail-dot {
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      width: 18px;
+      height: 18px;
+      padding: 0;
+    }
+
+    .ctx-icon-only-label {
+      display: none;
+    }
+
+    body.mode-wireframe .ctx-icon-only-label {
+      display: inline;
+    }
+
+    body.mode-wireframe .ctx-final-icon {
+      display: none;
+    }
+
+    .ctx-left-rail {
+      position: absolute;
+      top: 24px;
+      left: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .ctx-rail-tile {
+      width: 96px;
+      height: 88px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      text-align: center;
+      font-size: 23px;
+      line-height: 1.05;
+      color: #e2e8f0;
+    }
+
+    .ctx-bottom-row {
+      position: absolute;
+      bottom: 24px;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: center;
+      pointer-events: none;
+    }
+
+    .ctx-bottom-level {
+      width: 620px;
+      height: 68px;
+      padding: 10px 18px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      color: #f8fafc;
+    }
+
+    .ctx-level-badge {
+      font-size: 24px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .ctx-level-bar-track {
+      position: relative;
+      flex: 1;
+      height: 22px;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .ctx-level-bar-fill {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 64%;
+      padding: 0;
+    }
+
+    /* ----------------------------------------------------------------------
+       HERO COMPONENT: CheckpointReward Compact Non-Blocking Upper-Center Banner
+       100% Real Sprites — anchored strictly below Top Gem/Mail bar (top: 84px)
+       ---------------------------------------------------------------------- */
+    .cp-banner-row {
+      position: absolute;
+      top: 84px;
+      left: 0;
+      right: 0;
+      z-index: 30;
+      display: flex;
+      justify-content: center;
+      pointer-events: none;
+    }
+
+    .cp-banner-anchor {
+      position: relative;
+      width: 408px;
+      max-width: calc(100% - 280px);
+      padding: 10px 16px 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      pointer-events: none;
+      transition: opacity 0.32s ease, transform 0.36s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .cp-banner-anchor.is-anim-hidden {
+      opacity: 0;
+      transform: translateY(-28px);
+    }
+
+    /* Real sprite background: WorkshopIconLibrary/FF_ingame_hud_RandomBuff_Blue_Sml.png */
+    .cp-banner-bg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+    }
+
+    .cp-banner-content {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .cp-title {
+      width: 100%;
+      text-align: center;
+      font-size: 32px;
+      line-height: 1.05;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #ffffff;
+      font-weight: 700;
+      text-shadow: 0 2px 3px rgba(0, 0, 0, 0.75);
+    }
+
+    /* Conditional Single-Row Stat Increase Strip (real sprite: sr_bg_countdown_top) */
+    .cp-stat-box {
+      width: 100%;
+      padding: 5px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .cp-stat-row {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: nowrap;
+      gap: 8px;
+      font-size: 24px;
+      line-height: 1.15;
+      color: #e2e8f0;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .cp-speed-old-txt {
+      color: #e2e8f0;
+    }
+
+    /* Speed upgrade pill: dedicated sibling sprite (sr_square_rounded_128 tinted green) behind text */
+    .cp-speed-pill {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2px 10px;
+    }
+
+    .cp-speed-pill-bg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      padding: 0;
+    }
+
+    .cp-speed-new-txt {
+      position: relative;
+      z-index: 1;
+      font-size: 24px;
+      line-height: 1.15;
+      font-weight: 700;
+      color: #ffffff;
+      white-space: nowrap;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
+    }
+
+    /* Conditional Mail Notice Line (min Craftland 23px floor + real sr_mail_icon) */
+    .cp-mail-row {
+      width: 100%;
+      padding: 1px 4px 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+    }
+
+    .cp-mail-text {
+      font-size: 23px;
+      line-height: 1.15;
+      color: #fde68a;
+      font-weight: 400;
+      text-align: center;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
+    }
+
+    /* Auto-Dismiss Countdown Progress Bar (real sprites: sr_bg_menu_dark track + tinted sr_square_rounded_128 fill) */
+    .cp-timer-track {
+      position: absolute;
+      left: 4px;
+      right: 4px;
+      bottom: 3px;
+      height: 5px;
+      z-index: 2;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .cp-timer-fill {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 72%;
+      padding: 0;
+      transition: width 0.1s linear;
+    }
+
+    /* Wireframe-mode box clarity for sprites that use border:none */
+    body.mode-wireframe .cp-banner-anchor {
+      border: 1.5px solid #60a5fa;
+      background: rgba(15, 23, 42, 0.85);
+      border-radius: 6px;
+    }
+
+    body.mode-wireframe .cp-banner-bg {
+      display: none;
+    }
+
+    body.mode-wireframe .cp-speed-pill-bg {
+      border: 1.5px solid #4ade80;
+      background: rgba(20, 83, 45, 0.35);
+      border-radius: 4px;
+    }
+
+    body.mode-wireframe .cp-timer-track {
+      border: 1px solid #475569;
+      background: rgba(15, 23, 42, 0.8);
+    }
+
+    body.mode-wireframe .cp-timer-fill {
+      background: #e2e8f0;
+    }
+
+    body.mode-wireframe .ctx-level-bar-fill {
+      background: rgba(56, 189, 248, 0.5);
+    }
+
+    body.mode-wireframe .ctx-mail-dot {
+      background: #ef4444;
+      border-radius: 999px;
+    }
+
+    @media (max-width: 1360px) {
+      .cp-banner-anchor {
+        width: 400px;
+      }
+    }
+  </style>
+</head>
+<body data-catalog-base="../_catalog/" data-default-mode="final" data-ui-profile="craftland" data-default-res="1500x750" data-cp-state="default" data-cp-timer="mid">
+  <header class="workbench-bar">
+    <div class="workbench-title">
+      <span>SpeedyRace — Checkpoint Reward HUD</span>
+      <span class="workbench-badge">Craftland Mobile UI (1500×750)</span>
+    </div>
+    <div class="workbench-controls">
+      <div class="wb-group">
+        <span class="wb-label">Mode</span>
+        <button class="wb-btn" data-wb-mode="wireframe">Wireframe</button>
+        <button class="wb-btn" data-wb-mode="edit">Edit UI</button>
+        <button class="wb-btn is-active" data-wb-mode="final">Interactive</button>
+      </div>
+      <div class="wb-group">
+        <span class="wb-label">View</span>
+        <button class="wb-btn is-active" data-ui-state-trigger="full_reward">Full Reward</button>
+        <button class="wb-btn" data-ui-state-trigger="speed_only">Speed Only</button>
+        <button class="wb-btn" data-ui-state-trigger="mail_only">Mail Only</button>
+      </div>
+      <div class="wb-group">
+        <span class="wb-label">State</span>
+        <button class="wb-btn is-active" data-cp-preset="default">Stage 1</button>
+        <button class="wb-btn" data-cp-preset="big_numbers">Big #</button>
+        <button class="wb-btn" data-cp-preset="timer_low">Timer 22%</button>
+        <button class="wb-btn" data-cp-play-fifo>▶ FIFO (1→2)</button>
+      </div>
+      <div class="wb-group">
+        <span class="wb-label">Scale</span>
+        <button class="wb-btn" data-wb-scale="2">2x</button>
+        <button class="wb-btn is-active" data-wb-scale="3">3x</button>
+        <button class="wb-btn" data-wb-scale="4">4x</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="workbench-stage">
+    <div id="game-canvas" class="px-canvas scene-night-camp">
+      <!-- Real runner sprite for center focus reference (hidden in Wireframe mode) -->
+      <div class="ctx-runner-sprite-row" data-wireframe-hide="true">
+        <img class="px-icon" data-slice-id="sr_kelly_run" data-ui-role="Context: Runner (Kelly)" style="--w:86;--h:128;--pixel-scale:1;" alt="Runner">
+      </div>
+
+      <!-- Persistent contextual HUD showing Menu.ui + Currency.ui + Boost.ui + PlayerLevel.ui -->
+      <div class="hud-base-layer ctx-hud-layer" data-ui-role="Context HUD (Menu.ui + Currency + Level)">
+        <div class="ctx-top-row">
+          <div class="ctx-top-cluster">
+            <div class="px-9slice ctx-badge-slot" data-slice-id="sr_bg_menu_dark" data-slice-9="6,6,6,6" data-ui-role="Context: SpeedBoostBtn" style="--pixel-scale: 1;">
+              <img class="px-icon ctx-final-icon" data-slice-id="sr_speed_boost" data-ui-role="SpeedBoostIcon" style="--w:38;--h:38;--pixel-scale:1;" alt="">
+              <span class="ctx-icon-only-label">2x</span>
+            </div>
+            <div class="px-9slice ctx-badge-slot" data-slice-id="sr_bg_menu_dark" data-slice-9="6,6,6,6" data-ui-role="Context: GemBoostBtn" style="--pixel-scale: 1;">
+              <img class="px-icon ctx-final-icon" data-slice-id="sr_golden_ticket" data-ui-role="GemBoostIcon" style="--w:38;--h:38;--pixel-scale:1;" alt="">
+              <span class="ctx-icon-only-label">G+</span>
+            </div>
+            <div class="px-9slice ctx-gem-pill" data-slice-id="sr_bg_menu_dark" data-slice-9="6,6,6,6" data-ui-role="Context: GemCurrency" style="--pixel-scale: 1;">
+              <img class="px-icon ctx-final-icon" data-slice-id="sr_gem" data-ui-role="GemIcon" style="--w:34;--h:34;--pixel-scale:1;" alt="">
+              <span class="ctx-icon-only-label">GEM</span>
+              <span class="px-num">1,250</span>
+            </div>
+            <div class="px-9slice ctx-badge-slot" data-slice-id="sr_bg_menu_dark" data-slice-9="6,6,6,6" data-ui-role="Context: CollectionBtn" style="--pixel-scale: 1;">
+              <img class="px-icon ctx-final-icon" data-slice-id="sr_flag_icon" data-ui-role="CollectionIcon" style="--w:36;--h:36;--pixel-scale:1;" alt="">
+              <span class="ctx-icon-only-label">COL</span>
+            </div>
+            <div class="px-9slice ctx-badge-slot" data-slice-id="sr_bg_menu_dark" data-slice-9="6,6,6,6" data-ui-role="Context: DailyRewardBtn" style="--pixel-scale: 1;">
+              <img class="px-icon ctx-final-icon" data-slice-id="sr_timer_icon" data-ui-role="DailyIcon" style="--w:30;--h:30;--pixel-scale:1;" alt="">
+              <span class="ctx-icon-only-label">DAY</span>
+            </div>
+            <div class="px-9slice ctx-badge-slot" data-slice-id="sr_bg_menu_dark" data-slice-9="6,6,6,6" data-ui-role="Context: MailBtn" style="--pixel-scale: 1;">
+              <img class="px-icon ctx-final-icon" data-slice-id="sr_mail_icon" data-ui-role="MailBtnIcon" style="--w:38;--h:38;--pixel-scale:1;" alt="">
+              <span class="ctx-icon-only-label">MAIL</span>
+              <div class="px-9slice ctx-mail-dot" data-slice-id="sr_square_rounded_128" data-slice-9="6,6,6,6" data-tint="#ef4444" data-tint-mode="multiply" data-border-overlap-ok="true" data-ui-role="MailUnreadDot" style="--pixel-scale: 1;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="ctx-left-rail">
+          <div class="px-9slice ctx-rail-tile" data-slice-id="sr_bg_menu_dark" data-slice-9="6,6,6,6" data-ui-role="Context: BagBtn" style="--pixel-scale: 1;">
+            <img class="px-icon ctx-final-icon" data-slice-id="sr_speed_boost" data-ui-role="BagIcon" style="--w:38;--h:38;--pixel-scale:1;" alt="">
+            <span>BAG</span>
+          </div>
+          <div class="px-9slice ctx-rail-tile" data-slice-id="sr_bg_menu_dark" data-slice-9="6,6,6,6" data-ui-role="Context: WorldBtn" style="--pixel-scale: 1;">
+            <img class="px-icon ctx-final-icon" data-slice-id="sr_tower_img" data-ui-role="WorldIcon" style="--w:28;--h:38;--pixel-scale:1;" alt="">
+            <span>WORLD</span>
+          </div>
+          <div class="px-9slice ctx-rail-tile" data-slice-id="sr_bg_menu_dark" data-slice-9="6,6,6,6" data-ui-role="Context: TeleportBtn" style="--pixel-scale: 1;">
+            <img class="px-icon ctx-final-icon" data-slice-id="sr_flag_icon" data-ui-role="TeleportIcon" style="--w:36;--h:36;--pixel-scale:1;" alt="">
+            <span>TELE</span>
+          </div>
+        </div>
+
+        <div class="ctx-bottom-row">
+          <div class="px-9slice ctx-bottom-level" data-slice-id="sr_bg_menu_dark" data-slice-9="6,6,6,6" data-ui-role="Context: PlayerLevelBar" style="--pixel-scale: 1;">
+            <span class="ctx-level-badge">LV 12</span>
+            <div class="px-9slice ctx-level-bar-track" data-slice-id="sr_bg_countdown_top" data-slice-9="4,4,4,4" data-ui-role="LevelTrackBg" style="--pixel-scale: 1;">
+              <div class="px-9slice ctx-level-bar-fill" data-slice-id="sr_square_rounded_128" data-slice-9="4,4,4,4" data-tint="#38bdf8" data-tint-mode="multiply" data-border-overlap-ok="true" data-ui-role="LevelFillBar" style="--pixel-scale: 1;"></div>
+            </div>
+            <span class="ctx-level-badge px-num">64%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====================================================================
+           VIEW 1: FULL REWARD (Speed Increase + Mail Notice + Auto-Dismiss Bar)
+           ==================================================================== -->
+      <div class="cp-canvas-layer" data-ui-view="full_reward">
+        <div class="cp-banner-row">
+          <section class="cp-banner-anchor" data-cp-banner data-ui-role="CheckpointBanner" aria-label="CheckpointBanner">
+            <div class="px-sprite-box cp-banner-bg" data-slice-id="ws_ff_ingame_hud_randombuff_blue_sml" data-ui-role="BannerBg (FF_ingame_hud_RandomBuff_Blue_Sml)" style="--pixel-scale: 1;"></div>
+
+            <div class="cp-banner-content">
+              <div class="cp-title" data-cp-field="title" data-ui-role="TitleTxt">FINISHED STAGE 1</div>
+
+              <div class="px-9slice cp-stat-box" data-slice-id="sr_bg_countdown_top" data-slice-9="5,5,5,5" data-ui-role="StatBoxBg (sr_bg_countdown_top)" style="--pixel-scale: 1;">
+                <div class="cp-stat-row">
+                  <span class="cp-speed-old-txt" data-ui-role="SpeedOldTxt">Base speed: <strong class="px-num" data-cp-field="oldSpeed">1</strong> →</span>
+                  <span class="cp-speed-pill" data-ui-role="SpeedPill">
+                    <span class="px-9slice cp-speed-pill-bg" data-slice-id="sr_square_rounded_128" data-slice-9="6,6,6,6" data-tint="#15803d" data-tint-mode="multiply" data-ui-role="SpeedPillBg (sr_square_rounded_128)" style="--pixel-scale: 1;"></span>
+                    <span class="cp-speed-new-txt" data-ui-role="SpeedNewTxt"><span class="px-num" data-cp-field="newSpeed">2 Speed/s</span> ▲</span>
+                  </span>
+                </div>
+              </div>
+
+              <div class="cp-mail-row" data-ui-role="MailNoticeRow">
+                <img class="px-icon" data-slice-id="sr_mail_icon" data-ui-role="MailIcon (sr_mail_icon)" style="--w:26;--h:26;--pixel-scale:1;" alt="Mail">
+                <span class="cp-mail-text" data-cp-field="mailHint" data-ui-role="MailHintTxt">Check Mail for additional rewards</span>
+              </div>
+            </div>
+
+            <div class="px-9slice cp-timer-track" data-slice-id="sr_bg_menu_dark" data-slice-9="2,2,2,2" data-border-overlap-ok="true" data-ui-role="TimerTrackBg (sr_bg_menu_dark)" style="--pixel-scale: 1;">
+              <div class="px-9slice cp-timer-fill" data-slice-id="sr_square_rounded_128" data-slice-9="2,2,2,2" data-tint="#e0f2fe" data-tint-mode="multiply" data-border-overlap-ok="true" data-cp-timer-fill data-ui-role="TimerFillBar (sr_square_rounded_128)" style="--pixel-scale: 1;"></div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <!-- ====================================================================
+           VIEW 2: SPEED ONLY (No Gem/Item Mailed — Mail Notice Collapsed)
+           ==================================================================== -->
+      <div class="cp-canvas-layer" data-ui-view="speed_only" hidden>
+        <div class="cp-banner-row">
+          <section class="cp-banner-anchor" data-cp-banner data-ui-role="CheckpointBanner" aria-label="CheckpointBanner">
+            <div class="px-sprite-box cp-banner-bg" data-slice-id="ws_ff_ingame_hud_randombuff_blue_sml" data-ui-role="BannerBg (FF_ingame_hud_RandomBuff_Blue_Sml)" style="--pixel-scale: 1;"></div>
+
+            <div class="cp-banner-content">
+              <div class="cp-title" data-cp-field="title" data-ui-role="TitleTxt">FINISHED STAGE 1</div>
+
+              <div class="px-9slice cp-stat-box" data-slice-id="sr_bg_countdown_top" data-slice-9="5,5,5,5" data-ui-role="StatBoxBg (sr_bg_countdown_top)" style="--pixel-scale: 1;">
+                <div class="cp-stat-row">
+                  <span class="cp-speed-old-txt" data-ui-role="SpeedOldTxt">Base speed: <strong class="px-num" data-cp-field="oldSpeed">1</strong> →</span>
+                  <span class="cp-speed-pill" data-ui-role="SpeedPill">
+                    <span class="px-9slice cp-speed-pill-bg" data-slice-id="sr_square_rounded_128" data-slice-9="6,6,6,6" data-tint="#15803d" data-tint-mode="multiply" data-ui-role="SpeedPillBg (sr_square_rounded_128)" style="--pixel-scale: 1;"></span>
+                    <span class="cp-speed-new-txt" data-ui-role="SpeedNewTxt"><span class="px-num" data-cp-field="newSpeed">2 Speed/s</span> ▲</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div class="px-9slice cp-timer-track" data-slice-id="sr_bg_menu_dark" data-slice-9="2,2,2,2" data-border-overlap-ok="true" data-ui-role="TimerTrackBg (sr_bg_menu_dark)" style="--pixel-scale: 1;">
+              <div class="px-9slice cp-timer-fill" data-slice-id="sr_square_rounded_128" data-slice-9="2,2,2,2" data-tint="#e0f2fe" data-tint-mode="multiply" data-border-overlap-ok="true" data-cp-timer-fill data-ui-role="TimerFillBar (sr_square_rounded_128)" style="--pixel-scale: 1;"></div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <!-- ====================================================================
+           VIEW 3: MAIL ONLY (No Speed Change — Stat Box Collapsed)
+           ==================================================================== -->
+      <div class="cp-canvas-layer" data-ui-view="mail_only" hidden>
+        <div class="cp-banner-row">
+          <section class="cp-banner-anchor" data-cp-banner data-ui-role="CheckpointBanner" aria-label="CheckpointBanner">
+            <div class="px-sprite-box cp-banner-bg" data-slice-id="ws_ff_ingame_hud_randombuff_blue_sml" data-ui-role="BannerBg (FF_ingame_hud_RandomBuff_Blue_Sml)" style="--pixel-scale: 1;"></div>
+
+            <div class="cp-banner-content">
+              <div class="cp-title" data-cp-field="title" data-ui-role="TitleTxt">FINISHED STAGE 1</div>
+
+              <div class="cp-mail-row" data-ui-role="MailNoticeRow">
+                <img class="px-icon" data-slice-id="sr_mail_icon" data-ui-role="MailIcon (sr_mail_icon)" style="--w:26;--h:26;--pixel-scale:1;" alt="Mail">
+                <span class="cp-mail-text" data-cp-field="mailHint" data-ui-role="MailHintTxt">Check Mail for additional rewards</span>
+              </div>
+            </div>
+
+            <div class="px-9slice cp-timer-track" data-slice-id="sr_bg_menu_dark" data-slice-9="2,2,2,2" data-border-overlap-ok="true" data-ui-role="TimerTrackBg (sr_bg_menu_dark)" style="--pixel-scale: 1;">
+              <div class="px-9slice cp-timer-fill" data-slice-id="sr_square_rounded_128" data-slice-9="2,2,2,2" data-tint="#e0f2fe" data-tint-mode="multiply" data-border-overlap-ok="true" data-cp-timer-fill data-ui-role="TimerFillBar (sr_square_rounded_128)" style="--pixel-scale: 1;"></div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <section id="wb-behavior-drawer" class="workbench-drawer" aria-label="Element Behavior Specification">
+      <h3>Element Behavior Specification (Grouped by Interaction Role)</h3>
+      <table class="behavior-table">
+        <thead>
+          <tr>
+            <th>Element / Group</th>
+            <th>View</th>
+            <th>Count</th>
+            <th>Behavior Description</th>
+          </tr>
+        </thead>
+        <tbody id="wb-behavior-body">
+          <tr>
+            <td><strong>CheckpointBanner + BannerBg</strong> <span class="behavior-group-tag">Root</span></td>
+            <td><span class="behavior-view-badge">All</span></td>
+            <td>1</td>
+            <td>Compact non-blocking upper-center toast (`~408×130px`, `top: 84px`) backed by `WorkshopIconLibrary/FF_ingame_hud_RandomBuff_Blue_Sml.png` (`BannerBg`), anchored below the Top Gem/Mail bar and strictly above the Center 40% Focus Zone. Zero touch colliders (`CloseBtn` removed). Slides down + fades in (`400ms`), auto-dismisses after `3.5s`, and advances the strict FIFO `_Queue` (`ShowNext()`).</td>
+          </tr>
+          <tr>
+            <td><strong>TitleTxt</strong> <span class="behavior-group-tag">Header</span></td>
+            <td><span class="behavior-view-badge">All</span></td>
+            <td>1</td>
+            <td>Single concise headline (`"FINISHED STAGE {stage}"` at `32px` condensed) replacing the previous two-line congratulations header.</td>
+          </tr>
+          <tr>
+            <td><strong>StatBoxBg + SpeedPill</strong> <span class="behavior-group-tag">Conditional</span></td>
+            <td><span class="behavior-view-badge">full_reward</span> <span class="behavior-view-badge">speed_only</span></td>
+            <td>1</td>
+            <td>Shown only when `oldSpeed != newSpeed`. Uses `sr_bg_countdown_top` for the dark strip and green-tinted `sr_square_rounded_128` (`SpeedPillBg`) behind `2 Speed/s ▲`. Collapses cleanly (`IsVisible = false`) on `mail_only` checkpoints.</td>
+          </tr>
+          <tr>
+            <td><strong>MailNoticeRow (MailIcon + MailHintTxt)</strong> <span class="behavior-group-tag">Conditional</span></td>
+            <td><span class="behavior-view-badge">full_reward</span> <span class="behavior-view-badge">mail_only</span></td>
+            <td>1</td>
+            <td>Replaces the old 2-cell gem/item grid (`RewardCell1`/`RewardCell2`). Shown only when `gem > 0 || itemCount > 0`. Uses `sr_mail_icon` (`26×26`) + `"Check Mail for additional rewards"` at the Craftland minimum visible text floor (`23px`).</td>
+          </tr>
+          <tr>
+            <td><strong>TimerTrackBg + TimerFillBar</strong> <span class="behavior-group-tag">Feedback</span></td>
+            <td><span class="behavior-view-badge">All</span></td>
+            <td>1</td>
+            <td>Flush `5px` countdown bar at the bottom edge (`sr_bg_menu_dark` track + `sr_square_rounded_128` tinted `#e0f2fe` with `fillType: 3` Filled horizontal). Drains `100% → 0%` over `3.5s`, then triggers `ShowNext()`. Use `▶ FIFO (1→2)` in the toolbar to preview.</td>
+          </tr>
+          <tr>
+            <td><strong>Context HUD (Menu.ui + Currency + Level)</strong> <span class="behavior-group-tag">Context</span></td>
+            <td><span class="behavior-view-badge">All</span></td>
+            <td>3 groups</td>
+            <td>Reference placement of `Boost.ui`, `Currency.ui`, `Menu.ui` (top bar + left rail), `PlayerLevel.ui` (bottom bar), and runner (`sr_kelly_run`). All built strictly from existing Speedy Race sprites and listed in the UI Hierarchy Tree.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="wb-manifest-drawer" class="workbench-drawer" aria-label="Sprite Asset Manifest">
+      <h3>Sprite Asset Manifest (Auto-scanned from #game-canvas)</h3>
+      <table class="manifest-table">
+        <thead>
+          <tr>
+            <th>Preview</th>
+            <th>Slice ID</th>
+            <th>Role</th>
+            <th>Source PNG</th>
+            <th>Native Size</th>
+            <th>9-Slice</th>
+          </tr>
+        </thead>
+        <tbody id="wb-manifest-body"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="../_catalog/catalog-data.js"></script>
+  <script src="../_catalog/previews-data.js"></script>
+  <script src="./ui-edits.js"></script>
+  <script src="./pixel-ui-kit.js"></script>
+  <script>
+    (function () {
+      const PRESETS = {
+        default: {
+          title: 'FINISHED STAGE 1',
+          oldSpeed: '1',
+          newSpeed: '2 Speed/s',
+          timer: 'mid',
+          pct: 72
+        },
+        big_numbers: {
+          title: 'FINISHED STAGE 38',
+          oldSpeed: '1.25K',
+          newSpeed: '2.50K Speed/s',
+          timer: 'mid',
+          pct: 72
+        },
+        timer_low: {
+          title: 'FINISHED STAGE 1',
+          oldSpeed: '1',
+          newSpeed: '2 Speed/s',
+          timer: 'low',
+          pct: 22
+        }
+      };
+
+      let fifoRunId = 0;
+      let fifoRaf = null;
+      let fifoTimeout = null;
+
+      function stopFifo() {
+        fifoRunId++;
+        if (fifoRaf) { cancelAnimationFrame(fifoRaf); fifoRaf = null; }
+        if (fifoTimeout) { clearTimeout(fifoTimeout); fifoTimeout = null; }
+        document.querySelectorAll('[data-cp-banner]').forEach((el) => el.classList.remove('is-anim-hidden'));
+        const playBtn = document.querySelector('[data-cp-play-fifo]');
+        if (playBtn) playBtn.classList.remove('is-active');
+      }
+
+      function setFields(title, oldSpeed, newSpeed) {
+        document.querySelectorAll('[data-cp-field="title"]').forEach((el) => { el.textContent = title; });
+        document.querySelectorAll('[data-cp-field="oldSpeed"]').forEach((el) => { el.textContent = oldSpeed; });
+        document.querySelectorAll('[data-cp-field="newSpeed"]').forEach((el) => { el.textContent = newSpeed; });
+      }
+
+      function setTimerPct(pct) {
+        document.querySelectorAll('[data-cp-timer-fill]').forEach((el) => {
+          el.style.width = `${Math.max(0, Math.min(100, pct))}%`;
+        });
+      }
+
+      function applyPreset(key) {
+        stopFifo();
+        const cfg = PRESETS[key] || PRESETS.default;
+        document.body.dataset.cpState = key;
+        document.body.dataset.cpTimer = cfg.timer;
+        setFields(cfg.title, cfg.oldSpeed, cfg.newSpeed);
+        setTimerPct(cfg.pct);
+        document.querySelectorAll('[data-cp-preset]').forEach((btn) => {
+          btn.classList.toggle('is-active', btn.dataset.cpPreset === key);
+        });
+      }
+
+      function playFifoSequence() {
+        if (window.PixelUI && window.PixelUI.isWireframeMode()) return;
+        stopFifo();
+        const myRun = fifoRunId;
+        const queue = [
+          { title: 'FINISHED STAGE 1', oldSpeed: '1', newSpeed: '2 Speed/s' },
+          { title: 'FINISHED STAGE 2', oldSpeed: '2', newSpeed: '4 Speed/s' }
+        ];
+        document.querySelectorAll('[data-cp-preset]').forEach((btn) => btn.classList.remove('is-active'));
+        const playBtn = document.querySelector('[data-cp-play-fifo]');
+        if (playBtn) playBtn.classList.add('is-active');
+
+        const DURATION_MS = 3500;
+        let idx = 0;
+
+        function runNext() {
+          if (myRun !== fifoRunId) return;
+          if (idx >= queue.length) {
+            applyPreset('default');
+            return;
+          }
+          const item = queue[idx++];
+          const banners = document.querySelectorAll('[data-cp-banner]');
+          banners.forEach((el) => el.classList.add('is-anim-hidden'));
+
+          fifoTimeout = setTimeout(() => {
+            if (myRun !== fifoRunId) return;
+            setFields(item.title, item.oldSpeed, item.newSpeed);
+            setTimerPct(100);
+            banners.forEach((el) => el.classList.remove('is-anim-hidden'));
+
+            const startTs = performance.now();
+            function tick(now) {
+              if (myRun !== fifoRunId) return;
+              if (window.PixelUI && window.PixelUI.isWireframeMode()) {
+                applyPreset('default');
+                return;
+              }
+              const elapsed = now - startTs;
+              const remainPct = Math.max(0, 100 * (1 - elapsed / DURATION_MS));
+              setTimerPct(remainPct);
+              if (elapsed < DURATION_MS) {
+                fifoRaf = requestAnimationFrame(tick);
+              } else {
+                banners.forEach((el) => el.classList.add('is-anim-hidden'));
+                fifoTimeout = setTimeout(runNext, 380);
+              }
+            }
+            fifoRaf = requestAnimationFrame(tick);
+          }, 180);
+        }
+
+        runNext();
+      }
+
+      document.querySelectorAll('[data-cp-preset]').forEach((btn) => {
+        btn.addEventListener('click', () => applyPreset(btn.dataset.cpPreset));
+      });
+
+      const playBtn = document.querySelector('[data-cp-play-fifo]');
+      if (playBtn) {
+        playBtn.addEventListener('click', () => playFifoSequence());
+      }
+
+      document.querySelectorAll('[data-wb-mode]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          if (btn.dataset.wbMode !== 'final') applyPreset('default');
+        });
+      });
+
+      applyPreset('default');
+    })();
+  </script>
+</body>
+</html>

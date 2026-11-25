@@ -1,0 +1,311 @@
+{
+  "status": "PASSED",
+  "profile": "craftland",
+  "resolutions": [
+    "1500x750"
+  ],
+  "page": "previews/checkpoint-reward/index.html",
+  "timestamp": "2026-11-25T07:13:55.851Z",
+  "summary": {
+    "profile": "craftland",
+    "resolutionsTested": [
+      "1500x750"
+    ],
+    "statesTested": 3,
+    "totalAssetsVerified": 44,
+    "consoleErrors": 0,
+    "brokenAssets": 0,
+    "pixelatedViolations": 0,
+    "viewportDefects": 0,
+    "overflowDefects": 0,
+    "overlapDefects": 0,
+    "textLegibilityDefects": 0,
+    "touchTargetDefects": 0,
+    "warnings": 31
+  },
+  "consoleErrors": [],
+  "states": [
+    {
+      "state": "full_reward",
+      "resolution": "1500x750",
+      "profile": "craftland",
+      "mode": "final",
+      "canvasSize": {
+        "width": 1500,
+        "height": 750
+      },
+      "assetsChecked": 15,
+      "brokenAssets": [],
+      "pixelatedViolations": [],
+      "viewportDefects": [],
+      "overflowDefects": [],
+      "overlapDefects": [],
+      "textLegibilityDefects": [],
+      "touchTargetDefects": [],
+      "warnings": [
+        {
+          "type": "craftland-main-text-small",
+          "selector": "span.px-num",
+          "fontSize": 24,
+          "target": 35,
+          "message": "Text \"1,250\" is 24px (passes 23 floor, below 35–38 main reading target)."
+        },
+        {
+          "type": "craftland-main-text-small",
+          "selector": "span",
+          "fontSize": 23,
+          "target": 35,
+          "message": "Text \"BAG\" is 23px (passes 23 floor, below 35–38 main reading target)."
+        },
+        {
+          "type": "craftland-main-text-small",
+          "selector": "span",
+          "fontSize": 23,
+          "target": 35,
+          "message": "Text \"WORLD\" is 23px (passes 23 floor, below 35–38 main reading target)."
+        },
+        {
+          "type": "craftland-main-text-small",
+          "selector": "span",
+          "fontSize": 23,
+          "target": 35,
+          "message": "Text \"TELE\" is 23px (passes 23 floor, below 35–38 main reading target)."
+        },
+        {
+          "type": "craftland-main-text-small",
+          "selector": "span.ctx-level-badge",
+          "fontSize": 24,
+          "target": 35,
+          "message": "Text \"LV 12\" is 24px (passes 23 floor, below 35–38 main reading target)."
+        },
+        {
+          "type": "craftland-main-text-small",
+          "selector": "span.ctx-level-badge.px-num",
+          "fontSize": 24,
+          "target": 35,
+          "message": "Text \"64%\" is 24px (passes 23 floor, below 35–38 main reading target)."
+        },
+        {
+          "type": "craftland-main-text-small",
+          "selector": "div.cp-title",
+          "fontSize": 32,
+          "target": 35,
+          "message": "Text \"FINISHED STAGE 1\" is 32px (passes 23 floor, below 35–38 main reading target)."
+        },
+        {
+          "type": "craftland-main-text-small",
+          "selector": "span.cp-speed-old-txt",
+          "fontSize": 24,
+          "target": 35,
+          "message": "Text \"Base speed: 1 →\" is 24px (passes 23 floor, below 35–38 main reading target)."
+        },
+        {
+          "type": "craftland-main-text-small",
+          "selector": "strong.px-num",
+          "fontSize": 24,
+          "target": 35,
+          "message": "Text \"1\" is 24px (passes 23 floor, below 35–38 main reading target)."
+        },
+        {
+          "type": "craftland-main-text-small",
+          "selector": "span.cp-speed-new-txt",
+          "fontSize": 24,
+          "target": 35,
+          "message": "Text \"2 Speed/s ▲\" is 24px (passes 23 floor, below 35–38 main reading target)."
+        },
+        {
+          "type": "craftland-main-text-small",
+          "selector": "span.px-num",
+          "fontSize": 24,
+          "target": 35,
+          "message": "Text \"2 Speed/s\" is 24px (passes 23 floor, below 35–38 main reading target)."
+        },
+        {
+          "type": "craftland-main-text-small",
+          "selector": "span.cp-mail-text",
+          "fontSize": 23,
+          "target": 35,
+          "message": "Text \"Check Mail for additional re\" is 23px (passes 23 floor, below 35–38 main reading target)."
+        }
+      ]
+    },
+    {
+      "state": "speed_only",
+      "resolution": "1500x750",
+      "profile": "craftland",
+      "mode": "final",
+      "canvasSize": {
+        "width": 1500,
+        "height": 750
+      },
+      "assetsChecked": 14,
+      "brokenAssets": [],
+      "pixelatedViolations": [],
+      "viewportDefects": [],
+      "overflowDefects": [],
+      "overlapDefects": [],
+      "textLegibilityDefects": [],
+      "touchTargetDefects": [],
+      "warnings": [
+        {
+          "type": "craftland-main-text-small",
+          "selector": "span.px-num",
+          "fontSize": 24,
+          "target": 35,
+          "message": "Text \"1,250\" is 24px (passes 23 floor, below 35–38 main reading target)."
+        },
+        {
+          "type": "craftland-main-text-small",
+          "selector": "span",
+          "fontSize": 23,
+          "target": 35,
+          "message": "Text \"BAG\" is 23px (passes 23 floor, below 35–38 main reading target)."
+        },
+        {
+          "type": "craftland-main-text-small",
+          "selector": "span",
+          "fontSize": 23,
+          "target": 35,
+          "message": "Text \"WORLD\" is 23px (passes 23 floor, below 35–38 main reading target)."
+        },
+        {
+          "type": "craftland-main-text-small",
+          "selector": "span",
+          "fontSize": 23,
+          "target": 35,
+          "message": "Text \"TELE\" is 23px (passes 23 floor, below 35–38 main reading target)."
+        },
+        {
+          "type": "craftland-main-text-small",
+          "selector": "span.ctx-level-badge",
+          "fontSize": 24,
+          "target": 35,
+          "message": "Text \"LV 12\" is 24px (passes 23 floor, below 35–38 main reading target)."
+        },
+        {
+          "type": "craftland-main-text-small",
+          "selector": "span.ctx-level-badge.px-num",
+          "fontSize": 24,
+          "target": 35,
+          "message": "Text \"64%\" is 24px (passes 23 floor, below 35–38 main reading target)."
+        },
+        {
+          "type": "craftland-main-text-small",
+          "selector": "div.cp-title",
+          "fontSize": 32,
+          "target": 35,
+          "message": "Text \"FINISHED STAGE 1\" is 32px (passes 23 floor, below 35–38 main reading target)."
+        },
+        {
+          "type": "craftland-main-text-small",
+          "selector": "span.cp-speed-old-txt",
+          "fontSize": 24,
+          "target": 35,
+          "message": "Text \"Base speed: 1 →\" is 24px (passes 23 floor, below 35–38 main reading target)."
+        },
+        {
+          "type": "craftland-main-text-small",
+          "selector": "strong.px-num",
+          "fontSize": 24,
+          "target": 35,
+          "message": "Text \"1\" is 24px (passes 23 floor, below 35–38 main reading target)."
+        },
+        {
+          "type": "craftland-main-text-small",
+          "selector": "span.cp-speed-new-txt",
+          "fontSize": 24,
+          "target": 35,
+          "message": "Text \"2 Speed/s ▲\" is 24px (passes 23 floor, below 35–38 main reading target)."
+        },
+        {
+          "type": "craftland-main-text-small",
+          "selector": "span.px-num",
+          "fontSize": 24,
+          "target": 35,
+          "message": "Text \"2 Speed/s\" is 24px (passes 23 floor, below 35–38 main reading target)."
+        }
+      ]
+    },
+    {
+      "state": "mail_only",
+      "resolution": "1500x750",
+      "profile": "craftland",
+      "mode": "final",
+      "canvasSize": {
+        "width": 1500,
+        "height": 750
+      },
+      "assetsChecked": 15,
+      "brokenAssets": [],
+      "pixelatedViolations": [],
+      "viewportDefects": [],
+      "overflowDefects": [],
+      "overlapDefects": [],
+      "textLegibilityDefects": [],
+      "touchTargetDefects": [],
+      "warnings": [
+        {
+          "type": "craftland-main-text-small",
+          "selector": "span.px-num",
+          "fontSize": 24,
+          "target": 35,
+          "message": "Text \"1,250\" is 24px (passes 23 floor, below 35–38 main reading target)."
+        },
+        {
+          "type": "craftland-main-text-small",
+          "selector": "span",
+          "fontSize": 23,
+          "target": 35,
+          "message": "Text \"BAG\" is 23px (passes 23 floor, below 35–38 main reading target)."
+        },
+        {
+          "type": "craftland-main-text-small",
+          "selector": "span",
+          "fontSize": 23,
+          "target": 35,
+          "message": "Text \"WORLD\" is 23px (passes 23 floor, below 35–38 main reading target)."
+        },
+        {
+          "type": "craftland-main-text-small",
+          "selector": "span",
+          "fontSize": 23,
+          "target": 35,
+          "message": "Text \"TELE\" is 23px (passes 23 floor, below 35–38 main reading target)."
+        },
+        {
+          "type": "craftland-main-text-small",
+          "selector": "span.ctx-level-badge",
+          "fontSize": 24,
+          "target": 35,
+          "message": "Text \"LV 12\" is 24px (passes 23 floor, below 35–38 main reading target)."
+        },
+        {
+          "type": "craftland-main-text-small",
+          "selector": "span.ctx-level-badge.px-num",
+          "fontSize": 24,
+          "target": 35,
+          "message": "Text \"64%\" is 24px (passes 23 floor, below 35–38 main reading target)."
+        },
+        {
+          "type": "craftland-main-text-small",
+          "selector": "div.cp-title",
+          "fontSize": 32,
+          "target": 35,
+          "message": "Text \"FINISHED STAGE 1\" is 32px (passes 23 floor, below 35–38 main reading target)."
+        },
+        {
+          "type": "craftland-main-text-small",
+          "selector": "span.cp-mail-text",
+          "fontSize": 23,
+          "target": 35,
+          "message": "Text \"Check Mail for additional re\" is 23px (passes 23 floor, below 35–38 main reading target)."
+        }
+      ]
+    }
+  ],
+  "screenshots": [
+    "screenshots/full_reward-clean.png",
+    "screenshots/speed_only-clean.png",
+    "screenshots/mail_only-clean.png"
+  ]
+}
