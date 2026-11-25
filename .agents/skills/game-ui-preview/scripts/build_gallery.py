@@ -332,7 +332,17 @@ def build_gallery(
                     encoding="utf-8",
                 )
 
-    if detected_proj is None:
+    if detected_proj is not None:
+        bat_parent = previews_root.resolve()
+        bat_path = bat_parent / "launch_ui_hub.bat"
+        bat_content = _render_launch_bat(
+            bat_dir=bat_parent,
+            previews_root=previews_root,
+            catalog_dir=catalog_dir,
+            project_root=detected_proj,
+        )
+        bat_path.write_text(bat_content, encoding="utf-8")
+    else:
         bat_parent = previews_root.resolve().parent
         bat_path = bat_parent / "launch_ui_hub.bat"
         if not bat_path.exists():
