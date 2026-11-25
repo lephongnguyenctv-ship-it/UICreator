@@ -1,8 +1,0 @@
-{
-  "servers": {
-    "craftland-studio": {
-      "type": "http",
-      "url": "http://10.6.56.10:3000/a5kuyegpfvf-me2lfyzi-iyb6lce71qj/mcp"
-    }
-  }
-}

@@ -1,9 +1,0 @@
-# Values to put in the config block at the top of deploy.ps1 (NO secrets here).
-HostName   = <ssh_host from GET /api/projects/{id}>       # e.g. run.ingarena.net or a node IP
-SshPort    = <ssh_port>
-User       = <ssh_username>                              # e.g. project_user_123
-AppPort    = 3000                                        # port the app listens on inside the container
-RemoteDir  = my-app                                      # folder under ~ on the server
-StartCmd   = node server.js                              # how to start the app (run inside RemoteDir)
-InstallCmd = npm install --omit=dev --no-audit --no-fund # leave empty for none
-HealthPath = /                                           # path curl-checked after start (e.g. /api/version)
