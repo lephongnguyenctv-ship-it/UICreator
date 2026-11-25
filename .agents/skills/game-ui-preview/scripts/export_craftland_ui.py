@@ -15,6 +15,7 @@ Pipeline:
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import json
 import os
@@ -518,10 +519,10 @@ def apply_plan_to_craftland_mcp(
                     and ent.get("parentId") == root_id
                     and isinstance(ent.get("id"), str)
                 ]
-                if direct_child_ids:
+                for cid in direct_child_ids:
                     client.call_tool(
                         "asset-entity-remove",
-                        {"assetId": ui_id, "entityIds": direct_child_ids},
+                        {"assetId": ui_id, "entityId": cid},
                     )
     except Exception:
         ui_id = None
@@ -665,11 +666,17 @@ def apply_plan_to_craftland_mcp(
     audit_info = client.call_tool("asset-get", {"assetId": ui_id, "withEntities": "true"})
     verified_entities = len(audit_info.get("entities") or []) if isinstance(audit_info, dict) else (created_count + 1)
 
-    snapshot_result = None
+    snapshot_bytes: bytes | None = None
     if take_snapshot:
         try:
-            client.call_tool("asset-open", {"assetId": ui_rel_path})
-            snapshot_result = client.call_tool("ui-snapshot", {})
+            client.call_tool("asset-open", {"assetId": ui_id})
+            client.call_tool("asset-get", {"assetId": ui_id, "withEntities": "true"})
+            raw_snap = client.rpc("tools/call", {"name": "ui-snapshot", "arguments": {}})
+            if isinstance(raw_snap, dict):
+                for item in raw_snap.get("content", []):
+                    if isinstance(item, dict) and item.get("type") == "image" and item.get("data"):
+                        snapshot_bytes = base64.b64decode(item["data"])
+                        break
         except Exception as exc:
             mcp_warnings.append(f"ui-snapshot skipped/failed: {exc}")
 
@@ -679,7 +686,7 @@ def apply_plan_to_craftland_mcp(
         "createdWidgets": created_count,
         "verifiedEntityCount": verified_entities,
         "mcpWarnings": mcp_warnings,
-        "snapshot": snapshot_result,
+        "snapshotBytes": snapshot_bytes,
     }
 
 
@@ -763,6 +770,16 @@ def run_export_pipeline(
     )
     all_warnings = list(warnings) + [{"type": "mcp-warning", "message": w} for w in mcp_res.get("mcpWarnings", [])]
 
+    snapshot_rel: str | None = None
+    snap_bytes = mcp_res.get("snapshotBytes")
+    if isinstance(snap_bytes, (bytes, bytearray)) and snap_bytes:
+        snap_out = out_plan.parent / f"{plan.get('view') or 'active'}.craftland-snapshot.png"
+        snap_out.write_bytes(snap_bytes)
+        try:
+            snapshot_rel = snap_out.relative_to(resolved_proj).as_posix()
+        except ValueError:
+            snapshot_rel = snap_out.as_posix()
+
     return {
         "dryRun": False,
         "mcpUrl": mcp_url,
@@ -773,7 +790,7 @@ def run_export_pipeline(
         "entityCount": mcp_res["verifiedEntityCount"],
         "planPath": plan_rel,
         "warnings": all_warnings,
-        "snapshot": mcp_res.get("snapshot"),
+        "snapshotPath": snapshot_rel,
     }
 
 
