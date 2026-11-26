@@ -357,6 +357,96 @@ body.clean-mode {
   color: #86efac;
 }
 
+.wb-tree-node.is-export-ignore {
+  opacity: 0.58;
+  font-style: italic;
+}
+
+.wb-tree-node.is-drag-over-before {
+  border-top: 2px solid #38bdf8;
+}
+
+.wb-tree-node.is-drag-over-after {
+  border-bottom: 2px solid #38bdf8;
+}
+
+.wb-tree-idx {
+  font-size: 9px;
+  min-width: 14px;
+  text-align: right;
+  color: rgba(148, 163, 184, 0.65);
+  font-family: var(--px-font-pixel);
+  flex-shrink: 0;
+}
+
+.wb-tree-order-btns {
+  display: none;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.wb-tree-node:hover .wb-tree-order-btns,
+.wb-tree-node.is-selected .wb-tree-order-btns {
+  display: inline-flex;
+}
+
+.wb-tree-order-btn {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 3px;
+  background: rgba(15, 23, 42, 0.7);
+  color: #cbd5e1;
+  font-size: 10px;
+  line-height: 14px;
+  cursor: pointer;
+}
+
+.wb-tree-order-btn:hover {
+  background: rgba(56, 189, 248, 0.25);
+  border-color: #38bdf8;
+  color: #fff;
+}
+
+.wb-res-audit-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  background: rgba(245, 158, 11, 0.92);
+  color: #1f1300;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.wb-insp-warn-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.wb-insp-warn-btn {
+  appearance: none;
+  border: 1px solid rgba(254, 202, 202, 0.55);
+  background: rgba(127, 29, 29, 0.55);
+  color: #fef2f2;
+  border-radius: 4px;
+  padding: 3px 7px;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.wb-insp-warn-btn:hover {
+  background: rgba(185, 28, 28, 0.75);
+}
+
 /* Right Inspector & Unity-style 9-Slice Editor */
 .wb-insp-empty {
   color: var(--px-workbench-muted);
@@ -1966,18 +2056,26 @@ body.clean-mode #game-canvas {
 }
 
 /* High-res / non-pixel-art 1:1 9-slice (Craftland/Unity .meta 9-Grid Pattern).
-   Renders border-image on ::before with border:none so Wireframe & Interactive keep identical layout geometry. */
+   Renders border-image on ::before with border:none so Wireframe & Interactive keep identical layout geometry.
+   Centered around (0.5, 0.5) so any 9-slice border overflow matches Craftland Studio symmetrically. */
 .px-9slice.px-9slice--hd {
   border: none !important;
-  background-image: none !important;
   isolation: isolate;
   --pixel-scale: 1;
+}
+
+.px-9slice.px-9slice--hd:not(.px-img-simple):not(.px-img-tiled):not(.px-img-fit):not(.px-img-filled) {
+  background-image: none !important;
 }
 
 body:not(.mode-wireframe) .px-9slice.px-9slice--hd::before {
   content: "";
   position: absolute;
-  inset: 0;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(var(--px-flip-x, 1), var(--px-flip-y, 1));
+  width: max(100%, calc((var(--slice-l, 12) + var(--slice-r, 12)) * 1px * var(--pixel-scale, 1)));
+  height: max(100%, calc((var(--slice-t, 12) + var(--slice-b, 12)) * 1px * var(--pixel-scale, 1)));
   pointer-events: none;
   z-index: -1;
   box-sizing: border-box;
@@ -3180,13 +3278,21 @@ body:not(.mode-wireframe) .px-9slice.px-9slice--hd.px-9slice-no-center::before {
 }
 
 /* Image Fill Types: Simple / Tiled / Fit / Filled */
-.px-img-simple:not(img) {
+.px-img-simple:not(img),
+.px-9slice.px-9slice--hd.px-img-simple:not(img) {
   border-width: 0 !important;
   border-image-source: none !important;
   background-image: var(--skin-url) !important;
   background-size: 100% 100% !important;
   background-repeat: no-repeat !important;
   background-position: center !important;
+}
+
+.px-9slice.px-9slice--hd.px-img-simple:not(img),
+.px-9slice.px-9slice--hd.px-img-tiled:not(img),
+.px-9slice.px-9slice--hd.px-img-fit:not(img),
+.px-9slice.px-9slice--hd.px-img-filled:not(img) {
+  image-rendering: auto;
 }
 
 .px-img-simple.px-9slice--hd::before {
@@ -3197,7 +3303,8 @@ img.px-img-simple {
   object-fit: fill !important;
 }
 
-.px-img-tiled:not(img) {
+.px-img-tiled:not(img),
+.px-9slice.px-9slice--hd.px-img-tiled:not(img) {
   border-width: 0 !important;
   border-image-source: none !important;
   background-image: var(--skin-url) !important;
@@ -3222,7 +3329,8 @@ img.px-img-tiled {
     calc(var(--h, 32) * 1px * var(--pixel-scale, 1)) !important;
 }
 
-.px-img-fit:not(img) {
+.px-img-fit:not(img),
+.px-9slice.px-9slice--hd.px-img-fit:not(img) {
   border-width: 0 !important;
   border-image-source: none !important;
   background-image: var(--skin-url) !important;
@@ -3239,7 +3347,8 @@ img.px-img-fit {
   object-fit: contain !important;
 }
 
-.px-img-filled:not(img) {
+.px-img-filled:not(img),
+.px-9slice.px-9slice--hd.px-img-filled:not(img) {
   border-width: 0 !important;
   border-image-source: none !important;
   background-image: var(--skin-url) !important;
@@ -3263,7 +3372,7 @@ img.px-img-filled {
 
 /* Sprite Flip (H / V) without clobbering Transform CSS 'rotate' or flipping child text */
 .px-9slice--hd.px-flip-active::before {
-  transform: scale(var(--px-flip-x, 1), var(--px-flip-y, 1));
+  transform: translate(-50%, -50%) scale(var(--px-flip-x, 1), var(--px-flip-y, 1));
 }
 
 .px-flip-active:not(.px-9slice--hd) {

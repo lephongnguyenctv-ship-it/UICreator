@@ -45,6 +45,126 @@ class SliceRecord:
     is_white_mask_candidate: bool
     craftland_file_id: str | None = None
     craftland_asset_path: str | None = None
+    file_size_bytes: int | None = None
+    audit_warnings: list[dict[str, Any]] | None = None
+
+
+def audit_slice_record(
+    slice_id: str,
+    rel_posix: str,
+    width: int,
+    height: int,
+    category: str,
+    slice_9: list[int] | None,
+    file_size_bytes: int | None = None,
+) -> list[dict[str, Any]]:
+    """Audit a sprite against Craftland mobile UI size, 9-slice border, aspect ratio, and file weight standards."""
+    lower_path = rel_posix.lower()
+    lower_id = slice_id.lower()
+
+    # Skip built-in WorkshopIconLibrary sprites and full-screen preview backdrop screenshots
+    if lower_path.startswith("lib://") or "workshopiconlibrary/" in lower_path:
+        return []
+    is_backdrop = (
+        slice_9 is None
+        and any(tok in lower_id for tok in ("bg_craftland", "backdrop", "screenshot", "bg_scene"))
+        and max(width, height) >= 700
+    )
+    if is_backdrop:
+        return []
+
+    warnings: list[dict[str, Any]] = []
+    max_dim = max(width, height)
+    min_dim = max(1, min(width, height))
+    aspect = round(max_dim / min_dim, 2)
+
+    is_btn_or_slot = (
+        category == "button"
+        or any(tok in lower_id for tok in ("button", "btn", "slot", "inset"))
+    )
+    is_ribbon_or_strip = any(tok in lower_id for tok in ("ribbon", "strip", "banner", "bar"))
+
+    def _suggest_even(v: float) -> int:
+        return max(8, int(round(v / 2.0) * 2))
+
+    if slice_9 and len(slice_9) == 4:
+        t, r, b, l = (int(v or 0) for v in slice_9)
+        min_w = l + r
+        min_h = t + b
+        if is_btn_or_slot:
+            if max_dim > 256 or min_w > 92 or min_h > 78:
+                scale_dim = 224.0 / max_dim if max_dim > 256 else 1.0
+                scale_w = 56.0 / min_w if min_w > 92 else 1.0
+                scale_h = 44.0 / min_h if min_h > 78 else 1.0
+                scale = round(min(scale_dim, scale_w, scale_h, 0.5), 2)
+                s_w, s_h = _suggest_even(width * scale), _suggest_even(height * scale)
+                s_9 = [max(0, int(round(v * scale))) for v in (t, r, b, l)]
+                warnings.append(
+                    {
+                        "type": "oversized-9slice-button",
+                        "message": (
+                            f"{width}x{height} 9-slice {category} has borders {slice_9} (min widget {min_w}x{min_h}px > mobile button standard). "
+                            f"Recommend scaling to ~{s_w}x{s_h} (borders {s_9})."
+                        ),
+                        "suggested_scale": scale,
+                        "suggested_size": [s_w, s_h],
+                        "suggested_slice_9": s_9,
+                    }
+                )
+            if aspect > 3.0 and ("button" in lower_id or "btn" in lower_id):
+                warnings.append(
+                    {
+                        "type": "extreme-button-aspect",
+                        "message": (
+                            f"Wide button aspect ratio ({width}x{height}, {aspect}:1). "
+                            "Do not reuse wide pill/chamfered buttons as small square buttons (close/arrow) unless downscaled or paired with a square button sprite."
+                        ),
+                    }
+                )
+        else:
+            if max_dim > 384 or (min_h > 120) or (not is_ribbon_or_strip and min_w > 120):
+                target_max = 366.0 if is_ribbon_or_strip else 320.0
+                scale_dim = target_max / max_dim if max_dim > target_max else 1.0
+                scale_h = 56.0 / min_h if min_h > 120 else 1.0
+                scale_w = (180.0 / min_w if is_ribbon_or_strip else 64.0 / min_w) if min_w > 120 else 1.0
+                scale = round(min(scale_dim, scale_h, scale_w, 0.5), 2)
+                s_w, s_h = _suggest_even(width * scale), _suggest_even(height * scale)
+                s_9 = [max(0, int(round(v * scale))) for v in (t, r, b, l)]
+                warnings.append(
+                    {
+                        "type": "oversized-9slice-panel",
+                        "message": (
+                            f"{width}x{height} 9-slice panel has large borders {slice_9} (min widget {min_w}x{min_h}px). "
+                            f"Recommend scaling to ~{s_w}x{s_h} (borders {s_9})."
+                        ),
+                        "suggested_scale": scale,
+                        "suggested_size": [s_w, s_h],
+                        "suggested_slice_9": s_9,
+                    }
+                )
+    elif max_dim > 384:
+        target_max = 340.0 if min_dim >= 180 else 256.0
+        scale = round(min(target_max / max_dim, 0.7), 2)
+        s_w, s_h = _suggest_even(width * scale), _suggest_even(height * scale)
+        warnings.append(
+            {
+                "type": "oversized-sprite",
+                "message": f"Oversized sprite ({width}x{height}). Recommend downscaling to ~{s_w}x{s_h} for mobile UI.",
+                "suggested_scale": scale,
+                "suggested_size": [s_w, s_h],
+            }
+        )
+
+    if file_size_bytes is not None and file_size_bytes > 120 * 1024:
+        kb = round(file_size_bytes / 1024)
+        warnings.append(
+            {
+                "type": "heavy-file-size",
+                "message": f"Heavy PNG ({kb} KB > 120 KB). Recommend downscaling and PNG8 compression via preprocess_sprites.py.",
+            }
+        )
+
+    return warnings
 
 
 def slugify(text: str) -> str:
@@ -614,6 +734,7 @@ def apply_ui_edits_in_place(previews_root: Path, slug: str, edits_payload: dict[
     raw_tints = edits_payload.get("tintEdits") if isinstance(edits_payload, dict) else {}
     raw_labels = edits_payload.get("labelEdits") if isinstance(edits_payload, dict) else {}
     raw_images = edits_payload.get("imageEdits") if isinstance(edits_payload, dict) else {}
+    raw_orders = edits_payload.get("orderEdits") if isinstance(edits_payload, dict) else {}
 
     clean_text: dict[str, str] = {}
     if isinstance(raw_text, dict):
@@ -773,6 +894,24 @@ def apply_ui_edits_in_place(previews_root: Path, slug: str, edits_payload: dict[
             if entry:
                 clean_images[path_key.strip()] = entry
 
+    clean_orders: dict[str, list[int]] = {}
+    if isinstance(raw_orders, dict):
+        for parent_key, perm in raw_orders.items():
+            if not isinstance(parent_key, str) or not parent_key.strip() or not isinstance(perm, list):
+                continue
+            cleaned_perm: list[int] = []
+            seen_idx: set[int] = set()
+            for item in perm:
+                try:
+                    iv = int(item)
+                except (TypeError, ValueError):
+                    continue
+                if iv >= 0 and iv not in seen_idx:
+                    seen_idx.add(iv)
+                    cleaned_perm.append(iv)
+            if cleaned_perm:
+                clean_orders[parent_key.strip()] = cleaned_perm
+
     normalized: dict[str, Any] = {
         "textEdits": clean_text,
         "spriteEdits": clean_sprites,
@@ -785,6 +924,8 @@ def apply_ui_edits_in_place(previews_root: Path, slug: str, edits_payload: dict[
         normalized["labelEdits"] = clean_labels
     if clean_images:
         normalized["imageEdits"] = clean_images
+    if clean_orders:
+        normalized["orderEdits"] = clean_orders
 
     edits_json_path = target_dir / "ui-edits.json"
     edits_json_path.write_text(json.dumps(normalized, indent=2) + "\n", encoding="utf-8")
@@ -1363,6 +1504,20 @@ def process_directory(
                     slice_9 = estimate_9slice(im, cat)
                 white_mask = is_white_mask(im)
 
+            try:
+                png_bytes = png_path.stat().st_size
+            except OSError:
+                png_bytes = None
+            audit_warns = audit_slice_record(
+                slice_id=slice_id,
+                rel_posix=craftland_asset_path or real_source_file,
+                width=w,
+                height=h,
+                category=cat,
+                slice_9=slice_9,
+                file_size_bytes=png_bytes,
+            )
+
             records.append(
                 SliceRecord(
                     slice_id=slice_id,
@@ -1377,6 +1532,8 @@ def process_directory(
                     is_white_mask_candidate=white_mask,
                     craftland_file_id=file_id,
                     craftland_asset_path=craftland_asset_path,
+                    file_size_bytes=png_bytes,
+                    audit_warnings=audit_warns or None,
                 )
             )
             sources_meta.append(
@@ -1463,6 +1620,20 @@ def process_directory(
                         slice_9 = estimate_9slice(crop, cat)
                     white_mask = is_white_mask(crop)
 
+                    try:
+                        fsize = (workspace_root / slice_rel).stat().st_size
+                    except OSError:
+                        fsize = None
+                    audit_warns = audit_slice_record(
+                        slice_id=slice_id,
+                        rel_posix=real_source_file,
+                        width=cw,
+                        height=ch,
+                        category=cat,
+                        slice_9=slice_9,
+                        file_size_bytes=fsize,
+                    )
+
                     records.append(
                         SliceRecord(
                             slice_id=slice_id,
@@ -1477,6 +1648,8 @@ def process_directory(
                             is_white_mask_candidate=white_mask,
                             craftland_file_id=file_id if len(boxes) == 1 else None,
                             craftland_asset_path=real_source_file if len(boxes) == 1 else None,
+                            file_size_bytes=fsize,
+                            audit_warnings=audit_warns or None,
                         )
                     )
                     sheet_slice_ids.append(slice_id)
@@ -1531,10 +1704,30 @@ def process_directory(
                     if r.craftland_asset_path is not None
                     else {}
                 ),
+                **(
+                    {"file_size_bytes": r.file_size_bytes}
+                    if r.file_size_bytes is not None
+                    else {}
+                ),
+                **(
+                    {"audit_warnings": r.audit_warnings}
+                    if r.audit_warnings
+                    else {}
+                ),
             }
             for r in records
         },
     }
+
+    flagged = [r for r in records if r.audit_warnings]
+    if flagged:
+        print(f"[ASSET AUDIT] {len(flagged)} sprite(s) flagged for size/9-slice/weight standards:")
+        for r in flagged[:25]:
+            msgs = "; ".join(w["message"] for w in (r.audit_warnings or []))
+            print(f"  - {r.slice_id} ({r.source_file}): {msgs}")
+        if len(flagged) > 25:
+            print(f"  ... and {len(flagged) - 25} more (see manifest.json -> audit_warnings).")
+        print("  Run preprocess_sprites.py --catalog <manifest.json> --dry-run to preview recommended downscaling.")
 
     manifest_path = output_dir / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")

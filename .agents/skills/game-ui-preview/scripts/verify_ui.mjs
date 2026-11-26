@@ -468,20 +468,57 @@ async function auditCurrentState(page, stateName, auditOpts = {}) {
         });
       }
 
-      // 6. Parent container child-containment check (including 9-slice border safe interior)
+      // 6. Parent container child-containment check (including 9-slice minimum-size & safe interior)
       if (el.matches('.px-9slice, .px-wire-box, .px-btn, .px-slot, .px-card, .px-dialog-content')) {
+        const isOverriddenFill =
+          el.classList.contains('px-img-simple') ||
+          el.classList.contains('px-img-tiled') ||
+          el.classList.contains('px-img-fit') ||
+          el.classList.contains('px-img-filled');
+        const isActive9Slice = el.classList.contains('px-9slice') && !isWireframe && !isOverriddenFill;
+        const isHd9Slice = isActive9Slice && el.classList.contains('px-9slice--hd');
+        let bT = 0;
+        let bR = 0;
+        let bB = 0;
+        let bL = 0;
+        if (isActive9Slice) {
+          const bStyle = isHd9Slice ? getComputedStyle(el, '::before') : style;
+          bT = parseFloat(bStyle.borderTopWidth || '0') || 0;
+          bR = parseFloat(bStyle.borderRightWidth || '0') || 0;
+          bB = parseFloat(bStyle.borderBottomWidth || '0') || 0;
+          bL = parseFloat(bStyle.borderLeftWidth || '0') || 0;
+          if (isHd9Slice && bT === 0 && bR === 0 && bB === 0 && bL === 0) {
+            const pxScale = parseFloat(style.getPropertyValue('--pixel-scale') || '1') || 1;
+            bT = (parseFloat(style.getPropertyValue('--slice-t') || '0') || 0) * pxScale;
+            bR = (parseFloat(style.getPropertyValue('--slice-r') || '0') || 0) * pxScale;
+            bB = (parseFloat(style.getPropertyValue('--slice-b') || '0') || 0) * pxScale;
+            bL = (parseFloat(style.getPropertyValue('--slice-l') || '0') || 0) * pxScale;
+          }
+          const minW = bL + bR;
+          const minH = bT + bB;
+          if (
+            el.getAttribute('data-slice9-overflow-ok') !== 'true' &&
+            (minW > 0 || minH > 0) &&
+            (rect.width + 0.5 < minW || rect.height + 0.5 < minH)
+          ) {
+            overflowDefects.push({
+              selector: sel,
+              type: '9slice-smaller-than-borders',
+              message: `9-slice widget (${Math.round(rect.width)}x${Math.round(rect.height)}) is smaller than corner borders (${Math.round(minW)}x${Math.round(minH)}: T${Math.round(bT)},R${Math.round(bR)},B${Math.round(bB)},L${Math.round(bL)}). Craftland renders 9-slice corners 1:1 without scaling.`,
+              rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+              minSize: { width: Math.round(minW), height: Math.round(minH) },
+            });
+          }
+        }
         const checkInnerBorder =
-          el.classList.contains('px-9slice') &&
-          !isWireframe &&
-          el.getAttribute('data-border-overlap-ok') !== 'true';
-        const bT = checkInnerBorder ? parseFloat(style.borderTopWidth || '0') : 0;
-        const bR = checkInnerBorder ? parseFloat(style.borderRightWidth || '0') : 0;
-        const bB = checkInnerBorder ? parseFloat(style.borderBottomWidth || '0') : 0;
-        const bL = checkInnerBorder ? parseFloat(style.borderLeftWidth || '0') : 0;
-        const innerLeft = rect.left + bL;
-        const innerTop = rect.top + bT;
-        const innerRight = rect.right - bR;
-        const innerBottom = rect.bottom - bB;
+          isActive9Slice &&
+          el.getAttribute('data-border-overlap-ok') !== 'true' &&
+          rect.width > bL + bR + 1 &&
+          rect.height > bT + bB + 1;
+        const innerLeft = rect.left + (checkInnerBorder ? bL : 0);
+        const innerTop = rect.top + (checkInnerBorder ? bT : 0);
+        const innerRight = rect.right - (checkInnerBorder ? bR : 0);
+        const innerBottom = rect.bottom - (checkInnerBorder ? bB : 0);
 
         for (const child of Array.from(el.children)) {
           if (!isVisible(child) || isInternalOverlay(child) || child.getAttribute('data-overflow-ok') === 'true') continue;

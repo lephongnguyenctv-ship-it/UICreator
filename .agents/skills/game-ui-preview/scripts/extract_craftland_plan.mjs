@@ -208,6 +208,7 @@ async function main() {
         const labelEdits = mergeEditBucket('labelEdits');
         const imageEdits = mergeEditBucket('imageEdits');
         const tintEdits = mergeEditBucket('tintEdits');
+        const orderEdits = mergeEditBucket('orderEdits');
 
         const canvasRect = canvas.getBoundingClientRect();
         const warnings = [];
@@ -230,6 +231,49 @@ async function main() {
             return true;
           }
           return false;
+        }
+
+        // Snapshot original DOM paths before applying saved sibling orderEdits so edit lookups stay stable
+        const origPathMap = new WeakMap();
+        const origPathToEl = new Map();
+        const origKidsMap = new WeakMap();
+        (function snapOrig(parent, prefix) {
+          const kids = Array.from(parent.children).filter(c => !isDomPathOverlay(c));
+          origKidsMap.set(parent, kids);
+          kids.forEach((child, idx) => {
+            const p = prefix ? `${prefix}.${idx}` : String(idx);
+            origPathMap.set(child, p);
+            origPathToEl.set(p, child);
+            snapOrig(child, p);
+          });
+        })(canvas, '');
+
+        // Apply saved Hierarchy Tree sibling orderEdits so DOM order & Craftland priority match the Workbench
+        for (const [parentPath, perm] of Object.entries(orderEdits || {})) {
+          if (!Array.isArray(perm) || perm.length === 0) continue;
+          const parentEl = parentPath === '__canvas__' ? canvas : origPathToEl.get(parentPath);
+          if (!parentEl) continue;
+          const origKids = origKidsMap.get(parentEl) || [];
+          if (!origKids.length) continue;
+          const ordered = [];
+          const seen = new Set();
+          for (const rawIdx of perm) {
+            const n = parseInt(rawIdx, 10);
+            if (Number.isFinite(n) && n >= 0 && n < origKids.length && !seen.has(n)) {
+              seen.add(n);
+              ordered.push(origKids[n]);
+            }
+          }
+          origKids.forEach((child, idx) => {
+            if (!seen.has(idx)) ordered.push(child);
+          });
+          const overlays = Array.from(parentEl.children).filter(c => isDomPathOverlay(c));
+          ordered.forEach(child => {
+            if (child.parentElement === parentEl) parentEl.appendChild(child);
+          });
+          overlays.forEach(ov => {
+            if (ov.parentElement === parentEl) parentEl.appendChild(ov);
+          });
         }
 
         function isInternalOverlay(el) {
@@ -262,6 +306,8 @@ async function main() {
 
         function getCanvasPath(el) {
           if (!el || !canvas.contains(el) || el === canvas || isDomPathOverlay(el)) return '';
+          const cached = origPathMap.get(el);
+          if (cached) return cached;
           const parts = [];
           let cur = el;
           while (cur && cur !== canvas) {
@@ -441,40 +487,55 @@ async function main() {
 
         function resolveFillType(el, cs, spriteInfo, cPath, elRect) {
           const imgEdit = imageEdits[cPath] || {};
+          let resolved = 0;
           if (typeof imgEdit.fillType === 'number' && [0, 1, 2, 3, 5].includes(imgEdit.fillType)) {
-            return imgEdit.fillType;
+            resolved = imgEdit.fillType;
+          } else {
+            const attrFt = el.getAttribute('data-fill-type');
+            if (attrFt !== null && attrFt !== '') {
+              const parsed = parseInt(attrFt, 10);
+              if ([0, 1, 2, 3, 5].includes(parsed)) {
+                resolved = parsed;
+              }
+            } else if (el.classList.contains('px-img-filled')) {
+              resolved = 3;
+            } else if (el.classList.contains('px-img-tiled')) {
+              resolved = 2;
+            } else if (el.classList.contains('px-img-fit')) {
+              resolved = 5;
+            } else if (el.classList.contains('px-img-simple')) {
+              resolved = 0;
+            } else if (
+              el.classList.contains('px-9slice') ||
+              el.hasAttribute('data-slice-9') ||
+              (spriteInfo && spriteInfo.slice9 && el.tagName !== 'IMG' && !el.classList.contains('px-icon'))
+            ) {
+              resolved = 1;
+            } else if (el.tagName === 'IMG' || el.classList.contains('px-icon') || cs.objectFit === 'contain') {
+              resolved = 5;
+            } else {
+              resolved = 0;
+            }
           }
-          const attrFt = el.getAttribute('data-fill-type');
-          if (attrFt !== null && attrFt !== '') {
-            const parsed = parseInt(attrFt, 10);
-            if ([0, 1, 2, 3, 5].includes(parsed)) return parsed;
-          }
-          if (el.classList.contains('px-img-filled')) return 3;
-          if (el.classList.contains('px-img-tiled')) return 2;
-          if (el.classList.contains('px-img-fit')) return 5;
-          if (el.classList.contains('px-img-simple')) return 0;
-          if (
-            el.classList.contains('px-9slice') ||
-            el.hasAttribute('data-slice-9') ||
-            (spriteInfo && spriteInfo.slice9 && el.tagName !== 'IMG' && !el.classList.contains('px-icon'))
-          ) {
-            // In Craftland Studio, fillType 1 renders .png.meta 9-slice corners at 1:1 native pixel size.
-            // If the widget is thinner/smaller than the texture's native .meta border sum (e.g. a 5px progress bar),
-            // using fillType 1 inflates the widget to the full border height (24-40px); use Simple (0) instead.
+
+          // Strict parity: NEVER silently downgrade fillType 1 (9-Grid Pattern) to Simple (0).
+          // Warn loudly instead when a 9-slice widget is smaller than its 1:1 corner border sum.
+          if (resolved === 1 && el.getAttribute('data-slice9-overflow-ok') !== 'true') {
             const effS9 = (spriteInfo && (spriteInfo.slice9 || spriteInfo.nativeSlice9)) || null;
             if (effS9 && elRect) {
               const minH = (Number(effS9[0]) || 0) + (Number(effS9[2]) || 0);
               const minW = (Number(effS9[1]) || 0) + (Number(effS9[3]) || 0);
-              if (elRect.height < minH || elRect.width < minW) {
-                return 0;
+              if (elRect.height + 0.5 < minH || elRect.width + 0.5 < minW) {
+                warnings.push({
+                  type: '9slice-smaller-than-borders',
+                  selector: cleanEntityName(el),
+                  sliceId: (spriteInfo && spriteInfo.sliceId) || null,
+                  message: `Widget "${cleanEntityName(el)}" (${Math.round(elRect.width)}x${Math.round(elRect.height)}) uses 9-slice (${(spriteInfo && spriteInfo.sliceId) || 'sprite'}) whose corner borders require at least ${Math.round(minW)}x${Math.round(minH)} (T${effS9[0]},R${effS9[1]},B${effS9[2]},L${effS9[3]}). Resize widget, downscale sprite, or explicitly switch to Simple/Fit.`,
+                });
               }
             }
-            return 1;
           }
-          if (el.tagName === 'IMG' || el.classList.contains('px-icon') || cs.objectFit === 'contain') {
-            return 5;
-          }
-          return 0;
+          return resolved;
         }
 
         function resolveTintAndAlpha(el, cs, spriteInfo, cPath) {
@@ -555,6 +616,68 @@ async function main() {
           return rect;
         }
 
+        function inferDefaultAnchor(el, elRect, parentRect, isFullBleedChild) {
+          if (isFullBleedChild) {
+            return { anchorMin: [0, 0], anchorMax: [1, 1] };
+          }
+          const Wp = Math.max(1, parentRect.width);
+          const Hp = Math.max(1, parentRect.height);
+          const w = Math.max(1, elRect.width);
+          const h = Math.max(1, elRect.height);
+          const dL = elRect.left - parentRect.left;
+          const dR = parentRect.right - elRect.right;
+          const dT = elRect.top - parentRect.top;
+          const dB = parentRect.bottom - elRect.bottom;
+
+          // Full-bleed child (even if not position:absolute) -> Stretch [0,0]..[1,1]
+          if (
+            Math.abs(dL) <= 2 &&
+            Math.abs(dT) <= 2 &&
+            Math.abs(w - Wp) <= 3 &&
+            Math.abs(h - Hp) <= 3
+          ) {
+            return { anchorMin: [0, 0], anchorMax: [1, 1] };
+          }
+
+          // Full-width top/bottom bar -> Horizontal stretch anchored to top or bottom
+          if (w >= Wp * 0.92 && h <= Hp * 0.42 && Math.abs(dL) <= Wp * 0.06 && Math.abs(dR) <= Wp * 0.06) {
+            if (dT <= Hp * 0.22 && dT < dB) return { anchorMin: [0, 1], anchorMax: [1, 1] };
+            if (dB <= Hp * 0.22 && dB < dT) return { anchorMin: [0, 0], anchorMax: [1, 0] };
+          }
+
+          const inlineStyle = (el && el.style) || {};
+          let ax = 0.5;
+          let ay = 0.5;
+          const cxDiff = Math.abs((dL + w / 2) - Wp / 2);
+          const cyDiff = Math.abs((dT + h / 2) - Hp / 2);
+          const centerTolX = Math.max(8, Wp * 0.08);
+          const centerTolY = Math.max(8, Hp * 0.08);
+
+          if (inlineStyle.right && !inlineStyle.left) {
+            ax = 1;
+          } else if (cxDiff > centerTolX) {
+            const edgeBandX = Math.max(24, Wp * 0.28);
+            if (dL <= edgeBandX && dL < dR * 0.65) ax = 0;
+            else if (dR <= edgeBandX && dR < dL * 0.65) ax = 1;
+          }
+
+          if (inlineStyle.bottom && !inlineStyle.top) {
+            ay = 0;
+          } else if (cyDiff > centerTolY) {
+            const edgeBandY = Math.max(24, Hp * 0.28);
+            if (dT <= edgeBandY && dT < dB * 0.65) ay = 1; // Craftland Y-up: top = 1
+            else if (dB <= edgeBandY && dB < dT * 0.65) ay = 0; // Craftland Y-up: bottom = 0
+          }
+
+          const parentEl = el && el.parentElement;
+          if (parentEl && (parentEl.id === 'game-canvas' || parentEl.hasAttribute('data-ui-view'))) {
+            if (cxDiff <= Math.max(12, Wp * 0.06)) ax = 0.5;
+            if (cyDiff <= Math.max(12, Hp * 0.06)) ay = 0.5;
+          }
+
+          return { anchorMin: [ax, ay], anchorMax: [ax, ay] };
+        }
+
         function computeCraftlandTransform(el, cs, elRect, parentRect, cPath, isFullBleedChild = false) {
           const tfEdit = transformEdits[cPath] || null;
           const Wp = Math.max(1, parentRect.width);
@@ -564,7 +687,7 @@ async function main() {
           const xBL = elRect.left - parentRect.left;
           const yBL = Hp - (elRect.top - parentRect.top) - h;
 
-          // Match pixel-ui-kit.js Web Inspector defaults: Center/Middle (0.5, 0.5) & Pivot (0.5, 0.5)
+          // Match pixel-ui-kit.js Web Inspector smart anchor inference & Center Pivot (0.5, 0.5)
           let aMin = [0.5, 0.5];
           let aMax = [0.5, 0.5];
           let pivot = [0.5, 0.5];
@@ -591,9 +714,10 @@ async function main() {
           } else if (attrMin || attrMax) {
             if (attrMin) aMin = attrMin;
             aMax = attrMax || [aMin[0], aMin[1]];
-          } else if (isFullBleedChild) {
-            aMin = [0, 0];
-            aMax = [1, 1];
+          } else {
+            const inferred = inferDefaultAnchor(el, elRect, parentRect, isFullBleedChild);
+            aMin = inferred.anchorMin;
+            aMax = inferred.anchorMax;
           }
 
           if (tfEdit && Array.isArray(tfEdit.pivot) && tfEdit.pivot.length === 2) {
@@ -829,7 +953,7 @@ async function main() {
                 highlight: colorHex,
                 pressed: (imgEdit.pressedColor || '#C5C5C5').toUpperCase(),
                 disabled: (imgEdit.disableColor || '#808080').toUpperCase(),
-                fillType: btnSp.slice9 ? 1 : fillType,
+                fillType,
                 slicedBorder: btnSp.slice9
                   ? {
                       top: btnSp.slice9[0],

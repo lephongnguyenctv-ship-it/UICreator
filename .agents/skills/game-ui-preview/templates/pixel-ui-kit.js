@@ -75,6 +75,10 @@
       onlyUsed: false,
     },
     hierarchyItems: [],
+    origCanvasPaths: new WeakMap(),
+    origChildrenOrder: new WeakMap(),
+    pathToOrigEl: new Map(),
+    dragTreeIdx: null,
   };
 
   function snapshotInitialSlice9Defaults() {
@@ -290,9 +294,31 @@
     );
   }
 
+  function snapshotOriginalCanvasPaths() {
+    const canvas = document.getElementById('game-canvas');
+    if (!canvas) return;
+    function walkSnap(parent, prefix) {
+      const kids = Array.from(parent.children).filter(c => !isInternalOverlayElement(c));
+      if (!state.origChildrenOrder.has(parent) && kids.length > 0) {
+        state.origChildrenOrder.set(parent, kids.slice());
+      }
+      kids.forEach((child, idx) => {
+        const p = prefix ? `${prefix}.${idx}` : String(idx);
+        if (!state.origCanvasPaths.has(child)) {
+          state.origCanvasPaths.set(child, p);
+          state.pathToOrigEl.set(p, child);
+        }
+        walkSnap(child, p);
+      });
+    }
+    walkSnap(canvas, '');
+  }
+
   function getElementCanvasPath(el) {
     const canvas = document.getElementById('game-canvas');
     if (!canvas || !el || !canvas.contains(el) || el === canvas || isInternalOverlayElement(el)) return '';
+    const cached = state.origCanvasPaths.get(el);
+    if (cached) return cached;
     const parts = [];
     let cur = el;
     while (cur && cur !== canvas) {
@@ -310,6 +336,8 @@
   function resolveElementByCanvasPath(pathStr) {
     const canvas = document.getElementById('game-canvas');
     if (!canvas || !pathStr) return null;
+    const cached = state.pathToOrigEl.get(String(pathStr));
+    if (cached && canvas.contains(cached)) return cached;
     const parts = String(pathStr).split('.').map(n => parseInt(n, 10));
     let cur = canvas;
     for (const idx of parts) {
@@ -338,6 +366,7 @@
       tintEdits: Object.assign({}, diskEdits.tintEdits || {}, localEdits.tintEdits || {}),
       labelEdits: Object.assign({}, diskEdits.labelEdits || {}, localEdits.labelEdits || {}),
       imageEdits: Object.assign({}, diskEdits.imageEdits || {}, localEdits.imageEdits || {}),
+      orderEdits: Object.assign({}, diskEdits.orderEdits || {}, localEdits.orderEdits || {}),
     };
   }
 
@@ -350,6 +379,7 @@
       tintEdits: edits && edits.tintEdits ? edits.tintEdits : {},
       labelEdits: edits && edits.labelEdits ? edits.labelEdits : {},
       imageEdits: edits && edits.imageEdits ? edits.imageEdits : {},
+      orderEdits: edits && edits.orderEdits ? edits.orderEdits : {},
     };
     global.PIXELUI_EDITS = global.PIXELUI_EDITS || {};
     global.PIXELUI_EDITS[slug] = normalized;
@@ -361,7 +391,8 @@
         Object.keys(normalized.transformEdits).length === 0 &&
         Object.keys(normalized.tintEdits).length === 0 &&
         Object.keys(normalized.labelEdits).length === 0 &&
-        Object.keys(normalized.imageEdits).length === 0
+        Object.keys(normalized.imageEdits).length === 0 &&
+        Object.keys(normalized.orderEdits).length === 0
       ) {
         global.localStorage.removeItem(UI_EDITS_STORAGE_PREFIX + slug);
       } else {
@@ -1023,6 +1054,78 @@
     };
   }
 
+  function inferDefaultAnchor(el) {
+    const parent = getTransformParent(el);
+    if (!parent) return { anchorMin: [0.5, 0.5], anchorMax: [0.5, 0.5] };
+    const pRect = parent.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    if (pRect.width <= 1 || pRect.height <= 1 || elRect.width <= 0.5 || elRect.height <= 0.5) {
+      return { anchorMin: [0.5, 0.5], anchorMax: [0.5, 0.5] };
+    }
+    const cs = getComputedStyle(el);
+    const Wp = pRect.width;
+    const Hp = pRect.height;
+    const w = elRect.width;
+    const h = elRect.height;
+    const dL = elRect.left - pRect.left;
+    const dR = pRect.right - elRect.right;
+    const dT = elRect.top - pRect.top;
+    const dB = pRect.bottom - elRect.bottom;
+
+    // 1. Full-bleed child -> Stretch [0,0]..[1,1]
+    if (
+      Math.abs(dL) <= 2 &&
+      Math.abs(dT) <= 2 &&
+      Math.abs(w - Wp) <= 3 &&
+      Math.abs(h - Hp) <= 3
+    ) {
+      return { anchorMin: [0, 0], anchorMax: [1, 1] };
+    }
+
+    // 2. Full-width header / footer bar -> Horizontal stretch anchored to top or bottom
+    if (w >= Wp * 0.92 && h <= Hp * 0.42 && Math.abs(dL) <= Wp * 0.06 && Math.abs(dR) <= Wp * 0.06) {
+      if (dT <= Hp * 0.22 && dT < dB) {
+        return { anchorMin: [0, 1], anchorMax: [1, 1] };
+      }
+      if (dB <= Hp * 0.22 && dB < dT) {
+        return { anchorMin: [0, 0], anchorMax: [1, 0] };
+      }
+    }
+
+    // 3. Explicit CSS right/bottom edge positioning or parent-edge 9-point proximity
+    const inlineStyle = el.style || {};
+    let ax = 0.5;
+    let ay = 0.5;
+    const cxDiff = Math.abs((dL + w / 2) - Wp / 2);
+    const cyDiff = Math.abs((dT + h / 2) - Hp / 2);
+    const centerTolX = Math.max(8, Wp * 0.08);
+    const centerTolY = Math.max(8, Hp * 0.08);
+
+    if (inlineStyle.right && !inlineStyle.left) {
+      ax = 1;
+    } else if (cxDiff > centerTolX) {
+      const edgeBandX = Math.max(24, Wp * 0.28);
+      if (dL <= edgeBandX && dL < dR * 0.65) ax = 0;
+      else if (dR <= edgeBandX && dR < dL * 0.65) ax = 1;
+    }
+
+    if (inlineStyle.bottom && !inlineStyle.top) {
+      ay = 0;
+    } else if (cyDiff > centerTolY) {
+      const edgeBandY = Math.max(24, Hp * 0.28);
+      if (dT <= edgeBandY && dT < dB * 0.65) ay = 1; // Craftland Y-up: top = 1
+      else if (dB <= edgeBandY && dB < dT * 0.65) ay = 0; // Craftland Y-up: bottom = 0
+    }
+
+    // Keep top-level centered safe-frame stage (e.g. 1280x750 inside 1500x750) center-anchored
+    if (parent.id === 'game-canvas' || parent.hasAttribute('data-ui-view')) {
+      if (cxDiff <= Math.max(12, Wp * 0.06)) ax = 0.5;
+      if (cyDiff <= Math.max(12, Hp * 0.06)) ay = 0.5;
+    }
+
+    return { anchorMin: [ax, ay], anchorMax: [ax, ay] };
+  }
+
   function getWidgetTransformState(el) {
     if (!el) return null;
     const existing = state.widgetTransforms.get(el);
@@ -1055,8 +1158,11 @@
         .map(s => Number(s.trim()));
       return parts.length === 2 && Number.isFinite(parts[0]) && Number.isFinite(parts[1]) ? parts : null;
     };
-    const anchorMin = parsePairAttr(el.getAttribute('data-anchor-min')) || [0.5, 0.5];
-    const anchorMax = parsePairAttr(el.getAttribute('data-anchor-max')) || [anchorMin[0], anchorMin[1]];
+    const attrMin = parsePairAttr(el.getAttribute('data-anchor-min'));
+    const attrMax = parsePairAttr(el.getAttribute('data-anchor-max'));
+    const inferred = !attrMin && !attrMax ? inferDefaultAnchor(el) : null;
+    const anchorMin = attrMin || (inferred ? inferred.anchorMin : [0.5, 0.5]);
+    const anchorMax = attrMax || (attrMin ? [attrMin[0], attrMin[1]] : inferred ? inferred.anchorMax : [0.5, 0.5]);
     const pivot = parsePairAttr(el.getAttribute('data-pivot')) || [0.5, 0.5];
     const measured = measureElementTransformBox(el, anchorMin, anchorMax, pivot, 0);
     const tf = {
@@ -3060,7 +3166,99 @@
     return persistUiEditsToDisk();
   }
 
+  function applySavedOrderEdits(orderEdits) {
+    if (!orderEdits || typeof orderEdits !== 'object') return 0;
+    const canvas = document.getElementById('game-canvas');
+    if (!canvas) return 0;
+    let applied = 0;
+    Object.entries(orderEdits).forEach(([parentPath, perm]) => {
+      if (!Array.isArray(perm) || perm.length === 0) return;
+      const parentEl = parentPath === '__canvas__' ? canvas : resolveElementByCanvasPath(parentPath);
+      if (!parentEl) return;
+      const origKids =
+        state.origChildrenOrder.get(parentEl) ||
+        Array.from(parentEl.children).filter(c => !isInternalOverlayElement(c));
+      if (!origKids.length) return;
+      const ordered = [];
+      const seen = new Set();
+      perm.forEach(idx => {
+        const n = parseInt(idx, 10);
+        if (Number.isFinite(n) && n >= 0 && n < origKids.length && !seen.has(n)) {
+          seen.add(n);
+          ordered.push(origKids[n]);
+        }
+      });
+      origKids.forEach((child, idx) => {
+        if (!seen.has(idx)) ordered.push(child);
+      });
+      const overlays = Array.from(parentEl.children).filter(c => isInternalOverlayElement(c));
+      ordered.forEach(child => {
+        if (child.parentElement === parentEl) parentEl.appendChild(child);
+      });
+      overlays.forEach(ov => {
+        if (ov.parentElement === parentEl) parentEl.appendChild(ov);
+      });
+      applied += 1;
+    });
+    return applied;
+  }
+
+  function reorderSiblingElement(el, targetElOrDir, placeAfter = false) {
+    const canvas = document.getElementById('game-canvas');
+    if (!canvas || !el || !el.parentElement || el === canvas || el.hasAttribute('data-ui-view')) {
+      return Promise.resolve({ ok: false });
+    }
+    const parentEl = el.parentElement;
+    snapshotOriginalCanvasPaths();
+    const siblings = Array.from(parentEl.children).filter(c => !isInternalOverlayElement(c));
+    const curIdx = siblings.indexOf(el);
+    if (curIdx < 0 || siblings.length < 2) return Promise.resolve({ ok: false });
+
+    const nextSiblings = siblings.slice();
+    if (targetElOrDir === 'up') {
+      if (curIdx === 0) return Promise.resolve({ ok: false });
+      nextSiblings.splice(curIdx, 1);
+      nextSiblings.splice(curIdx - 1, 0, el);
+    } else if (targetElOrDir === 'down') {
+      if (curIdx >= siblings.length - 1) return Promise.resolve({ ok: false });
+      nextSiblings.splice(curIdx, 1);
+      nextSiblings.splice(curIdx + 1, 0, el);
+    } else if (targetElOrDir && targetElOrDir.parentElement === parentEl && targetElOrDir !== el) {
+      nextSiblings.splice(curIdx, 1);
+      const tIdx = nextSiblings.indexOf(targetElOrDir);
+      if (tIdx < 0) return Promise.resolve({ ok: false });
+      nextSiblings.splice(placeAfter ? tIdx + 1 : tIdx, 0, el);
+    } else {
+      return Promise.resolve({ ok: false });
+    }
+
+    const overlays = Array.from(parentEl.children).filter(c => isInternalOverlayElement(c));
+    nextSiblings.forEach(child => parentEl.appendChild(child));
+    overlays.forEach(ov => parentEl.appendChild(ov));
+
+    const origKids = state.origChildrenOrder.get(parentEl) || siblings;
+    const perm = nextSiblings
+      .map(child => origKids.indexOf(child))
+      .filter(i => i >= 0);
+    const parentPath = parentEl === canvas ? '__canvas__' : getElementCanvasPath(parentEl);
+    if (parentPath && perm.length === origKids.length) {
+      const edits = loadUiEdits();
+      const isIdentity = perm.every((v, i) => v === i);
+      if (isIdentity) {
+        delete edits.orderEdits[parentPath];
+      } else {
+        edits.orderEdits[parentPath] = perm;
+      }
+      saveUiEdits(edits);
+    }
+
+    renderHierarchyTree();
+    renderTransformGizmo();
+    return persistUiEditsToDisk();
+  }
+
   function applySavedUiEdits() {
+    snapshotOriginalCanvasPaths();
     const edits = loadUiEdits();
     const spriteEntries = Object.entries(edits.spriteEdits || {});
     const textEntries = Object.entries(edits.textEdits || {});
@@ -3068,6 +3266,7 @@
     const tintEntries = Object.entries(edits.tintEdits || {});
     const labelEntries = Object.entries(edits.labelEdits || {});
     const imageEntries = Object.entries(edits.imageEdits || {});
+    const orderCount = applySavedOrderEdits(edits.orderEdits || {});
 
     spriteEntries.forEach(([pathKey, attrMap]) => {
       const el = resolveElementByCanvasPath(pathKey);
@@ -3161,7 +3360,8 @@
       transformEntries.length +
       tintEntries.length +
       labelEntries.length +
-      imageEntries.length
+      imageEntries.length +
+      orderCount
     );
   }
 
@@ -4093,6 +4293,12 @@
       .map(rec => {
         const url = resolveAssetUrl(rec.file);
         const isSelected = state.inspectorMode === 'resource' && state.selectedResourceSliceId === rec.id;
+        const auditList = Array.isArray(rec.audit_warnings) ? rec.audit_warnings : [];
+        const auditTitle = auditList.map(w => w.message || w.type).join(' | ');
+        const auditBadge =
+          auditList.length > 0
+            ? `<span class="wb-res-audit-badge" title="${escapeHtml(auditTitle)}">! ${auditList.length}</span>`
+            : '';
 
         return `
           <button
@@ -4100,8 +4306,9 @@
             class="wb-res-card${isSelected ? ' is-selected' : ''}"
             data-res-pick="${escapeHtml(rec.id)}"
             data-card-cat="${escapeHtml(rec.category)}"
-            title="${escapeHtml(rec.id)} (${escapeHtml(rec.source_file)})"
+            title="${escapeHtml(rec.id)} (${escapeHtml(rec.source_file)})${auditTitle ? ' — ' + escapeHtml(auditTitle) : ''}"
           >
+            ${auditBadge}
             <div class="wb-res-thumb">
               <img src="${escapeHtml(url)}" alt="${escapeHtml(rec.id)}" loading="lazy">
             </div>
@@ -4681,7 +4888,7 @@
     if (isInternalOverlayElement(el)) return false;
     if (
       el.matches(
-        '[data-ui-view], .hud-base-layer, [data-slice-id], [data-ui-role], button, .px-9slice, .px-sprite-box, .px-icon, .px-wire-box, .px-row, .px-stack, .px-grid, h1, h2, h3, h4, p'
+        '[data-ui-view], [data-craftland-name], [cname], .hud-base-layer, [data-slice-id], [data-ui-role], button, .px-9slice, .px-sprite-box, .px-icon, .px-wire-box, .px-row, .px-stack, .px-grid, h1, h2, h3, h4, p'
       )
     ) {
       return true;
@@ -4706,6 +4913,9 @@
     if (el.classList.contains('hud-base-layer')) {
       return 'Persistent HUD Layer';
     }
+    const craftName = el.getAttribute('data-craftland-name') || el.getAttribute('cname');
+    if (craftName && craftName.trim()) return craftName.trim();
+
     const role =
       el.getAttribute('data-ui-role') ||
       el.getAttribute('aria-label') ||
@@ -4736,7 +4946,9 @@
 
     const items = [];
     function collect(node, depth, insideCollapsed) {
-      for (const child of Array.from(node.children)) {
+      const children = Array.from(node.children);
+      let siblingIdx = 0;
+      for (const child of children) {
         if (!isTreeElement(child)) {
           collect(child, depth, insideCollapsed);
           continue;
@@ -4760,9 +4972,11 @@
           }
         })(child);
 
+        const orderPos = siblingIdx++;
         items.push({
           el: child,
           depth,
+          orderPos,
           isView,
           isCollapsed,
           hasChildren: hasInspectedKids,
@@ -4779,23 +4993,38 @@
 
     const html = items
       .map((item, idx) => {
-        const { el, depth, isView, isCollapsed, hasChildren } = item;
+        const { el, depth, orderPos, isView, isCollapsed, hasChildren } = item;
         const selected = state.inspectorMode === 'widget' && el === state.selectedEl;
         const sliceId = el.getAttribute('data-slice-id');
+        const exportIgnore = el.getAttribute('data-export-ignore') === 'true';
         const label = describeTreeLabel(el);
-        const tag = el.classList.contains('px-9slice')
-          ? '9s'
-          : el.tagName === 'IMG'
-            ? 'img'
-            : el.tagName === 'BUTTON'
-              ? 'btn'
-              : sliceId
-                ? 'spr'
-                : isView
-                  ? el.classList.contains('is-active')
-                    ? 'active'
-                    : 'hidden'
-                  : el.tagName.toLowerCase();
+        const isSimple = el.classList.contains('px-img-simple');
+        const isFit = el.classList.contains('px-img-fit');
+        const isTiled = el.classList.contains('px-img-tiled');
+        const isFilled = el.classList.contains('px-img-filled');
+        const tag = exportIgnore
+          ? 'ctx'
+          : el.tagName === 'BUTTON' || el.classList.contains('px-btn')
+            ? 'btn'
+            : el.classList.contains('px-9slice') && !isSimple && !isFit && !isTiled && !isFilled
+              ? '9s'
+              : el.tagName === 'IMG'
+                ? 'img'
+                : sliceId
+                  ? isSimple
+                    ? 'smp'
+                    : isFit
+                      ? 'fit'
+                      : 'spr'
+                  : isView
+                    ? el.classList.contains('is-active')
+                      ? 'active'
+                      : 'hidden'
+                    : hasChildren
+                      ? 'grp'
+                      : getDirectText(el)
+                        ? 'txt'
+                        : el.tagName.toLowerCase();
 
         const arrow = hasChildren ? (isCollapsed ? '▸' : '▾') : '';
         const classes = [
@@ -4803,13 +5032,24 @@
           selected ? 'is-selected' : '',
           isView ? 'is-view-root' : '',
           sliceId ? 'has-slice' : '',
+          exportIgnore ? 'is-export-ignore' : '',
         ]
           .filter(Boolean)
           .join(' ');
 
-        return `<div class="${classes}" data-tree-idx="${idx}" style="padding-left:${6 + depth * 12}px">
+        const reorderHtml = !isView
+          ? `<span class="wb-tree-order-btns" title="Reorder sibling draw order (top = behind, bottom = front)">
+               <button type="button" class="wb-tree-order-btn" data-tree-move="up" data-tree-move-idx="${idx}" aria-label="Move up (draw behind)">↑</button>
+               <button type="button" class="wb-tree-order-btn" data-tree-move="down" data-tree-move-idx="${idx}" aria-label="Move down (draw in front)">↓</button>
+             </span>`
+          : '';
+        const idxBadge = !isView ? `<span class="wb-tree-idx" title="Draw order index (${orderPos})">${orderPos}</span>` : '';
+
+        return `<div class="${classes}" data-tree-idx="${idx}" draggable="${!isView ? 'true' : 'false'}" style="padding-left:${6 + depth * 12}px">
           <button type="button" class="wb-tree-toggle" data-tree-toggle="${idx}" aria-label="Toggle children">${arrow}</button>
+          ${idxBadge}
           <span class="wb-tree-label" title="${escapeHtml(label)}">${escapeHtml(label)}</span>
+          ${reorderHtml}
           <span class="wb-tree-tag">${escapeHtml(tag)}</span>
         </div>`;
       })
@@ -4818,20 +5058,59 @@
     container.innerHTML = html;
   }
 
-  function findBorderOverlapChildren(el) {
+  function getEffective9SliceBorders(el) {
     if (!el || !el.classList || !el.classList.contains('px-9slice') || isWireframeMode()) {
-      return [];
+      return { active: false, t: 0, r: 0, b: 0, l: 0 };
     }
-    const style = getComputedStyle(el);
+    if (
+      el.classList.contains('px-img-simple') ||
+      el.classList.contains('px-img-tiled') ||
+      el.classList.contains('px-img-fit') ||
+      el.classList.contains('px-img-filled')
+    ) {
+      return { active: false, t: 0, r: 0, b: 0, l: 0 };
+    }
+    const isHd = el.classList.contains('px-9slice--hd');
+    const style = isHd ? getComputedStyle(el, '::before') : getComputedStyle(el);
+    let bT = parseFloat(style.borderTopWidth || '0') || 0;
+    let bR = parseFloat(style.borderRightWidth || '0') || 0;
+    let bB = parseFloat(style.borderBottomWidth || '0') || 0;
+    let bL = parseFloat(style.borderLeftWidth || '0') || 0;
+    if (isHd && bT === 0 && bR === 0 && bB === 0 && bL === 0) {
+      const hostCs = getComputedStyle(el);
+      const pxScale = parseFloat(hostCs.getPropertyValue('--pixel-scale') || '1') || 1;
+      bT = (parseFloat(hostCs.getPropertyValue('--slice-t') || '0') || 0) * pxScale;
+      bR = (parseFloat(hostCs.getPropertyValue('--slice-r') || '0') || 0) * pxScale;
+      bB = (parseFloat(hostCs.getPropertyValue('--slice-b') || '0') || 0) * pxScale;
+      bL = (parseFloat(hostCs.getPropertyValue('--slice-l') || '0') || 0) * pxScale;
+    }
+    return { active: true, t: bT, r: bR, b: bB, l: bL };
+  }
+
+  function get9SliceMinSizeIssue(el) {
+    if (!el || el.getAttribute('data-slice9-overflow-ok') === 'true') return null;
+    const b = getEffective9SliceBorders(el);
+    if (!b.active) return null;
+    const minW = Math.round(b.l + b.r);
+    const minH = Math.round(b.t + b.b);
+    if (minW <= 0 && minH <= 0) return null;
     const rect = el.getBoundingClientRect();
-    const bT = parseFloat(style.borderTopWidth || '0');
-    const bR = parseFloat(style.borderRightWidth || '0');
-    const bB = parseFloat(style.borderBottomWidth || '0');
-    const bL = parseFloat(style.borderLeftWidth || '0');
-    const innerLeft = rect.left + bL;
-    const innerTop = rect.top + bT;
-    const innerRight = rect.right - bR;
-    const innerBottom = rect.bottom - bB;
+    const w = Math.round(rect.width);
+    const h = Math.round(rect.height);
+    if (rect.width + 0.5 < minW || rect.height + 0.5 < minH) {
+      return { w, h, minW, minH, t: Math.round(b.t), r: Math.round(b.r), b: Math.round(b.b), l: Math.round(b.l) };
+    }
+    return null;
+  }
+
+  function findBorderOverlapChildren(el) {
+    const borders = getEffective9SliceBorders(el);
+    if (!borders.active) return [];
+    const rect = el.getBoundingClientRect();
+    const innerLeft = rect.left + borders.l;
+    const innerTop = rect.top + borders.t;
+    const innerRight = rect.right - borders.r;
+    const innerBottom = rect.bottom - borders.b;
 
     const hits = [];
     for (const child of Array.from(el.children)) {
@@ -4878,11 +5157,29 @@
     }
   }
 
+  function buildInspectorBorderWarnHtml(el) {
+    const minIssue = get9SliceMinSizeIssue(el);
+    const overlaps = findBorderOverlapChildren(el);
+    const parts = [];
+    if (minIssue) {
+      parts.push(
+        `<div><strong>9-Slice overflow:</strong> widget is ${minIssue.w}×${minIssue.h}px, smaller than corners ${minIssue.minW}×${minIssue.minH}px (L${minIssue.l}+R${minIssue.r}, T${minIssue.t}+B${minIssue.b}). Craftland renders 9-slice corners 1:1 without scaling.</div>` +
+          `<div class="wb-insp-warn-actions">` +
+          `<button type="button" class="wb-insp-warn-btn" data-insp-fix-9slice="fit-min">Fit to Min (${Math.max(minIssue.w, minIssue.minW)}×${Math.max(minIssue.h, minIssue.minH)})</button>` +
+          `<button type="button" class="wb-insp-warn-btn" data-insp-fix-9slice="simple">Switch to Simple</button>` +
+          `</div>`
+      );
+    }
+    if (overlaps.length > 0) {
+      parts.push(`<div>Border overlap detected: ${escapeHtml(overlaps.join(', '))} touches the 9-slice frame border.</div>`);
+    }
+    return parts.join('');
+  }
+
   function updateInspectorGeometryReadout() {
     const el = state.selectedEl;
     if (!el || state.inspectorMode !== 'widget') return;
     const rect = el.getBoundingClientRect();
-    const cs = getComputedStyle(el);
     const sizeNode = document.getElementById('wb-insp-size');
     const innerNode = document.getElementById('wb-insp-inner');
     const warnNode = document.getElementById('wb-insp-border-warn');
@@ -4890,21 +5187,19 @@
       sizeNode.textContent = `${Math.round(rect.width)} × ${Math.round(rect.height)} px`;
     }
     if (innerNode) {
-      const bT = parseFloat(cs.borderTopWidth || '0');
-      const bR = parseFloat(cs.borderRightWidth || '0');
-      const bB = parseFloat(cs.borderBottomWidth || '0');
-      const bL = parseFloat(cs.borderLeftWidth || '0');
-      const iw = Math.max(0, Math.round(rect.width - bL - bR));
-      const ih = Math.max(0, Math.round(rect.height - bT - bB));
+      const b = getEffective9SliceBorders(el);
+      const iw = Math.max(0, Math.round(rect.width - b.l - b.r));
+      const ih = Math.max(0, Math.round(rect.height - b.t - b.b));
       innerNode.textContent = `${iw} × ${ih} px`;
     }
     if (warnNode) {
-      const overlaps = findBorderOverlapChildren(el);
-      if (overlaps.length > 0) {
+      const warnHtml = buildInspectorBorderWarnHtml(el);
+      if (warnHtml) {
         warnNode.style.display = 'block';
-        warnNode.textContent = `Border overlap detected: ${overlaps.join(', ')} touches the 9-slice frame border.`;
+        warnNode.innerHTML = warnHtml;
       } else {
         warnNode.style.display = 'none';
+        warnNode.innerHTML = '';
       }
     }
   }
@@ -4958,6 +5253,17 @@
              </button>
            </div>`;
 
+    const auditWarnings = Array.isArray(rec.audit_warnings) ? rec.audit_warnings : [];
+    const auditCardHtml =
+      auditWarnings.length > 0
+        ? `<div class="wb-insp-warn" style="margin-top:6px;">
+             <strong>Asset Standards Audit (${auditWarnings.length}):</strong>
+             <ul style="margin:4px 0 0 14px;padding:0;">
+               ${auditWarnings.map(w => `<li>${escapeHtml(w.message || w.type)}</li>`).join('')}
+             </ul>
+           </div>`
+        : '';
+
     body.innerHTML = `
       <div class="wb-insp-card">
         <div class="wb-insp-section-title">Selected Sprite Resource</div>
@@ -4968,6 +5274,7 @@
           <span class="wb-insp-k">Source PNG</span><span class="wb-insp-v">${escapeHtml(rec.source_file)}</span>
           <span class="wb-insp-k">Canvas Usage</span><span class="wb-insp-v">${usedCount} widget${usedCount === 1 ? '' : 's'}</span>
         </div>
+        ${auditCardHtml}
         ${assignBtnHtml}
         <div id="wb-res-feedback" class="wb-insp-feedback"></div>
       </div>
@@ -5081,14 +5388,11 @@
           ? 'UI Widget Label'
           : 'Layout Widget';
 
-    const is9SliceEl = el.classList.contains('px-9slice');
-    const bT = parseFloat(cs.borderTopWidth || '0');
-    const bR = parseFloat(cs.borderRightWidth || '0');
-    const bB = parseFloat(cs.borderBottomWidth || '0');
-    const bL = parseFloat(cs.borderLeftWidth || '0');
-    const innerW = Math.max(0, Math.round(rect.width - bL - bR));
-    const innerH = Math.max(0, Math.round(rect.height - bT - bB));
-    const overlaps = findBorderOverlapChildren(el);
+    const effBorders = getEffective9SliceBorders(el);
+    const is9SliceEl = effBorders.active;
+    const innerW = Math.max(0, Math.round(rect.width - effBorders.l - effBorders.r));
+    const innerH = Math.max(0, Math.round(rect.height - effBorders.t - effBorders.b));
+    const borderWarnHtml = buildInspectorBorderWarnHtml(el);
     const targetView = el.getAttribute('data-ui-state-trigger');
     const gotoBtnHtml = targetView
       ? `<div style="margin-top:6px;"><button type="button" class="wb-btn wb-btn-sm" data-insp-goto-view="${escapeHtml(targetView)}">Open View: ${escapeHtml(targetView)} →</button></div>`
@@ -5113,8 +5417,8 @@
         </div>
         ${gotoBtnHtml}
         ${childIconBtnHtml ? `<div style="margin-top:4px;">${childIconBtnHtml}</div>` : ''}
-        <div id="wb-insp-border-warn" class="wb-insp-warn" style="display:${overlaps.length > 0 ? 'block' : 'none'};">
-          ${overlaps.length > 0 ? `Border overlap detected: ${escapeHtml(overlaps.join(', '))} touches the 9-slice frame border.` : ''}
+        <div id="wb-insp-border-warn" class="wb-insp-warn" style="display:${borderWarnHtml ? 'block' : 'none'};">
+          ${borderWarnHtml}
         </div>
       </div>
     `;
@@ -5241,6 +5545,68 @@
 
   function wireStudioInteractions() {
     if (isCleanMode()) return;
+
+    const treeRoot = document.getElementById('wb-hierarchy-tree');
+    if (treeRoot) {
+      const clearDragClasses = () => {
+        treeRoot
+          .querySelectorAll('.is-drag-over-before, .is-drag-over-after')
+          .forEach(n => n.classList.remove('is-drag-over-before', 'is-drag-over-after'));
+      };
+      treeRoot.addEventListener('dragstart', evt => {
+        const row = evt.target && evt.target.closest ? evt.target.closest('[data-tree-idx]') : null;
+        if (!row) return;
+        const idx = parseInt(row.getAttribute('data-tree-idx'), 10);
+        const item = state.hierarchyItems[idx];
+        if (!item || item.isView) {
+          evt.preventDefault();
+          return;
+        }
+        state.dragTreeIdx = idx;
+        if (evt.dataTransfer) {
+          evt.dataTransfer.effectAllowed = 'move';
+          evt.dataTransfer.setData('text/plain', String(idx));
+        }
+      });
+      treeRoot.addEventListener('dragover', evt => {
+        if (state.dragTreeIdx === null) return;
+        const row = evt.target && evt.target.closest ? evt.target.closest('[data-tree-idx]') : null;
+        if (!row) return;
+        const targetIdx = parseInt(row.getAttribute('data-tree-idx'), 10);
+        const srcItem = state.hierarchyItems[state.dragTreeIdx];
+        const dstItem = state.hierarchyItems[targetIdx];
+        if (!srcItem || !dstItem || srcItem.el === dstItem.el || srcItem.el.parentElement !== dstItem.el.parentElement) {
+          return;
+        }
+        evt.preventDefault();
+        clearDragClasses();
+        const r = row.getBoundingClientRect();
+        const after = evt.clientY > r.top + r.height / 2;
+        row.classList.add(after ? 'is-drag-over-after' : 'is-drag-over-before');
+      });
+      treeRoot.addEventListener('dragleave', () => {
+        // Cleared on next dragover / dragend
+      });
+      treeRoot.addEventListener('dragend', () => {
+        state.dragTreeIdx = null;
+        clearDragClasses();
+      });
+      treeRoot.addEventListener('drop', evt => {
+        if (state.dragTreeIdx === null) return;
+        const row = evt.target && evt.target.closest ? evt.target.closest('[data-tree-idx]') : null;
+        const srcItem = state.hierarchyItems[state.dragTreeIdx];
+        state.dragTreeIdx = null;
+        clearDragClasses();
+        if (!row || !srcItem) return;
+        const targetIdx = parseInt(row.getAttribute('data-tree-idx'), 10);
+        const dstItem = state.hierarchyItems[targetIdx];
+        if (!dstItem || srcItem.el === dstItem.el || srcItem.el.parentElement !== dstItem.el.parentElement) return;
+        evt.preventDefault();
+        const r = row.getBoundingClientRect();
+        const after = evt.clientY > r.top + r.height / 2;
+        reorderSiblingElement(srcItem.el, dstItem.el, after);
+      });
+    }
 
     const canvas = document.getElementById('game-canvas');
     function pickStudioElement(target) {
@@ -5686,6 +6052,9 @@
 
       img.dirty = true;
       applyWidgetImageToDom(targetEl, img, isBtn ? hostEl : null);
+      if (field === 'fillType') {
+        renderHierarchyTree();
+      }
       updateInspectorGeometryReadout();
       renderTransformGizmo();
       saveWidgetImageEdit(targetEl, img, persist).then(result => {
@@ -6142,6 +6511,51 @@
                 : '✓ Transform reset in browser storage';
           }
         });
+        return;
+      }
+
+      const moveBtn = evt.target.closest('[data-tree-move]');
+      if (moveBtn) {
+        evt.stopPropagation();
+        const dir = moveBtn.getAttribute('data-tree-move');
+        const idx = parseInt(moveBtn.getAttribute('data-tree-move-idx'), 10);
+        const item = state.hierarchyItems[idx];
+        if (item && item.el && (dir === 'up' || dir === 'down')) {
+          reorderSiblingElement(item.el, dir);
+        }
+        return;
+      }
+
+      const fix9Btn = evt.target.closest('[data-insp-fix-9slice]');
+      if (fix9Btn && state.selectedEl) {
+        const mode = fix9Btn.getAttribute('data-insp-fix-9slice');
+        const el = state.selectedEl;
+        if (mode === 'fit-min') {
+          const issue = get9SliceMinSizeIssue(el);
+          if (issue) {
+            const tf = getWidgetTransformState(el);
+            if (tf) {
+              tf.width = Math.max(tf.width, issue.minW);
+              tf.height = Math.max(tf.height, issue.minH);
+              tf.dirty = true;
+              applyWidgetTransformToDom(el, tf, { applyCss: true });
+              saveWidgetTransformEdit(el, tf, true);
+              renderInspector();
+              renderTransformGizmo();
+            }
+          }
+        } else if (mode === 'simple') {
+          const targetEl = isButtonComponent(el) ? getButtonSpriteTargetEl(el) || el : el;
+          const img = getWidgetImageState(targetEl);
+          if (img) {
+            img.fillType = 0;
+            img.dirty = true;
+            applyWidgetImageToDom(targetEl, img, isButtonComponent(el) ? el : null);
+            saveWidgetImageEdit(targetEl, img, true);
+            renderHierarchyTree();
+            renderInspector();
+          }
+        }
         return;
       }
 
