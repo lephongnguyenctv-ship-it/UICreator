@@ -924,6 +924,7 @@ async function main() {
           `?clean=1&res=${encodeURIComponent(resKey)}` +
           (modeArg ? `&mode=${encodeURIComponent(modeArg)}` : '');
         await page.goto(pageUrl, { waitUntil: 'load' });
+        await page.evaluate(() => (document.fonts ? document.fonts.ready : Promise.resolve()));
         await page.waitForTimeout(250);
 
         const resolvedMode = await page.evaluate(() =>

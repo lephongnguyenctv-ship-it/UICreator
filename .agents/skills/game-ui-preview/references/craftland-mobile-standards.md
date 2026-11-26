@@ -65,7 +65,7 @@ Additional rules:
 ## 4. Verified Craftland Engine Capabilities (`FE 1.19.4689915`)
 
 - **Fonts & Text (`UITextEntity`)**:
-  - Locked to `"font": "Default"` (no custom font asset import). Never prompt AI mockups with custom typography.
+  - Locked to `"font": "Default"` (no custom font asset import). For Latin-script text, Craftland Studio's `Default` font renders **GFF Latin** (*Garena Free Fire Latin*, `UIFONT_LATIN_BOLD`). UICreator bundles **GFF Latin** (`gff-latin.css`, Thin/Regular/Medium/Bold WOFF2) and applies it automatically to `#game-canvas` on `data-ui-profile="craftland"` previews via `--px-font-craftland`. Never prompt AI mockups with custom typography.
   - Supported effects: `color`, 2-stop vertical `gradient` (`gradientTop`/`gradientBottom`), `outline`, `shadow`, `fontStyle` (`bold`/`italic`/`underline`), and optional flat `background`. **No** beveled, embossed, metallic, textured, inner-glow, or curved text.
   - Supports `Shrink` (reduce font size), `Clamp` (wrap/clip), and `ResizeFreely` overflow modes with **no `minFontSize` property** — wide text boxes are what prevent unreadable micro-text.
 - **Sprites, 9-Slice & Multiply Tinting (`UIImageEntity` / `UIButtonEntity`)**:

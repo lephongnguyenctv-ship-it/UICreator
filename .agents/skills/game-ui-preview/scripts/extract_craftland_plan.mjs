@@ -141,6 +141,7 @@ async function main() {
     }`;
 
     await page.goto(targetUrl, { waitUntil: 'load', timeout: 30000 });
+    await page.evaluate(() => (document.fonts ? document.fonts.ready : Promise.resolve()));
 
     let diskUiEditsFallback = {};
     const editsJsonPath = path.join(path.dirname(pagePath), 'ui-edits.json');

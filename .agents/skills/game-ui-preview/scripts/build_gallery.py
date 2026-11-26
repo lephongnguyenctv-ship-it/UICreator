@@ -304,6 +304,7 @@ def seed_starter_wireframe_templates(
 
     css_src = templates_dir / "pixel-ui-kit.css"
     js_src = templates_dir / "pixel-ui-kit.js"
+    font_css_src = templates_dir / "gff-latin.css"
     seeded: list[str] = []
 
     for tpl_dir in sorted(wireframes_src.iterdir(), key=lambda p: p.name.lower()):
@@ -318,6 +319,8 @@ def seed_starter_wireframe_templates(
             shutil.copy2(css_src, dest_dir / "pixel-ui-kit.css")
         if js_src.is_file():
             shutil.copy2(js_src, dest_dir / "pixel-ui-kit.js")
+        if font_css_src.is_file():
+            shutil.copy2(font_css_src, dest_dir / "gff-latin.css")
         edits_js = dest_dir / "ui-edits.js"
         if not edits_js.exists():
             edits_js.write_text(
@@ -378,12 +381,15 @@ def build_gallery(
     if sync_kit:
         css_src = templates_dir / "pixel-ui-kit.css"
         js_src = templates_dir / "pixel-ui-kit.js"
+        font_css_src = templates_dir / "gff-latin.css"
         for item in payload["previews"]:
             target_dir = previews_root / item["slug"]
             if css_src.exists():
                 shutil.copy2(css_src, target_dir / "pixel-ui-kit.css")
             if js_src.exists():
                 shutil.copy2(js_src, target_dir / "pixel-ui-kit.js")
+            if font_css_src.exists():
+                shutil.copy2(font_css_src, target_dir / "gff-latin.css")
             edits_js = target_dir / "ui-edits.js"
             if not edits_js.exists():
                 edits_js.write_text(

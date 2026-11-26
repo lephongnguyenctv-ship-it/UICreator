@@ -1,3 +1,5 @@
+@import url("./gff-latin.css");
+
 /* pixel-ui-kit.css — Reusable Pixel-Art Game UI Preview Kit & Workbench Styles */
 
 :root {
@@ -28,6 +30,7 @@
   --px-workbench-muted: #9aa4b8;
 
   --px-font-ui: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  --px-font-craftland: "GFF Latin", "Bahnschrift Condensed", "Segoe UI", system-ui, sans-serif;
   --px-font-pixel: "Consolas", "Lucida Console", "Courier New", monospace;
 
   /* Design Tokens — 4px Spacing Grid & Named Type Scale */
@@ -1973,6 +1976,16 @@ body[data-ui-profile="craftland"] #game-canvas .px-icon,
 body[data-ui-profile="craftland"] #game-canvas .px-btn,
 body[data-ui-profile="craftland"] #game-canvas .px-btn-square {
   image-rendering: auto;
+}
+
+/* Match Craftland Studio's official Default Latin typeface (GFF Latin) inside Craftland canvases */
+body[data-ui-profile="craftland"] #game-canvas,
+body[data-ui-profile="craftland"] #game-canvas button,
+body[data-ui-profile="craftland"] #game-canvas input,
+body[data-ui-profile="craftland"] #game-canvas select,
+body[data-ui-profile="craftland"] #game-canvas textarea,
+.px-font-craftland {
+  font-family: var(--px-font-craftland);
 }
 
 .workbench-canvas-slot {

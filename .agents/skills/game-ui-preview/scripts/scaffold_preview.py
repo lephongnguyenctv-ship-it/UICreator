@@ -125,6 +125,9 @@ def scaffold_preview(
     templates_dir = Path(__file__).resolve().parent.parent / "templates"
     shutil.copy2(templates_dir / "pixel-ui-kit.css", target_dir / "pixel-ui-kit.css")
     shutil.copy2(templates_dir / "pixel-ui-kit.js", target_dir / "pixel-ui-kit.js")
+    font_css_src = templates_dir / "gff-latin.css"
+    if font_css_src.is_file():
+        shutil.copy2(font_css_src, target_dir / "gff-latin.css")
 
     index_path = target_dir / "index.html"
     rel_catalog = Path(
